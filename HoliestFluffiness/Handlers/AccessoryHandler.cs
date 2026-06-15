@@ -36,13 +36,24 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
 
         if (configuration.AccessoryInventory >= 1)
         {
-            int freeSlots = 0;
-            await framework.RunOnFrameworkThread(() => { freeSlots = GetFreeInventorySlots(); });
-
-            if (freeSlots < configuration.AccessoryInventory)
+            bool whitelisted = false;
+            await framework.RunOnFrameworkThread(() =>
             {
-                await framework.RunOnFrameworkThread(() => chatGui.Print("Not enough empty space, stopping equip"));
-                return;
+                if (objectTable[0] is not IPlayerCharacter player) return;
+                var key = $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}";
+                whitelisted = configuration.AccessoryWhitelist.Contains(key);
+            });
+
+            if (!whitelisted)
+            {
+                int freeSlots = 0;
+                await framework.RunOnFrameworkThread(() => { freeSlots = GetFreeInventorySlots(); });
+
+                if (freeSlots < configuration.AccessoryInventory)
+                {
+                    await framework.RunOnFrameworkThread(() => chatGui.Print("Not enough empty space, stopping equip"));
+                    return;
+                }
             }
         }
 

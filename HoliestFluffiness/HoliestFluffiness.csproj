@@ -8,6 +8,9 @@
     <Deterministic>true</Deterministic>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="SQLite-net" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="images\icon.png">
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
