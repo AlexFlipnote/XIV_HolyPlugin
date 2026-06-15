@@ -16,16 +16,16 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.0.8",
+        "AssemblyVersion": "0.0.9",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.8/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.8/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.8/latest.zip",
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.9/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.9/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.9/latest.zip",
         "DownloadCount": 0,
-        "LastUpdate": "1781490711"
+        "LastUpdate": "1781490902"
     }
 ]
