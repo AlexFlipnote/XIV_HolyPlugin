@@ -34,7 +34,7 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
             return;
         }
 
-        if (configuration.AccessoryInventory >= 1)
+        if (configuration.AccessoryInventory >= 1 || configuration.AccessoryInventoryMin >= 1)
         {
             bool whitelisted = false;
             await framework.RunOnFrameworkThread(() =>
@@ -49,9 +49,15 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
                 int freeSlots = 0;
                 await framework.RunOnFrameworkThread(() => { freeSlots = GetFreeInventorySlots(); });
 
-                if (freeSlots < configuration.AccessoryInventory)
+                if (configuration.AccessoryInventory >= 1 && freeSlots <= configuration.AccessoryInventory)
                 {
                     await framework.RunOnFrameworkThread(() => chatGui.Print("Not enough empty space, stopping equip"));
+                    return;
+                }
+
+                if (configuration.AccessoryInventoryMin >= 1 && freeSlots >= configuration.AccessoryInventoryMin)
+                {
+                    await framework.RunOnFrameworkThread(() => chatGui.Print("Too much empty space, stopping equip"));
                     return;
                 }
             }

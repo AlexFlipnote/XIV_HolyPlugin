@@ -704,12 +704,27 @@ public class ConfigWindow : Window
         ImGui.BeginDisabled(!enabled);
 
         SectionRow();
-        var minSlots = configuration.AccessoryInventory;
+        var maxFreeSlots = configuration.AccessoryInventory;
         ImGui.SetNextItemWidth(90);
         PushInput();
-        if (ImGui.InputInt("Min free inventory slots (0–140)", ref minSlots, 1, 10))
+        if (ImGui.InputInt("Stop if N or fewer free inventory slots (0–140)##max", ref maxFreeSlots, 1, 10))
         {
-            configuration.AccessoryInventory = Math.Clamp(minSlots, 0, 140);
+            configuration.AccessoryInventory = Math.Clamp(maxFreeSlots, 0, 140);
+            configuration.Save();
+        }
+        PopInput();
+        ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("(0 = skip check)");
+        ImGui.PopStyleColor();
+
+        SectionRow();
+        var minFreeSlots = configuration.AccessoryInventoryMin;
+        ImGui.SetNextItemWidth(90);
+        PushInput();
+        if (ImGui.InputInt("Stop if N or more free inventory slots (0–140)##min", ref minFreeSlots, 1, 10))
+        {
+            configuration.AccessoryInventoryMin = Math.Clamp(minFreeSlots, 0, 140);
             configuration.Save();
         }
         PopInput();
