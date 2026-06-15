@@ -83,6 +83,11 @@ def main():
     with open("repo.json", "w") as f:
         json.dump([manifest], f, indent=4)
 
+    dist_manifest_path = f"dist/{PLUGIN_NAME}/{PLUGIN_NAME}.json"
+    if os.path.exists(dist_manifest_path):
+        with open(dist_manifest_path, "w") as f:
+            json.dump(manifest, f, indent=4)
+
     print(f"Generated repo.json for {PLUGIN_NAME} v{version}")
 
 

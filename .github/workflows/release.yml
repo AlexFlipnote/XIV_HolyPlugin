@@ -35,6 +35,11 @@ jobs:
       - name: Build Release
         run: dotnet build HoliestFluffiness/HoliestFluffiness.csproj -c Release
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Pack Plugin
         run: |
           mkdir -p dist/HoliestFluffiness/images
@@ -42,6 +47,14 @@ jobs:
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
           cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
           cp HoliestFluffiness/images/icon.png dist/HoliestFluffiness/images/
+
+      - name: Generate repo.json
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git show origin/release:repo.json > repo.json 2>/dev/null || true
+          python build.py
 
       - name: Create Zip
         run: |
@@ -52,19 +65,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: latest.zip
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Generate repo.json
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git show origin/release:repo.json > repo.json 2>/dev/null || true
-          python build.py
 
       - name: Push to release branch
         run: |
