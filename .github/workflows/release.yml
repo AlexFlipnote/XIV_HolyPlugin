@@ -23,6 +23,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Download Dalamud
+        run: |
+          mkdir -p $HOME/.xlcore/dalamud/Hooks/dev
+          curl -L https://goatcorp.github.io/dalamud-distrib/latest.zip -o /tmp/dalamud.zip
+          unzip /tmp/dalamud.zip -d $HOME/.xlcore/dalamud/Hooks/dev
+
       - name: Build Release
         run: dotnet build HoliestFluffiness/HoliestFluffiness.csproj -c Release
 
