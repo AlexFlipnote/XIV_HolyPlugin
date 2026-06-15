@@ -64,9 +64,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python generate_pluginmaster.py
 
-      - name: Commit PluginMaster
-        uses: EndBug/add-and-commit@v9
-        with:
-          author_name: GitHub Action
-          author_email: github-actions[bot]@users.noreply.github.com
-          message: 'Update pluginmaster.json for ${{ github.ref_name }}'
+      - name: Push to release branch
+        run: |
+          git fetch origin release:release 2>/dev/null || true
+          git checkout release 2>/dev/null || git checkout --orphan release
+          git rm -rf . --quiet 2>/dev/null || true
+          cp $GITHUB_WORKSPACE/pluginmaster.json pluginmaster.json
+          git add pluginmaster.json
+          git config user.name "GitHub Action"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update pluginmaster.json for ${{ github.ref_name }}"
+          git push origin release

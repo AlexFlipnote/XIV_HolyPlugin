@@ -7,7 +7,7 @@ Yes, this is vibe coded. Deal with it.
 Add the repo URL to your Dalamud custom plugin repositories:
 
 ```
-https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/pluginmaster.json
+https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/release/pluginmaster.json
 ```
 
 Then find "The Holiest Fluffiness" in the plugin installer.
