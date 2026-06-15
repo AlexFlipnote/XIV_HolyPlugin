@@ -2,6 +2,7 @@
     {
         "Author": "AlexFlipnote",
         "Name": "The Holiest Fluffiness",
+        "InternalName": "HoliestFluffiness",
         "Punchline": "Simple plugin that was made for the FC 'The Holiest Fluffiness'",
         "Description": "Simple plugin that was made for the FC 'The Holiest Fluffiness'",
         "ApplicableVersion": "any",
@@ -15,17 +16,16 @@
             "fluffiness",
             "cute"
         ],
-        "InternalName": "HoliestFluffiness",
-        "AssemblyVersion": "0.0.7",
+        "AssemblyVersion": "0.0.8",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.7/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.7/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.7/latest.zip",
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.8/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.8/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.0.8/latest.zip",
         "DownloadCount": 0,
-        "LastUpdate": "1781490430"
+        "LastUpdate": "1781490711"
     }
 ]
