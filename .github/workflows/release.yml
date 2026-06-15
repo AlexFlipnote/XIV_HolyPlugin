@@ -62,14 +62,17 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python generate_pluginmaster.py
+        run: |
+          git show origin/release:pluginmaster.json > pluginmaster.json 2>/dev/null || true
+          python generate_pluginmaster.py
 
       - name: Push to release branch
         run: |
+          cp pluginmaster.json /tmp/pluginmaster.json
           git fetch origin release:release 2>/dev/null || true
           git checkout release 2>/dev/null || git checkout --orphan release
           git rm -rf . --quiet 2>/dev/null || true
-          cp $GITHUB_WORKSPACE/pluginmaster.json pluginmaster.json
+          cp /tmp/pluginmaster.json pluginmaster.json
           git add pluginmaster.json
           git config user.name "GitHub Action"
           git config user.email "github-actions[bot]@users.noreply.github.com"
