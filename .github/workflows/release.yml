@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build Release
+        run: dotnet build HoliestFluffiness/HoliestFluffiness.csproj -c Release
+
+      - name: Pack Plugin
+        run: |
+          mkdir -p dist/HoliestFluffiness/images
+          cp HoliestFluffiness/bin/x64/Release/HoliestFluffiness.dll dist/HoliestFluffiness/
+          cp HoliestFluffiness/bin/x64/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
+          cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
+          cp HoliestFluffiness/images/icon.png dist/HoliestFluffiness/images/
+
+      - name: Create Zip
+        run: |
+          cd dist/HoliestFluffiness
+          zip -r ../../latest.zip .
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: latest.zip
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate PluginMaster
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python generate_pluginmaster.py
+
+      - name: Commit PluginMaster
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: GitHub Action
+          author_email: github-actions[bot]@users.noreply.github.com
+          message: 'Update pluginmaster.json for ${{ github.ref_name }}'
