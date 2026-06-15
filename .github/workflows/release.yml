@@ -35,8 +35,8 @@ jobs:
       - name: Pack Plugin
         run: |
           mkdir -p dist/HoliestFluffiness/images
-          cp HoliestFluffiness/bin/x64/Release/HoliestFluffiness.dll dist/HoliestFluffiness/
-          cp HoliestFluffiness/bin/x64/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
+          cp HoliestFluffiness/bin/Release/HoliestFluffiness.dll dist/HoliestFluffiness/
+          cp HoliestFluffiness/bin/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
           cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
           cp HoliestFluffiness/images/icon.png dist/HoliestFluffiness/images/
 
