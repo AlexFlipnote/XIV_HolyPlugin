@@ -103,11 +103,12 @@ public sealed class Plugin : IDalamudPlugin
         var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 2 && int.TryParse(parts[1], out int slot) && slot >= 1 && slot <= 8)
         {
-            var rec = characterDb.GetByWorldAndSlot(parts[0], slot);
+            var world = WorldResolver.Resolve(parts[0], DataManager) ?? parts[0];
+            var rec = characterDb.GetByWorldAndSlot(world, slot);
             if (rec != null)
                 SwitchToCharacter(rec.Name, rec.World);
             else
-                ChatGui.PrintError($"[HF] No character in slot {slot} on world '{parts[0]}'.");
+                ChatGui.PrintError($"[HF] No character in slot {slot} on world '{world}'.");
         }
         else
         {

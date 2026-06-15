@@ -26,6 +26,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         public string DbKey   => $"{Name}@{World}";
     }
 
+    public event Action? OnInfoReady;
+
     // Called on login — retries every second for up to 10s waiting for data to load.
     public async Task RunAsync(CancellationToken token, bool instant = false)
     {
@@ -117,6 +119,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             };
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
         }
+
+        OnInfoReady?.Invoke();
     }
 
     public async Task QuickSaveAsync()

@@ -43,6 +43,8 @@ public class ConfigWindow : Window
     private static readonly Vector4 ColBgDeep   = new(18f / 255f,  18f / 255f,  18f / 255f,  1f);
     private static readonly Vector4 ColWhite    = new(249f / 255f, 248f / 255f, 244f / 255f, 1f);
     private static readonly Vector4 ColWhiteDim = new(249f / 255f, 248f / 255f, 244f / 255f, 0.55f);
+    private static readonly Vector4 ColGreen    = new( 80f / 255f, 200f / 255f,  80f / 255f, 1f);
+    private static readonly Vector4 ColRed      = new(220f / 255f,  80f / 255f,  80f / 255f, 1f);
     private static readonly Vector4 ColGold     = new(235f / 255f, 230f / 255f, 114f / 255f, 1f);
     private static readonly Vector4 ColGoldSub  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.18f);
     private static readonly Vector4 ColGoldMid  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.35f);
@@ -64,7 +66,7 @@ public class ConfigWindow : Window
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(480, 250),
-            MaximumSize = new Vector2(700, 520),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
 
         Size          = new Vector2(600, 420);
@@ -83,7 +85,7 @@ public class ConfigWindow : Window
     {
         SizeConstraints = selectedSection == 3
             ? new WindowSizeConstraints { MinimumSize = new Vector2(700, 380), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) }
-            : new WindowSizeConstraints { MinimumSize = new Vector2(480, 250), MaximumSize = new Vector2(700, 520) };
+            : new WindowSizeConstraints { MinimumSize = new Vector2(480, 250), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
 
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         PushGlobalStyle();
@@ -98,7 +100,7 @@ public class ConfigWindow : Window
     public override void Draw()
     {
         var avail = ImGui.GetContentRegionAvail();
-        const float sidebarWidth = 145f;
+        const float sidebarWidth = 180f;
 
         DrawSidebar(sidebarWidth, avail.Y);
         ImGui.SameLine(0, 0);
@@ -175,9 +177,10 @@ public class ConfigWindow : Window
             ImGui.PushStyleColor(ImGuiCol.Text,          ColWhite);
         }
 
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 6f);
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5f);
-        ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0.08f, 0.5f));
-        bool clicked = ImGui.Button(label, new Vector2(ImGui.GetContentRegionAvail().X, 30));
+        ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0f, 0.5f));
+        bool clicked = ImGui.Button(label, new Vector2(ImGui.GetContentRegionAvail().X - 6f, 30));
         if (clicked)
         {
             selectedSection = index;
@@ -216,7 +219,7 @@ public class ConfigWindow : Window
 
     // ── Section helpers ───────────────────────────────────────────────────────
 
-    private void BeginSection(string title)
+    private void BeginSection(string title, Action? afterTitle = null)
     {
         ImGui.PushStyleColor(ImGuiCol.ChildBg, ColSection);
         ImGui.BeginChild(title + "##sec", new Vector2(0, 0), false);
@@ -225,6 +228,7 @@ public class ConfigWindow : Window
         ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 10f);
         ImGui.TextUnformatted(title);
+        if (afterTitle != null) { ImGui.SameLine(); afterTitle(); }
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 6));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
@@ -459,18 +463,22 @@ public class ConfigWindow : Window
                 bulkUpdateProgress++;
 
                 var loginTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                void OnLogin() => loginTcs.TrySetResult(true);
-                clientState.Login += OnLogin;
+                var infoTcs  = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnLogin()   => loginTcs.TrySetResult(true);
+                void OnInfoReady() => infoTcs.TrySetResult(true);
+                clientState.Login              += OnLogin;
+                loginInfoHandler.OnInfoReady   += OnInfoReady;
                 try
                 {
                     onSwitchCharacter(rec.Name, rec.World);
                     await loginTcs.Task.WaitAsync(TimeSpan.FromSeconds(60), token);
-                    await Task.Delay(TimeSpan.FromSeconds(20), token); // ponytail: fixed wait for RunAsync; wire Plugin event if exact timing matters
+                    await infoTcs.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
                 }
-                catch (TimeoutException) { /* character didn't log in, skip to next */ }
+                catch (TimeoutException) { /* character didn't respond in time, skip */ }
                 finally
                 {
-                    clientState.Login -= OnLogin;
+                    clientState.Login            -= OnLogin;
+                    loginInfoHandler.OnInfoReady -= OnInfoReady;
                 }
             }
         }
@@ -487,7 +495,12 @@ public class ConfigWindow : Window
 
         bool lifestreamOn = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
 
-        BeginSection("Characters");
+        BeginSection("Characters", () =>
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
+            ImGui.TextUnformatted(lifestreamOn ? "(✓ Lifestream)" : "(✗ Lifestream)");
+            ImGui.PopStyleColor();
+        });
 
         var cols = configuration.CharactersColumns;
 
@@ -523,20 +536,6 @@ public class ConfigWindow : Window
                 PopCheckbox();
             }
             ImGui.EndPopup();
-        }
-
-        SectionRow();
-        if (lifestreamOn)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
-            ImGui.TextUnformatted("Lifestream detected — click a character name to switch");
-            ImGui.PopStyleColor();
-        }
-        else
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-            ImGui.TextUnformatted("Lifestream not found — install it to enable character switching");
-            ImGui.PopStyleColor();
         }
 
         ImGui.Dummy(new Vector2(0, 2));
@@ -579,26 +578,27 @@ public class ConfigWindow : Window
                     bool desc = spec.SortDirection == ImGuiSortDirection.Descending;
                     cachedRecords = (int)spec.ColumnUserID switch
                     {
-                        0 => [.. (desc ? cachedRecords.OrderByDescending(r => r.LastSeen)     : cachedRecords.OrderBy(r => r.LastSeen))],
-                        1 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Name)         : cachedRecords.OrderBy(r => r.Name))],
-                        2 => [.. (desc ? cachedRecords.OrderByDescending(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue) : cachedRecords.OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        3 => [.. (desc ? cachedRecords.OrderByDescending(r => r.DataCenter)   : cachedRecords.OrderBy(r => r.DataCenter))],
-                        4 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FreeCompany)  : cachedRecords.OrderBy(r => r.FreeCompany))],
-                        5 => [.. (desc ? cachedRecords.OrderByDescending(r => r.SearchInfo)   : cachedRecords.OrderBy(r => r.SearchInfo))],
-                        6 => [.. (desc ? cachedRecords.OrderByDescending(r => r.PrivateHouse) : cachedRecords.OrderBy(r => r.PrivateHouse))],
-                        7 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FcHouse)      : cachedRecords.OrderBy(r => r.FcHouse))],
-                        8 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Gil)          : cachedRecords.OrderBy(r => r.Gil))],
+                        0 => [.. (desc ? cachedRecords.OrderByDescending(r => r.LastSeen).ThenBy(r => r.Slot ?? int.MaxValue)     : cachedRecords.OrderBy(r => r.LastSeen).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        1 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Name).ThenBy(r => r.Slot ?? int.MaxValue)         : cachedRecords.OrderBy(r => r.Name).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        2 => [.. (desc ? cachedRecords.OrderByDescending(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue)        : cachedRecords.OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        3 => [.. (desc ? cachedRecords.OrderByDescending(r => r.DataCenter).ThenBy(r => r.Slot ?? int.MaxValue)   : cachedRecords.OrderBy(r => r.DataCenter).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        4 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FreeCompany).ThenBy(r => r.Slot ?? int.MaxValue)  : cachedRecords.OrderBy(r => r.FreeCompany).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        5 => [.. (desc ? cachedRecords.OrderByDescending(r => r.SearchInfo).ThenBy(r => r.Slot ?? int.MaxValue)   : cachedRecords.OrderBy(r => r.SearchInfo).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        6 => [.. (desc ? cachedRecords.OrderByDescending(r => r.PrivateHouse).ThenBy(r => r.Slot ?? int.MaxValue) : cachedRecords.OrderBy(r => r.PrivateHouse).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        7 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FcHouse).ThenBy(r => r.Slot ?? int.MaxValue)      : cachedRecords.OrderBy(r => r.FcHouse).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        8 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Gil).ThenBy(r => r.Slot ?? int.MaxValue)          : cachedRecords.OrderBy(r => r.Gil).ThenBy(r => r.Slot ?? int.MaxValue))],
                         _ => cachedRecords,
                     };
                     sortSpecs.SpecsDirty = false;
                 }
 
                 var filter = charFilter.Trim();
+                var worldFilter = WorldResolver.Resolve(filter, cachedRecords!.Select(r => r.World)) ?? filter;
                 foreach (var rec in cachedRecords ?? [])
                 {
                     if (filter.Length > 0
                         && !rec.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                        && !rec.World.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                        && !rec.World.Contains(worldFilter, StringComparison.OrdinalIgnoreCase)
                         && !rec.DataCenter.Contains(filter, StringComparison.OrdinalIgnoreCase)
                         && !(rec.FreeCompany ?? "").Contains(filter, StringComparison.OrdinalIgnoreCase))
                         continue;
