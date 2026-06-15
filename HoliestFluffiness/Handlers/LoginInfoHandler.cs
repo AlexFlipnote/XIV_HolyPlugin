@@ -5,6 +5,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
@@ -12,7 +13,7 @@ using HoliestFluffiness.Windows;
 
 namespace HoliestFluffiness;
 
-public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log)
+public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log, INotificationManager notificationManager)
 {
     private record FcData(string Tag, string Name)
     {
@@ -202,17 +203,32 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
     private async Task ShowData(string? character, FcData? fc, SeString? plate, string? privateHouse, string? fcHouse)
     {
-        if (configuration.LoginInfoAsPopup)
+        switch (configuration.LoginInfoDisplay)
         {
-            var order = configuration.LoginInfoOrder;
-            await framework.RunOnFrameworkThread(() =>
-                loginInfoWindow.SetData(character, fc?.Display, plate?.ToString(), privateHouse, fcHouse, order));
-        }
-        else
-        {
-            var message = BuildChatMessage(character, fc, plate, privateHouse, fcHouse);
-            if (message != null)
-                await framework.RunOnFrameworkThread(() => chatGui.Print(message));
+            case LoginInfoDisplay.Popup:
+                var order = configuration.LoginInfoOrder;
+                await framework.RunOnFrameworkThread(() =>
+                    loginInfoWindow.SetData(character, fc?.Display, plate?.ToString(), privateHouse, fcHouse, order));
+                break;
+
+            case LoginInfoDisplay.Toast:
+                var toastMsg = BuildChatMessage(character, fc, plate, privateHouse, fcHouse);
+                if (toastMsg != null)
+                    await framework.RunOnFrameworkThread(() =>
+                        notificationManager.AddNotification(new Notification
+                        {
+                            Content         = toastMsg.ToString(),
+                            Type            = NotificationType.Info,
+                            InitialDuration = TimeSpan.FromSeconds(10),
+                            Minimized       = false,
+                        }));
+                break;
+
+            default: // Echo
+                var message = BuildChatMessage(character, fc, plate, privateHouse, fcHouse);
+                if (message != null)
+                    await framework.RunOnFrameworkThread(() => chatGui.Print(message));
+                break;
         }
     }
 
@@ -378,7 +394,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     {
         token.ThrowIfCancellationRequested();
 
-        long result = 0;
+        long result = -1; // -1 = not yet cached
 
         await framework.RunOnFrameworkThread(() =>
         {

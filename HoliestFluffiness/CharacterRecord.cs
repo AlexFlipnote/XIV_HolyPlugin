@@ -31,7 +31,7 @@ public class CharacterRecord
     public string? FcHouse { get; set; }
 
     [Column("gil")]
-    public long Gil { get; set; }
+    public long Gil { get; set; } = -1;
 
     [Column("last_seen")]
     public DateTime LastSeen { get; set; }

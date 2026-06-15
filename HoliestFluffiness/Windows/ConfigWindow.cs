@@ -23,6 +23,7 @@ public class ConfigWindow : Window
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly IClientState clientState;
     private readonly Action<string, string> onSwitchCharacter;
+    private readonly WotsitIpc wotsitIpc;
 
     private CancellationTokenSource? testAllCts;
     private CancellationTokenSource? accessoryCts;
@@ -50,7 +51,7 @@ public class ConfigWindow : Window
     private static readonly Vector4 ColGoldMid  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.35f);
     private static readonly Vector4 ColNone     = new(0f, 0f, 0f, 0f);
 
-    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter)
+    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, WotsitIpc wotsitIpc)
         : base($"The Holiest Fluffiness##Config")
     {
         this.configuration = configuration;
@@ -61,6 +62,7 @@ public class ConfigWindow : Window
         this.pluginInterface = pluginInterface;
         this.clientState = clientState;
         this.onSwitchCharacter = onSwitchCharacter;
+        this.wotsitIpc = wotsitIpc;
         selectedSection = configuration.LastSelectedSection;
 
         SizeConstraints = new WindowSizeConstraints
@@ -275,15 +277,20 @@ public class ConfigWindow : Window
         ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
-        PushCheckbox();
-        var asPopup = configuration.LoginInfoAsPopup;
-        bool popupChanged = ImGui.Checkbox("Show as a popup instead", ref asPopup);
-        PopCheckbox();
-        if (popupChanged)
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("Show as:");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        foreach (var (label, val) in new (string, LoginInfoDisplay)[] { ("Echo text", LoginInfoDisplay.Echo), ("Popup", LoginInfoDisplay.Popup), ("Toast", LoginInfoDisplay.Toast) })
         {
-            configuration.LoginInfoAsPopup = asPopup;
-            configuration.Save();
+            if (ImGui.RadioButton(label, configuration.LoginInfoDisplay == val))
+            {
+                configuration.LoginInfoDisplay = val;
+                configuration.Save();
+            }
+            ImGui.SameLine();
         }
+        ImGui.NewLine();
 
         ImGui.Dummy(new Vector2(0, 8));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
@@ -413,9 +420,29 @@ public class ConfigWindow : Window
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
 
-        var count = characterDb.Count();
+        var count        = characterDb.Count();
+        var totalGil     = characterDb.TotalGil();
+        var withFc       = characterDb.CountWithFc();
+        var withHouse    = characterDb.CountWithPrivateHouse();
+        var statNums     = new[] { $"{count:N0}", $"{totalGil:N0}", $"{withFc:N0}", $"{withHouse:N0}" };
+        var statLabels   = new[] { $"character{(count == 1 ? "" : "s")} indexed", "gil total across all characters", "in a free company", "with a private house" };
+        var numColW      = statNums.Max(n => ImGui.CalcTextSize(n).X) + 4f;
         ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted($"{count:N0} character{(count == 1 ? "" : "s")} indexed");
+        if (ImGui.BeginTable("##dbstats", 2))
+        {
+            ImGui.TableSetupColumn("##n", ImGuiTableColumnFlags.WidthFixed, numColW);
+            ImGui.TableSetupColumn("##l", ImGuiTableColumnFlags.WidthStretch);
+            for (var i = 0; i < statNums.Length; i++)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + numColW - ImGui.CalcTextSize(statNums[i]).X);
+                ImGui.TextUnformatted(statNums[i]);
+                ImGui.TableSetColumnIndex(1);
+                ImGui.TextUnformatted(statLabels[i]);
+            }
+            ImGui.EndTable();
+        }
         ImGui.PopStyleColor();
 
         ImGui.Dummy(new Vector2(0, 8));
@@ -500,6 +527,10 @@ public class ConfigWindow : Window
             ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
             ImGui.TextUnformatted(lifestreamOn ? "(✓ Lifestream)" : "(✗ Lifestream)");
             ImGui.PopStyleColor();
+            ImGui.SameLine();
+            ImGui.PushStyleColor(ImGuiCol.Text, wotsitIpc.IsAvailable ? ColGreen : ColRed);
+            ImGui.TextUnformatted(wotsitIpc.IsAvailable ? "(✓ Wotsit)" : "(✗ Wotsit)");
+            ImGui.PopStyleColor();
         });
 
         var cols = configuration.CharactersColumns;
@@ -515,28 +546,22 @@ public class ConfigWindow : Window
         ImGui.PopStyleColor();
         ImGui.SameLine();
         PushButton();
-        if (ImGui.Button("Columns##colvis")) ImGui.OpenPopup("##colpopup");
-        PopButton();
-        ImGui.SameLine();
-        PushButton();
         if (ImGui.Button("Refresh##charrefresh")) LoadCharacters();
         PopButton();
 
-        if (ImGui.BeginPopup("##colpopup"))
+        SectionRow();
+        PushCheckbox();
+        for (int i = 0; i < DbColNames.Length; i++)
         {
-            for (int i = 0; i < DbColNames.Length; i++)
+            bool vis = configuration.CharactersColumns[i];
+            if (ImGui.Checkbox(DbColNames[i] + "##colchk" + i, ref vis))
             {
-                bool vis = cols[i];
-                PushCheckbox();
-                if (ImGui.Checkbox(DbColNames[i] + "##colchk" + i, ref vis))
-                {
-                    cols[i] = vis;
-                    configuration.Save();
-                }
-                PopCheckbox();
+                configuration.CharactersColumns[i] = vis;
+                configuration.Save();
             }
-            ImGui.EndPopup();
+            if (i < DbColNames.Length - 1) ImGui.SameLine();
         }
+        PopCheckbox();
 
         ImGui.Dummy(new Vector2(0, 2));
 
@@ -617,7 +642,7 @@ public class ConfigWindow : Window
                     if (cols[5]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.SearchInfo ?? ""); }
                     if (cols[6]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.PrivateHouse ?? ""); }
                     if (cols[7]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.FcHouse ?? ""); }
-                    if (cols[8]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Gil == 0 ? "" : rec.Gil.ToString("N0", CultureInfo.InvariantCulture)); }
+                    if (cols[8]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Gil < 0 ? "" : rec.Gil.ToString("N0", CultureInfo.InvariantCulture)); }
                 }
 
                 ImGui.EndTable();

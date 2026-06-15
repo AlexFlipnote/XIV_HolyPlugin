@@ -6,6 +6,8 @@ using Dalamud.Plugin;
 
 namespace HoliestFluffiness;
 
+public enum LoginInfoDisplay { Echo = 0, Popup = 1, Toast = 2 }
+
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
@@ -22,12 +24,12 @@ public class Configuration : IPluginConfiguration
     public bool AdventurePlateEnabled { get; set; } = false;
     public bool ShowPrivateHouseLocation { get; set; } = false;
     public bool ShowFcHouseLocation { get; set; } = false;
-    public bool LoginInfoAsPopup { get; set; } = false;
+    public LoginInfoDisplay LoginInfoDisplay { get; set; } = LoginInfoDisplay.Echo;
     // Order of the 5 info items: 0=Character, 1=SearchInfo, 2=PrivateHouse, 3=FreeCompany, 4=FcHouse
     public List<int> LoginInfoOrder { get; set; } = [0, 1, 2, 3, 4];
     public bool CharactersDbEnabled { get; set; } = false;
     // Visibility of the 9 Characters table columns: LastSeen, Name, World, DC, FC, SearchInfo, PrivateHouse, FcHouse, Gil
-    public List<bool> CharactersColumns { get; set; } = [true, true, true, true, true, true, true, true, true];
+    public bool[] CharactersColumns { get; set; } = [true, true, true, true, true, true, true, true, true];
     public int LastSelectedSection { get; set; } = 0;
 
     private IDalamudPluginInterface pluginInterface = null!;
@@ -41,7 +43,7 @@ public class Configuration : IPluginConfiguration
         if (LoginInfoOrder.Count != 5 || !expected.All(LoginInfoOrder.Contains))
             LoginInfoOrder = expected;
 
-        if (CharactersColumns.Count != 9)
+        if (CharactersColumns == null || CharactersColumns.Length != 9)
             CharactersColumns = [true, true, true, true, true, true, true, true, true];
     }
 

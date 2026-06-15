@@ -11,9 +11,10 @@
     <Reference Include="SQLite-net" Private="false" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="images\icon.png">
+    <EmbeddedResource Include="images\icon.png">
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </EmbeddedResource>
+    <EmbeddedResource Include="images\menu_icon.png" Condition="Exists('images\menu_icon.png')" />
   </ItemGroup>
 </Project>

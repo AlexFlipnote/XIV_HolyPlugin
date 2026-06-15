@@ -11,6 +11,7 @@ using Dalamud.Plugin.Services;
 using HoliestFluffiness.Handlers;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using HoliestFluffiness.Windows;
+using System.Reflection;
 
 namespace HoliestFluffiness;
 
@@ -30,6 +31,9 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IObjectTable ObjectTable { get; init; } = null!;
     [PluginService] private IAddonLifecycle AddonLifecycle { get; init; } = null!;
     [PluginService] private IDataManager DataManager { get; init; } = null!;
+    [PluginService] private ITitleScreenMenu TitleScreenMenu { get; init; } = null!;
+    [PluginService] private ITextureProvider TextureProvider { get; init; } = null!;
+    [PluginService] private INotificationManager NotificationManager { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -39,6 +43,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LoginInfoHandler loginInfoHandler;
     private readonly CharacterDb characterDb;
     private readonly CharaSelectHandler charaSelectHandler;
+    private readonly WotsitIpc wotsitIpc;
 
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
@@ -53,10 +58,12 @@ public sealed class Plugin : IDalamudPlugin
 
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(3); });
-        loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
+        loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log, NotificationManager);
         charaSelectHandler  = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework);
+        wotsitIpc              = new WotsitIpc(PluginInterface, Log, characterDb, SwitchToCharacter);
+        characterDb.Changed   += wotsitIpc.RegisterAll;
 
-        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter);
+        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, wotsitIpc);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
 
@@ -80,6 +87,9 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
+
+        var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.images.menu_icon.png");
+        TitleScreenMenu.AddEntry("Holy Plugin", icon, OpenMainUi);
 
         ClientState.Login += OnLogin;
     }
@@ -147,6 +157,12 @@ public sealed class Plugin : IDalamudPlugin
             // IPC must be called on the framework thread; after the async save we may be on a pool thread
             await Framework.RunOnFrameworkThread(() =>
             {
+                NotificationManager.AddNotification(new Dalamud.Interface.ImGuiNotification.Notification
+                {
+                    Content   = $"Switching to {name} ({world})",
+                    Type      = Dalamud.Interface.ImGuiNotification.NotificationType.Info,
+                    Minimized = false,
+                });
                 // Return type is ErrorCode enum — use object to avoid InvalidCastException
                 PluginInterface.GetIpcSubscriber<string, string, object>("Lifestream.ChangeCharacter")
                                .InvokeFunc(name, world);
@@ -221,7 +237,9 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
         windowSystem.RemoveAllWindows();
+        characterDb.Changed   -= wotsitIpc.RegisterAll;
         charaSelectHandler.Dispose();
+        wotsitIpc.Dispose();
         characterDb.Dispose();
     }
 }

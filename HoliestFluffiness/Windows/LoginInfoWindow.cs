@@ -33,7 +33,8 @@ public class LoginInfoWindow : Window
         : base("Character info##LoginInfoPopup",
                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoCollapse)
     {
-        this.onOpenCharList = onOpenCharList;
+        this.onOpenCharList  = onOpenCharList;
+        RespectCloseHotkey   = true;
     }
 
     public void SetChangingState(string name, string world, int? slot)

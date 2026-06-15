@@ -42,13 +42,22 @@ public sealed class CharacterDb : IDisposable
 
     public int Count() => db.Table<CharacterRecord>().Count();
 
-    public void Upsert(CharacterRecord record) => db.InsertOrReplace(record);
+    public long TotalGil() => db.Table<CharacterRecord>().ToList().Where(r => r.Gil >= 0).Sum(r => r.Gil);
+
+    public int CountWithFc() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.FreeCompany));
+
+    public int CountWithPrivateHouse() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.PrivateHouse));
+
+    public event Action? Changed;
+
+    public void Upsert(CharacterRecord record) { db.InsertOrReplace(record); Changed?.Invoke(); }
 
     public void UpsertPreservingSlot(CharacterRecord record)
     {
         if (record.Slot == null)
             record.Slot = db.Find<CharacterRecord>(record.Key)?.Slot;
         db.InsertOrReplace(record);
+        Changed?.Invoke();
     }
 
     public void UpsertSlot(string key, string name, string world, string dc, int slot)
@@ -72,6 +81,7 @@ public sealed class CharacterDb : IDisposable
                 LastSeen   = DateTime.UtcNow,
             });
         }
+        Changed?.Invoke();
     }
 
     public CharacterRecord? GetByKey(string key) => db.Find<CharacterRecord>(key);
