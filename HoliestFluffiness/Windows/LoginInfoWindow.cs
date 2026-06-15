@@ -14,7 +14,8 @@ public class LoginInfoWindow : Window
     private string? privateHouseDisplay;
     private string? fcHouseDisplay;
     private List<int> order = [0, 1, 2, 3];
-    private bool changingCharacter;
+    private bool   changingCharacter;
+    private string changingToText = "Changing character...";
 
     private static readonly Vector4 ColBg      = new(30f / 255f,  30f / 255f,  30f / 255f,  1f);
     private static readonly Vector4 ColSection = new(40f / 255f,  40f / 255f,  40f / 255f,  1f);
@@ -35,11 +36,16 @@ public class LoginInfoWindow : Window
         this.onOpenCharList = onOpenCharList;
     }
 
-    public void SetChangingState() => changingCharacter = true;
+    public void SetChangingState(string name, string world, int? slot)
+    {
+        changingToText    = slot.HasValue ? $"Changing to {name} @ {world}/{slot}..." : $"Changing to {name} @ {world}...";
+        changingCharacter = true;
+    }
 
     public void SetData(string? character, string? fc, string? plate, string? privateHouse, string? fcHouse, List<int> displayOrder)
     {
-        changingCharacter   = false;
+        changingCharacter = false;
+        changingToText    = "Changing character...";
         characterDisplay    = character;
         fcDisplay           = fc;
         plateDisplay        = plate;
@@ -75,7 +81,7 @@ public class LoginInfoWindow : Window
         {
             ImGui.Dummy(new Vector2(0, 4));
             ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
-            ImGui.TextUnformatted("Changing character...");
+            ImGui.TextUnformatted(changingToText);
             ImGui.PopStyleColor();
             ImGui.Dummy(new Vector2(0, 4));
             return;

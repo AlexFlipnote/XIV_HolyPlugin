@@ -79,11 +79,13 @@ public sealed class Plugin : IDalamudPlugin
 
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
+        PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
         ClientState.Login += OnLogin;
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
+    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(3); }
 
     private void OnCommand(string command, string args) =>
         configWindow.IsOpen = !configWindow.IsOpen;
@@ -147,7 +149,8 @@ public sealed class Plugin : IDalamudPlugin
                 // Return type is ErrorCode enum — use object to avoid InvalidCastException
                 PluginInterface.GetIpcSubscriber<string, string, object>("Lifestream.ChangeCharacter")
                                .InvokeFunc(name, world);
-                loginInfoWindow.SetChangingState();
+                var slot = characterDb.GetByKey($"{name}@{world}")?.Slot;
+                loginInfoWindow.SetChangingState(name, world, slot);
             });
         }
         catch (Exception ex)
@@ -215,6 +218,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(HwMinCommand);
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
+        PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
         windowSystem.RemoveAllWindows();
         charaSelectHandler.Dispose();
         characterDb.Dispose();

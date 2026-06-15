@@ -19,9 +19,10 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         public string Display => $"«{Tag}» {Name}";
     }
 
-    private record CharInfo(string Name, string World, string Dc)
+    private record CharInfo(string Name, string World, string Dc, int? Slot = null)
     {
-        public string Display => Dc.Length > 0 ? $"{Name} @ {World} ({Dc})" : $"{Name} @ {World}";
+        private string WorldSlot => Slot.HasValue ? $"{World}/{Slot}" : World;
+        public string Display => Dc.Length > 0 ? $"{Name} @ {WorldSlot} ({Dc})" : $"{Name} @ {WorldSlot}";
         public string DbKey   => $"{Name}@{World}";
     }
 
@@ -262,6 +263,12 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
             result = new CharInfo(name, world, dc);
         });
+
+        if (result != null)
+        {
+            var slot = await Task.Run(() => characterDb.GetByKey(result.DbKey)?.Slot, token);
+            result = result with { Slot = slot };
+        }
 
         return result;
     }

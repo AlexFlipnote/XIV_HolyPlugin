@@ -21,10 +21,14 @@ public class ConfigWindow : Window
     private readonly IObjectTable objectTable;
     private readonly CharacterDb characterDb;
     private readonly IDalamudPluginInterface pluginInterface;
+    private readonly IClientState clientState;
     private readonly Action<string, string> onSwitchCharacter;
 
     private CancellationTokenSource? testAllCts;
     private CancellationTokenSource? accessoryCts;
+    private CancellationTokenSource? bulkUpdateCts;
+    private int bulkUpdateProgress;
+    private int bulkUpdateTotal;
 
     private int selectedSection;
 
@@ -53,6 +57,7 @@ public class ConfigWindow : Window
         this.objectTable = objectTable;
         this.characterDb = characterDb;
         this.pluginInterface = pluginInterface;
+        this.clientState = clientState;
         this.onSwitchCharacter = onSwitchCharacter;
         selectedSection = configuration.LastSelectedSection;
 
@@ -359,7 +364,8 @@ public class ConfigWindow : Window
         ImGui.Dummy(new Vector2(0, 4));
     }
 
-    private void LoadCharacters() => cachedRecords = characterDb.GetAll();
+    private void LoadCharacters() =>
+        cachedRecords = [.. characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue)];
 
     private void DrawCharacterNameCell(CharacterRecord rec, bool lifestreamOn)
     {
@@ -408,7 +414,71 @@ public class ConfigWindow : Window
         ImGui.TextUnformatted($"{count:N0} character{(count == 1 ? "" : "s")} indexed");
         ImGui.PopStyleColor();
 
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
+
+        if (bulkUpdateTotal > 0)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+            ImGui.TextUnformatted($"Processing {bulkUpdateProgress}/{bulkUpdateTotal}...");
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            PushButton();
+            if (ImGui.Button("Cancel##bulkupdate")) bulkUpdateCts?.Cancel();
+            PopButton();
+        }
+        else
+        {
+            PushButton();
+            if (ImGui.Button("Update all characters"))
+            {
+                bulkUpdateCts?.Cancel();
+                bulkUpdateCts?.Dispose();
+                bulkUpdateCts = new CancellationTokenSource();
+                _ = RunBulkUpdateAsync(bulkUpdateCts.Token);
+            }
+            PopButton();
+        }
+
         EndSection();
+    }
+
+    private async Task RunBulkUpdateAsync(CancellationToken token)
+    {
+        var chars = characterDb.GetAll()
+            .OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue)
+            .ToList();
+        bulkUpdateTotal    = chars.Count;
+        bulkUpdateProgress = 0;
+
+        try
+        {
+            foreach (var rec in chars)
+            {
+                token.ThrowIfCancellationRequested();
+                bulkUpdateProgress++;
+
+                var loginTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnLogin() => loginTcs.TrySetResult(true);
+                clientState.Login += OnLogin;
+                try
+                {
+                    onSwitchCharacter(rec.Name, rec.World);
+                    await loginTcs.Task.WaitAsync(TimeSpan.FromSeconds(60), token);
+                    await Task.Delay(TimeSpan.FromSeconds(20), token); // ponytail: fixed wait for RunAsync; wire Plugin event if exact timing matters
+                }
+                catch (TimeoutException) { /* character didn't log in, skip to next */ }
+                finally
+                {
+                    clientState.Login -= OnLogin;
+                }
+            }
+        }
+        finally
+        {
+            bulkUpdateTotal    = 0;
+            bulkUpdateProgress = 0;
+        }
     }
 
     private void DrawCharactersSection()
@@ -541,7 +611,7 @@ public class ConfigWindow : Window
                         ImGui.TableSetColumnIndex(c++);
                         DrawCharacterNameCell(rec, lifestreamOn);
                     }
-                    if (cols[2]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Slot is { } s ? $"{rec.World} [{s}]" : rec.World); }
+                    if (cols[2]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Slot is { } s ? $"{rec.World}/{s}" : rec.World); }
                     if (cols[3]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.DataCenter); }
                     if (cols[4]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.FreeCompany ?? ""); }
                     if (cols[5]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.SearchInfo ?? ""); }
@@ -771,5 +841,6 @@ public class ConfigWindow : Window
     {
         testAllCts?.Cancel();
         accessoryCts?.Cancel();
+        bulkUpdateCts?.Cancel();
     }
 }

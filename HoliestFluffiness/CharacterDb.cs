@@ -56,8 +56,7 @@ public sealed class CharacterDb : IDisposable
         var existing = db.Find<CharacterRecord>(key);
         if (existing != null)
         {
-            existing.Slot     = slot;
-            existing.LastSeen = DateTime.UtcNow;
+            existing.Slot = slot;
             if (!string.IsNullOrEmpty(dc)) existing.DataCenter = dc;
             db.Update(existing);
         }
