@@ -43,7 +43,7 @@ def get_download_count(version):
 
 def get_last_update(assembly_version):
     try:
-        with open("pluginmaster.json", "r") as f:
+        with open("repo.json", "r") as f:
             previous = json.load(f)
         if isinstance(previous, list) and previous:
             prev = previous[0]
@@ -80,10 +80,10 @@ def main():
     manifest["DownloadCount"] = get_download_count(version)
     manifest["LastUpdate"] = get_last_update(version)
 
-    with open("pluginmaster.json", "w") as f:
+    with open("repo.json", "w") as f:
         json.dump([manifest], f, indent=4)
 
-    print(f"Generated pluginmaster.json for {PLUGIN_NAME} v{version}")
+    print(f"Generated repo.json for {PLUGIN_NAME} v{version}")
 
 
 if __name__ == "__main__":
