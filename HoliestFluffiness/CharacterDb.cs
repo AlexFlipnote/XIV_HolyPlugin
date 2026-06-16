@@ -46,7 +46,24 @@ public sealed class CharacterDb : IDisposable
 
     public int CountWithFc() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.FreeCompany));
 
+    public int CountUniqueFc() => db.Table<CharacterRecord>().ToList()
+        .Where(r => !string.IsNullOrEmpty(r.FreeCompany)).Select(r => r.FreeCompany).Distinct().Count();
+
     public int CountWithPrivateHouse() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.PrivateHouse));
+
+    public int CountUniqueFcHouse() => db.Table<CharacterRecord>().ToList()
+        .Where(r => !string.IsNullOrEmpty(r.FcHouse)).Select(r => r.FcHouse).Distinct().Count();
+
+    public int CountWithSearchInfo() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.SearchInfo));
+
+    public CharacterRecord? RichestCharacter() => db.Table<CharacterRecord>().ToList()
+        .Where(r => r.Gil >= 0).OrderByDescending(r => r.Gil).FirstOrDefault();
+
+    public long AverageGil()
+    {
+        var list = db.Table<CharacterRecord>().ToList().Where(r => r.Gil >= 0).ToList();
+        return list.Count == 0 ? 0 : (long)list.Average(r => r.Gil);
+    }
 
     public event Action? Changed;
 
@@ -54,8 +71,8 @@ public sealed class CharacterDb : IDisposable
 
     public void UpsertPreservingSlot(CharacterRecord record)
     {
-        if (record.Slot == null)
-            record.Slot = db.Find<CharacterRecord>(record.Key)?.Slot;
+        if (record.Slot == 0)
+            record.Slot = db.Find<CharacterRecord>(record.Key)?.Slot ?? 0;
         db.InsertOrReplace(record);
         Changed?.Invoke();
     }
@@ -93,9 +110,24 @@ public sealed class CharacterDb : IDisposable
     public List<CharacterRecord> GetByWorld(string world) =>
         [.. db.Table<CharacterRecord>().ToList()
               .Where(r => string.Equals(r.World, world, StringComparison.OrdinalIgnoreCase))
-              .OrderBy(r => r.Slot ?? int.MaxValue)];
+              .OrderBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)];
 
     public List<CharacterRecord> GetAll() => [.. db.Table<CharacterRecord>()];
+
+    public void Delete(string key) { db.Delete<CharacterRecord>(key); Changed?.Invoke(); }
+
+    public void Reset(string key)
+    {
+        var rec = db.Find<CharacterRecord>(key);
+        if (rec == null) return;
+        rec.FreeCompany  = null;
+        rec.SearchInfo   = null;
+        rec.PrivateHouse = null;
+        rec.FcHouse      = null;
+        rec.Gil          = -1;
+        db.Update(rec);
+        Changed?.Invoke();
+    }
 
     public void Dispose() => db.Close();
 }

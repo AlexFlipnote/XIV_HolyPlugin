@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -24,6 +27,7 @@ public class ConfigWindow : Window
     private readonly IClientState clientState;
     private readonly Action<string, string> onSwitchCharacter;
     private readonly WotsitIpc wotsitIpc;
+    private readonly FileDialogManager fileDialogManager = new() { AddedWindowFlags = ImGuiWindowFlags.NoCollapse };
 
     private CancellationTokenSource? testAllCts;
     private CancellationTokenSource? accessoryCts;
@@ -36,6 +40,8 @@ public class ConfigWindow : Window
     // Characters section state
     private List<CharacterRecord>? cachedRecords;
     private string charFilter = "";
+
+    private string? csvExportMessage;
 
     private static readonly Vector4 ColBg       = new(30f / 255f,  30f / 255f,  30f / 255f,  1f);
     private static readonly Vector4 ColSidebar  = new(48f / 255f,  48f / 255f,  48f / 255f,  1f);
@@ -109,6 +115,15 @@ public class ConfigWindow : Window
         DrawMain(avail.Y);
 
         DrawResizeGrip();
+        fileDialogManager.Draw();
+    }
+
+    private static string CsvEscape(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        return s.Contains(',') || s.Contains('"') || s.Contains('\n')
+            ? $"\"{s.Replace("\"", "\"\"")}\""
+            : s;
     }
 
     private void DrawResizeGrip()
@@ -376,21 +391,26 @@ public class ConfigWindow : Window
     }
 
     private void LoadCharacters() =>
-        cachedRecords = [.. characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue)];
+        cachedRecords = [.. characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)];
 
-    private void DrawCharacterNameCell(CharacterRecord rec, bool lifestreamOn)
+    private void DrawCharacterNameCell(CharacterRecord rec, bool lifestreamOn, string? currentKey)
     {
-        if (lifestreamOn)
+        bool isCurrent = currentKey != null && rec.Key == currentKey;
+
+        if (isCurrent)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ColGreen);
+            ImGui.TextUnformatted(rec.Name);
+            ImGui.PopStyleColor();
+        }
+        else if (lifestreamOn)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
             if (ImGui.Selectable($"{rec.Name}##sel{rec.Key}", false, ImGuiSelectableFlags.None))
                 onSwitchCharacter(rec.Name, rec.World);
             ImGui.PopStyleColor();
             if (ImGui.IsItemHovered())
-            {
-                var slotHint = rec.Slot is { } s ? $" (slot {s})" : "";
-                ImGui.SetTooltip($"Click to switch to {rec.Name} on {rec.World}{slotHint}");
-            }
+                ImGui.SetTooltip($"Click to switch to {rec.Name} on {rec.World}");
         }
         else
         {
@@ -417,35 +437,7 @@ public class ConfigWindow : Window
         }
         PopCheckbox();
 
-        ImGui.Dummy(new Vector2(0, 8));
-        SectionRow();
-
-        var count        = characterDb.Count();
-        var totalGil     = characterDb.TotalGil();
-        var withFc       = characterDb.CountWithFc();
-        var withHouse    = characterDb.CountWithPrivateHouse();
-        var statNums     = new[] { $"{count:N0}", $"{totalGil:N0}", $"{withFc:N0}", $"{withHouse:N0}" };
-        var statLabels   = new[] { $"character{(count == 1 ? "" : "s")} indexed", "gil total across all characters", "in a free company", "with a private house" };
-        var numColW      = statNums.Max(n => ImGui.CalcTextSize(n).X) + 4f;
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        if (ImGui.BeginTable("##dbstats", 2))
-        {
-            ImGui.TableSetupColumn("##n", ImGuiTableColumnFlags.WidthFixed, numColW);
-            ImGui.TableSetupColumn("##l", ImGuiTableColumnFlags.WidthStretch);
-            for (var i = 0; i < statNums.Length; i++)
-            {
-                ImGui.TableNextRow();
-                ImGui.TableSetColumnIndex(0);
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + numColW - ImGui.CalcTextSize(statNums[i]).X);
-                ImGui.TextUnformatted(statNums[i]);
-                ImGui.TableSetColumnIndex(1);
-                ImGui.TextUnformatted(statLabels[i]);
-            }
-            ImGui.EndTable();
-        }
-        ImGui.PopStyleColor();
-
-        ImGui.Dummy(new Vector2(0, 8));
+        ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
         if (bulkUpdateTotal > 0)
@@ -468,8 +460,97 @@ public class ConfigWindow : Window
                 bulkUpdateCts = new CancellationTokenSource();
                 _ = RunBulkUpdateAsync(bulkUpdateCts.Token);
             }
+            ImGui.SameLine();
+            if (ImGui.Button("Export CSV##dbexport"))
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Key,Name,World,DataCenter,Slot,FreeCompany,SearchInfo,PrivateHouse,FcHouse,Gil,LastSeen");
+                foreach (var r in characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))
+                    sb.AppendLine(string.Join(",", CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
+                        r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany), CsvEscape(r.SearchInfo),
+                        CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
+                        r.Gil < 0 ? "" : r.Gil.ToString(),
+                        r.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")));
+                var csv = sb.ToString();
+                fileDialogManager.SaveFileDialog("Export characters", "CSV{.csv}", "characters_export.csv", ".csv",
+                    (ok, path) => { if (ok) { File.WriteAllText(path, csv, Encoding.UTF8); csvExportMessage = $"Saved: {path}"; } },
+                    pluginInterface.ConfigDirectory.FullName);
+            }
             PopButton();
         }
+
+        if (csvExportMessage != null)
+        {
+            ImGui.Dummy(new Vector2(0, 2));
+            SectionRow();
+            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+            ImGui.TextUnformatted(csvExportMessage);
+            ImGui.PopStyleColor();
+        }
+
+        ImGui.Dummy(new Vector2(0, 8));
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+        ImGui.TextUnformatted("Did you know?");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+
+        var count         = characterDb.Count();
+        var totalGil      = characterDb.TotalGil();
+        var withFc        = characterDb.CountWithFc();
+        var uniqueFc      = characterDb.CountUniqueFc();
+        var uniqueFcHouse = characterDb.CountUniqueFcHouse();
+        var withHouse     = characterDb.CountWithPrivateHouse();
+        var loneWolves    = count - withFc;
+        var withStory     = characterDb.CountWithSearchInfo();
+        var richest       = characterDb.RichestCharacter();
+        var avgGil        = characterDb.AverageGil();
+
+        var statNums   = new[] { $"{count:N0}", $"{withFc:N0}", $"{loneWolves:N0}", $"{uniqueFcHouse:N0}", $"{withHouse:N0}", $"{withStory:N0}", $"{totalGil:N0}", $"{avgGil:N0}" };
+        var statLabels = new[]
+        {
+            $"character{(count == 1 ? "" : "s")} are indexed",
+            $"are in a free company ({uniqueFc:N0} being unique)",
+            $"lone {(loneWolves == 1 ? "wolf roams" : "wolves roam")} without a free company",
+            $"free {(uniqueFcHouse == 1 ? "company has" : "companies have")} a house",
+            $"character{(withHouse == 1 ? "" : "s")} have a private house",
+            $"character{(withStory == 1 ? "" : "s")} have written their search comment",
+            "gil is spread across all your characters",
+            "is the average gil per character",
+        };
+
+        var numColW = statNums.Max(n => ImGui.CalcTextSize(n).X) + 4f;
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        if (ImGui.BeginTable("##dbstats", 2))
+        {
+            ImGui.TableSetupColumn("##n", ImGuiTableColumnFlags.WidthFixed, numColW);
+            ImGui.TableSetupColumn("##l", ImGuiTableColumnFlags.WidthStretch);
+
+            for (var i = 0; i < statNums.Length; i++)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + numColW - ImGui.CalcTextSize(statNums[i]).X);
+                ImGui.TextUnformatted(statNums[i]);
+                ImGui.TableSetColumnIndex(1);
+                ImGui.TextUnformatted(statLabels[i]);
+            }
+
+            if (richest != null)
+            {
+                var richestNum = $"{richest.Gil:N0}";
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + numColW - ImGui.CalcTextSize(richestNum).X);
+                ImGui.TextUnformatted(richestNum);
+                ImGui.TableSetColumnIndex(1);
+                ImGui.TextUnformatted($"is the highest gil amount, owned by {richest.Name} @ {richest.World}");
+            }
+
+            ImGui.EndTable();
+        }
+        ImGui.PopStyleColor();
 
         EndSection();
     }
@@ -477,7 +558,7 @@ public class ConfigWindow : Window
     private async Task RunBulkUpdateAsync(CancellationToken token)
     {
         var chars = characterDb.GetAll()
-            .OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue)
+            .OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)
             .ToList();
         bulkUpdateTotal    = chars.Count;
         bulkUpdateProgress = 0;
@@ -521,15 +602,19 @@ public class ConfigWindow : Window
         if (cachedRecords == null) LoadCharacters();
 
         bool lifestreamOn = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
+        var localPlayer = objectTable[0] as IPlayerCharacter;
+        string? currentKey = localPlayer != null
+            ? $"{localPlayer.Name.TextValue}@{localPlayer.HomeWorld.ValueNullable?.Name.ExtractText()}"
+            : null;
 
         BeginSection("Characters", () =>
         {
             ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
-            ImGui.TextUnformatted(lifestreamOn ? "(✓ Lifestream)" : "(✗ Lifestream)");
+            ImGui.TextUnformatted("[ Lifestream ]");
             ImGui.PopStyleColor();
             ImGui.SameLine();
             ImGui.PushStyleColor(ImGuiCol.Text, wotsitIpc.IsAvailable ? ColGreen : ColRed);
-            ImGui.TextUnformatted(wotsitIpc.IsAvailable ? "(✓ Wotsit)" : "(✗ Wotsit)");
+            ImGui.TextUnformatted("[ Wotsit ]");
             ImGui.PopStyleColor();
         });
 
@@ -565,8 +650,8 @@ public class ConfigWindow : Window
 
         ImGui.Dummy(new Vector2(0, 2));
 
-        int colCount = cols.Count(v => v);
-        if (colCount == 0)
+        int colCount = cols.Count(v => v) + 1; // +1 for Actions
+        if (colCount == 1)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
             ImGui.TextUnformatted("No columns selected.");
@@ -594,6 +679,7 @@ public class ConfigWindow : Window
                 if (cols[6]) ImGui.TableSetupColumn("Private House", ImGuiTableColumnFlags.None, 0, 6);
                 if (cols[7]) ImGui.TableSetupColumn("FC House",      ImGuiTableColumnFlags.None, 0, 7);
                 if (cols[8]) ImGui.TableSetupColumn("Gil",           ImGuiTableColumnFlags.None, 0, 8);
+                ImGui.TableSetupColumn("##actions",  ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.WidthFixed, 60f, 9);
                 ImGui.TableHeadersRow();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
@@ -603,15 +689,15 @@ public class ConfigWindow : Window
                     bool desc = spec.SortDirection == ImGuiSortDirection.Descending;
                     cachedRecords = (int)spec.ColumnUserID switch
                     {
-                        0 => [.. (desc ? cachedRecords.OrderByDescending(r => r.LastSeen).ThenBy(r => r.Slot ?? int.MaxValue)     : cachedRecords.OrderBy(r => r.LastSeen).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        1 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Name).ThenBy(r => r.Slot ?? int.MaxValue)         : cachedRecords.OrderBy(r => r.Name).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        2 => [.. (desc ? cachedRecords.OrderByDescending(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue)        : cachedRecords.OrderBy(r => r.World).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        3 => [.. (desc ? cachedRecords.OrderByDescending(r => r.DataCenter).ThenBy(r => r.Slot ?? int.MaxValue)   : cachedRecords.OrderBy(r => r.DataCenter).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        4 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FreeCompany).ThenBy(r => r.Slot ?? int.MaxValue)  : cachedRecords.OrderBy(r => r.FreeCompany).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        5 => [.. (desc ? cachedRecords.OrderByDescending(r => r.SearchInfo).ThenBy(r => r.Slot ?? int.MaxValue)   : cachedRecords.OrderBy(r => r.SearchInfo).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        6 => [.. (desc ? cachedRecords.OrderByDescending(r => r.PrivateHouse).ThenBy(r => r.Slot ?? int.MaxValue) : cachedRecords.OrderBy(r => r.PrivateHouse).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        7 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FcHouse).ThenBy(r => r.Slot ?? int.MaxValue)      : cachedRecords.OrderBy(r => r.FcHouse).ThenBy(r => r.Slot ?? int.MaxValue))],
-                        8 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Gil).ThenBy(r => r.Slot ?? int.MaxValue)          : cachedRecords.OrderBy(r => r.Gil).ThenBy(r => r.Slot ?? int.MaxValue))],
+                        0 => [.. (desc ? cachedRecords.OrderByDescending(r => r.LastSeen).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)     : cachedRecords.OrderBy(r => r.LastSeen).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        1 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Name).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)         : cachedRecords.OrderBy(r => r.Name).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        2 => [.. (desc ? cachedRecords.OrderByDescending(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)        : cachedRecords.OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        3 => [.. (desc ? cachedRecords.OrderByDescending(r => r.DataCenter).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)   : cachedRecords.OrderBy(r => r.DataCenter).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        4 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FreeCompany).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)  : cachedRecords.OrderBy(r => r.FreeCompany).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        5 => [.. (desc ? cachedRecords.OrderByDescending(r => r.SearchInfo).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)   : cachedRecords.OrderBy(r => r.SearchInfo).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        6 => [.. (desc ? cachedRecords.OrderByDescending(r => r.PrivateHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot) : cachedRecords.OrderBy(r => r.PrivateHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        7 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FcHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)      : cachedRecords.OrderBy(r => r.FcHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        8 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Gil).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)          : cachedRecords.OrderBy(r => r.Gil).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
                         _ => cachedRecords,
                     };
                     sortSpecs.SpecsDirty = false;
@@ -619,6 +705,8 @@ public class ConfigWindow : Window
 
                 var filter = charFilter.Trim();
                 var worldFilter = WorldResolver.Resolve(filter, cachedRecords!.Select(r => r.World)) ?? filter;
+                string? pendingReset  = null;
+                string? pendingDelete = null;
                 foreach (var rec in cachedRecords ?? [])
                 {
                     if (filter.Length > 0
@@ -634,18 +722,32 @@ public class ConfigWindow : Window
                     if (cols[1])
                     {
                         ImGui.TableSetColumnIndex(c++);
-                        DrawCharacterNameCell(rec, lifestreamOn);
+                        DrawCharacterNameCell(rec, lifestreamOn, currentKey);
                     }
-                    if (cols[2]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Slot is { } s ? $"{rec.World}/{s}" : rec.World); }
+                    if (cols[2]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Slot > 0 ? $"{rec.World}/{rec.Slot}" : rec.World); }
                     if (cols[3]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.DataCenter); }
                     if (cols[4]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.FreeCompany ?? ""); }
                     if (cols[5]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.SearchInfo ?? ""); }
                     if (cols[6]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.PrivateHouse ?? ""); }
                     if (cols[7]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.FcHouse ?? ""); }
                     if (cols[8]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Gil < 0 ? "" : rec.Gil.ToString("N0", CultureInfo.InvariantCulture)); }
+
+                    ImGui.TableSetColumnIndex(c);
+                    PushButton();
+                    if (ImGui.SmallButton($"/##{rec.Key}")) pendingReset = rec.Key;
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Reset cached data for this character");
+                    ImGui.SameLine(0, 2);
+                    ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
+                    if (ImGui.SmallButton($"X##{rec.Key}")) pendingDelete = rec.Key;
+                    ImGui.PopStyleColor();
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Delete this character from the database");
+                    PopButton();
                 }
 
                 ImGui.EndTable();
+
+                if (pendingReset  != null) { characterDb.Reset(pendingReset);   LoadCharacters(); }
+                if (pendingDelete != null) { characterDb.Delete(pendingDelete); LoadCharacters(); }
             }
         }
 

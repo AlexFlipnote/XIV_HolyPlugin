@@ -137,7 +137,7 @@ public sealed class Plugin : IDalamudPlugin
         var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
         if (string.IsNullOrEmpty(world)) { ChatGui.PrintError("[HF] Could not determine home world."); return; }
 
-        var slotted = characterDb.GetByWorld(world).Where(r => r.Slot.HasValue).ToList();
+        var slotted = characterDb.GetByWorld(world).Where(r => r.Slot > 0).ToList();
         if (slotted.Count == 0) { ChatGui.PrintError($"[HF] No characters with known slots found for {world}."); return; }
 
         var currentKey = $"{player.Name.TextValue}@{world}";
@@ -166,8 +166,7 @@ public sealed class Plugin : IDalamudPlugin
                 // Return type is ErrorCode enum — use object to avoid InvalidCastException
                 PluginInterface.GetIpcSubscriber<string, string, object>("Lifestream.ChangeCharacter")
                                .InvokeFunc(name, world);
-                var slot = characterDb.GetByKey($"{name}@{world}")?.Slot;
-                loginInfoWindow.SetChangingState(name, world, slot);
+                loginInfoWindow.SetChangingState(name, world);
             });
         }
         catch (Exception ex)

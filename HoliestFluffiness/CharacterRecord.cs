@@ -37,5 +37,5 @@ public class CharacterRecord
     public DateTime LastSeen { get; set; }
 
     [Column("slot")]
-    public int? Slot { get; set; }
+    public int Slot { get; set; }
 }

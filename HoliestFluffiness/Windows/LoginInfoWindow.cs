@@ -37,9 +37,9 @@ public class LoginInfoWindow : Window
         RespectCloseHotkey   = true;
     }
 
-    public void SetChangingState(string name, string world, int? slot)
+    public void SetChangingState(string name, string world)
     {
-        changingToText    = slot.HasValue ? $"Changing to {name} @ {world}/{slot}..." : $"Changing to {name} @ {world}...";
+        changingToText    = $"Changing to {name} @ {world}...";
         changingCharacter = true;
     }
 

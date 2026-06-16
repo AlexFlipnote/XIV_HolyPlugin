@@ -20,10 +20,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         public string Display => $"«{Tag}» {Name}";
     }
 
-    private record CharInfo(string Name, string World, string Dc, int? Slot = null)
+    private record CharInfo(string Name, string World, string Dc)
     {
-        private string WorldSlot => Slot.HasValue ? $"{World}/{Slot}" : World;
-        public string Display => Dc.Length > 0 ? $"{Name} @ {WorldSlot} ({Dc})" : $"{Name} @ {WorldSlot}";
+        public string Display => Dc.Length > 0 ? $"{Name} @ {World} ({Dc})" : $"{Name} @ {World}";
         public string DbKey   => $"{Name}@{World}";
     }
 
@@ -74,22 +73,20 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         FcData?   fc           = null;
         SeString? plate        = null;
 
-        if (needFc)
+        if ((needFc || needPlate) && !instant)
         {
-            int attempts = instant ? 1 : 10;
-            for (int attempt = 0; attempt < attempts; attempt++)
+            for (var attempt = 0; attempt < 6; attempt++)
             {
-                token.ThrowIfCancellationRequested();
-                fc = await CollectFcAsync(token);
-                if (fc != null) break;
-                if (attempt < attempts - 1) await Task.Delay(1000, token);
+                if (needFc    && fc    == null) fc    = await CollectFcAsync(token);
+                if (needPlate && plate == null) plate = await CollectPlateAsync(token);
+                if ((!needFc || fc != null) && (!needPlate || plate != null)) break;
+                await Task.Delay(500, token);
             }
         }
-
-        if (needPlate)
+        else
         {
-            if (!instant) await Task.Delay(3000, token);
-            plate = await CollectPlateAsync(token);
+            if (needFc)    fc    = await CollectFcAsync(token);
+            if (needPlate) plate = await CollectPlateAsync(token);
         }
 
         // Display (filtered by per-toggle settings)
@@ -283,12 +280,6 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
             result = new CharInfo(name, world, dc);
         });
-
-        if (result != null)
-        {
-            var slot = await Task.Run(() => characterDb.GetByKey(result.DbKey)?.Slot, token);
-            result = result with { Slot = slot };
-        }
 
         return result;
     }
