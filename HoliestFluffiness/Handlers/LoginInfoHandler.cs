@@ -122,9 +122,21 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         OnInfoReady?.Invoke();
     }
 
+    private async Task<bool> IsOnDifferentWorldAsync()
+    {
+        bool different = false;
+        await framework.RunOnFrameworkThread(() =>
+        {
+            if (objectTable[0] is IPlayerCharacter pc)
+                different = pc.HomeWorld.RowId != pc.CurrentWorld.RowId;
+        });
+        return different;
+    }
+
     public async Task QuickSaveAsync()
     {
         if (!configuration.CharactersDbEnabled) return;
+        if (await IsOnDifferentWorldAsync()) return;
 
         var charInfo = await CollectCharacterAsync(CancellationToken.None);
         if (charInfo == null) return;
@@ -164,6 +176,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
             try
             {
+                if (await IsOnDifferentWorldAsync()) continue;
+
                 var newFc           = await CollectFcAsync(token);
                 var newPrivateHouse = await CollectPrivateHouseAsync(token);
                 var newFcHouse      = await CollectFcHouseAsync(token);
