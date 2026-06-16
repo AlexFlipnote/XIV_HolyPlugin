@@ -47,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
+    private string? pendingLifestreamArgs;
 
     public Plugin()
     {
@@ -63,7 +64,7 @@ public sealed class Plugin : IDalamudPlugin
         wotsitIpc              = new WotsitIpc(PluginInterface, Log, characterDb, SwitchToCharacter);
         characterDb.Changed   += wotsitIpc.RegisterAll;
 
-        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, wotsitIpc);
+        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, wotsitIpc, GoToBid);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
 
@@ -73,7 +74,7 @@ public sealed class Plugin : IDalamudPlugin
         });
         CommandManager.AddHandler(HwCommand, new CommandInfo(OnHwCommand)
         {
-            HelpMessage = "Open the character list. Use /hw WORLD INDEX to switch to a specific character slot on a world."
+            HelpMessage = "Open the character list. Use /hw SEARCH to fuzzy-find a character, or /hw WORLD INDEX to switch to a specific slot."
         });
         CommandManager.AddHandler(HwPlusCommand, new CommandInfo(OnHwPlusCommand)
         {
@@ -111,7 +112,21 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 2 && int.TryParse(parts[1], out int slot) && slot >= 1 && slot <= 8)
+        if (parts.Length == 1)
+        {
+            var query = parts[0];
+            var matches = characterDb.GetAll()
+                .Where(r => r.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                            r.World.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matches.Count == 1)
+                SwitchToCharacter(matches[0].Name, matches[0].World);
+            else if (matches.Count == 0)
+                ChatGui.PrintError($"[HF] No character matching '{query}'.");
+            else
+                ChatGui.PrintError($"[HF] Ambiguous: {string.Join(", ", matches.Select(r => $"{r.Name}@{r.World}"))}");
+        }
+        else if (parts.Length == 2 && int.TryParse(parts[1], out int slot) && slot >= 1 && slot <= 8)
         {
             var world = WorldResolver.Resolve(parts[0], DataManager) ?? parts[0];
             var rec = characterDb.GetByWorldAndSlot(world, slot);
@@ -147,6 +162,37 @@ public sealed class Plugin : IDalamudPlugin
         int nextIdx = (idx + direction + slotted.Count) % slotted.Count;
         var next = slotted[nextIdx];
         SwitchToCharacter(next.Name, next.World);
+    }
+
+    private void GoToBid(CharacterRecord rec, HousingBidRecord bid)
+    {
+        var args = $"{rec.World}, {bid.District}, ward {bid.Ward}, plot {bid.Plot}";
+
+        var player     = ObjectTable[0] as IPlayerCharacter;
+        var currentKey = player != null
+            ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
+            : null;
+
+        if (currentKey == rec.Key)
+            InvokeLifestreamTeleport(args);
+        else
+        {
+            pendingLifestreamArgs = args;
+            SwitchToCharacter(rec.Name, rec.World);
+        }
+    }
+
+    private void InvokeLifestreamTeleport(string args)
+    {
+        try
+        {
+            CommandManager.ProcessCommand($"/li {args}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Lifestream teleport failed: {Args}", args);
+            ChatGui.PrintError("[HF] Failed to teleport via Lifestream. Is Lifestream installed and loaded?");
+        }
     }
 
     private async void SwitchToCharacter(string name, string world)
@@ -207,6 +253,12 @@ public sealed class Plugin : IDalamudPlugin
 
             await loginInfoHandler.RunAsync(token);
             await accessoryHandler.RunAsync(token);
+
+            var tp = pendingLifestreamArgs;
+            pendingLifestreamArgs = null;
+            if (tp != null)
+                await Framework.RunOnFrameworkThread(() => InvokeLifestreamTeleport(tp));
+
             await loginInfoHandler.RunPeriodicUpdatesAsync(token);
         }
         catch (OperationCanceledException)

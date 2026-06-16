@@ -75,7 +75,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
         if ((needFc || needPlate) && !instant)
         {
-            for (var attempt = 0; attempt < 6; attempt++)
+            // Attempt 10 times (1 try = 500ms = 5 second wait)
+            for (var attempt = 0; attempt < 10; attempt++)
             {
                 if (needFc    && fc    == null) fc    = await CollectFcAsync(token);
                 if (needPlate && plate == null) plate = await CollectPlateAsync(token);

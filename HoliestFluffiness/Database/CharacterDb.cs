@@ -16,9 +16,11 @@ public sealed class CharacterDb : IDisposable
         // SQLite-net caches TableMappings in a static dict keyed by type full name.
         // After a Dalamud hot-reload the stale entry points to the old load context's
         // type, causing an InvalidCastException. Clear it before opening the connection.
-        ClearStaleMapping();
+        ClearStaleMapping<CharacterRecord>();
+        ClearStaleMapping<HousingBidRecord>();
         db = new SQLiteConnection(path);
         db.CreateTable<CharacterRecord>();
+        db.CreateTable<HousingBidRecord>();
         AddColumnIfMissing("slot", "INTEGER");
     }
 
@@ -28,13 +30,13 @@ public sealed class CharacterDb : IDisposable
         catch { /* column already exists */ }
     }
 
-    private static void ClearStaleMapping()
+    private static void ClearStaleMapping<T>()
     {
         try
         {
             var field = typeof(SQLiteConnection).GetField(
                 "_mappings", BindingFlags.Static | BindingFlags.NonPublic);
-            if (field?.GetValue(null) is IDictionary cache && typeof(CharacterRecord).FullName is { } key)
+            if (field?.GetValue(null) is IDictionary cache && typeof(T).FullName is { } key)
                 cache.Remove(key);
         }
         catch { /* reflection may fail on trimmed/obfuscated builds */ }
@@ -128,6 +130,10 @@ public sealed class CharacterDb : IDisposable
         db.Update(rec);
         Changed?.Invoke();
     }
+
+    public List<HousingBidRecord> GetAllBids() => [.. db.Table<HousingBidRecord>()];
+    public void AddBid(HousingBidRecord bid)    => db.Insert(bid);
+    public void DeleteBid(int id)               => db.Delete<HousingBidRecord>(id);
 
     public void Dispose() => db.Close();
 }
