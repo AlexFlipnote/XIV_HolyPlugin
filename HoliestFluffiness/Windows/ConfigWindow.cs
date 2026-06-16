@@ -161,6 +161,9 @@ public class ConfigWindow : Window
         if (SidebarItem("Characters", 3))
             LoadCharacters();
 
+        ImGui.SetCursorPosY(ImGui.GetContentRegionMax().Y - 36f);
+        SidebarItem("About", 4);
+
         ImGui.EndChild();
         ImGui.PopStyleVar();
         ImGui.PopStyleColor();
@@ -227,6 +230,7 @@ public class ConfigWindow : Window
             case 1: DrawAccessorySection();   break;
             case 2: DrawDatabaseSection();    break;
             case 3: DrawCharactersSection();  break;
+            case 4: DrawAboutSection();       break;
         }
 
         ImGui.EndChild();
@@ -331,8 +335,7 @@ public class ConfigWindow : Window
 
     private void DrawInfoOrderList()
     {
-        var order  = configuration.LoginInfoOrder;
-        var right  = ImGui.GetContentRegionMax().X;
+        var order = configuration.LoginInfoOrder;
         const float btnW = 22f;
 
         for (int i = 0; i < order.Count; i++)
@@ -340,6 +343,26 @@ public class ConfigWindow : Window
             int slot = order[i];
 
             SectionRow();
+
+            PushButton();
+            ImGui.BeginDisabled(i == 0);
+            if (ImGui.Button($"^##{slot}u", new Vector2(btnW, 0)))
+            {
+                (order[i - 1], order[i]) = (order[i], order[i - 1]);
+                configuration.Save();
+            }
+            ImGui.EndDisabled();
+            ImGui.SameLine(0, 2);
+            ImGui.BeginDisabled(i == order.Count - 1);
+            if (ImGui.Button($"v##{slot}d", new Vector2(btnW, 0)))
+            {
+                (order[i + 1], order[i]) = (order[i], order[i + 1]);
+                configuration.Save();
+            }
+            ImGui.EndDisabled();
+            PopButton();
+
+            ImGui.SameLine(0, 6);
 
             bool enabled = slot switch
             {
@@ -365,26 +388,6 @@ public class ConfigWindow : Window
                 configuration.Save();
             }
             PopCheckbox();
-
-            // ▲ / ▼ buttons right-aligned
-            ImGui.SameLine(right - btnW * 2 - 4);
-            PushButton();
-            ImGui.BeginDisabled(i == 0);
-            if (ImGui.Button($"^##{slot}u", new Vector2(btnW, 0)))
-            {
-                (order[i - 1], order[i]) = (order[i], order[i - 1]);
-                configuration.Save();
-            }
-            ImGui.EndDisabled();
-            ImGui.SameLine(0, 2);
-            ImGui.BeginDisabled(i == order.Count - 1);
-            if (ImGui.Button($"v##{slot}d", new Vector2(btnW, 0)))
-            {
-                (order[i + 1], order[i]) = (order[i], order[i + 1]);
-                configuration.Save();
-            }
-            ImGui.EndDisabled();
-            PopButton();
         }
 
         ImGui.Dummy(new Vector2(0, 4));
@@ -631,22 +634,26 @@ public class ConfigWindow : Window
         ImGui.PopStyleColor();
         ImGui.SameLine();
         PushButton();
+        if (ImGui.Button("Columns##charcolsbtn")) ImGui.OpenPopup("##charcolspopup");
+        ImGui.SameLine(0, 4);
         if (ImGui.Button("Refresh##charrefresh")) LoadCharacters();
         PopButton();
 
-        SectionRow();
-        PushCheckbox();
-        for (int i = 0; i < DbColNames.Length; i++)
+        if (ImGui.BeginPopup("##charcolspopup"))
         {
-            bool vis = configuration.CharactersColumns[i];
-            if (ImGui.Checkbox(DbColNames[i] + "##colchk" + i, ref vis))
+            PushCheckbox();
+            for (int i = 0; i < DbColNames.Length; i++)
             {
-                configuration.CharactersColumns[i] = vis;
-                configuration.Save();
+                bool vis = configuration.CharactersColumns[i];
+                if (ImGui.Checkbox(DbColNames[i] + "##colchk" + i, ref vis))
+                {
+                    configuration.CharactersColumns[i] = vis;
+                    configuration.Save();
+                }
             }
-            if (i < DbColNames.Length - 1) ImGui.SameLine();
+            PopCheckbox();
+            ImGui.EndPopup();
         }
-        PopCheckbox();
 
         ImGui.Dummy(new Vector2(0, 2));
 
@@ -734,7 +741,7 @@ public class ConfigWindow : Window
 
                     ImGui.TableSetColumnIndex(c);
                     PushButton();
-                    if (ImGui.SmallButton($"/##{rec.Key}")) pendingReset = rec.Key;
+                    if (ImGui.SmallButton($"~##{rec.Key}")) pendingReset = rec.Key;
                     if (ImGui.IsItemHovered()) ImGui.SetTooltip("Reset cached data for this character");
                     ImGui.SameLine(0, 2);
                     ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
@@ -877,12 +884,14 @@ public class ConfigWindow : Window
         for (int i = 0; i < configuration.AccessoryWhitelist.Count; i++)
         {
             SectionRow();
-            ImGui.TextUnformatted(configuration.AccessoryWhitelist[i]);
-            ImGui.SameLine(ImGui.GetContentRegionMax().X - 65f);
             PushButton();
-            if (ImGui.Button($" - ##{i}"))
+            ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
+            if (ImGui.Button($"X##{i}", new Vector2(22, 0)))
                 removeIdx = i;
+            ImGui.PopStyleColor();
             PopButton();
+            ImGui.SameLine(0, 6);
+            ImGui.TextUnformatted(configuration.AccessoryWhitelist[i]);
         }
         if (removeIdx >= 0)
         {
@@ -907,6 +916,40 @@ public class ConfigWindow : Window
         ImGui.EndDisabled();
 
         ImGui.EndDisabled();
+    }
+
+    private void DrawAboutSection()
+    {
+        BeginSection("About");
+
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("A custom plugin made mostly for our FC, but shared to others too.");
+        ImGui.PopStyleColor();
+
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushTextWrapPos(ImGui.GetContentRegionMax().X - 8f);
+        ImGui.TextUnformatted(
+            "The plugin is named after our Free Company, when no existing plugin did exactly what we needed, " +
+            "building our own felt like the natural next step, so we named it after home. " +
+            "The gold-and-dark palette is pulled straight from our FC colours, because the plugin is part of the " +
+            "experience and should look the part. As for why it exists: we have too many alts and other plugins " +
+            "couldn't keep up with how we play, so we took matters into our own hands.");
+        ImGui.PopTextWrapPos();
+        ImGui.PopStyleColor();
+
+        ImGui.Dummy(new Vector2(0, 10));
+        SubsectionLabel("Developer");
+        SectionRow();
+        ImGui.TextUnformatted("AlexFlipnote");
+        ImGui.SameLine();
+        PushButton();
+        if (ImGui.Button("GitHub##about"))
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/AlexFlipnote/XIV_HolyPlugin") { UseShellExecute = true });
+        PopButton();
+
+        EndSection();
     }
 
     private void SubsectionLabel(string label)

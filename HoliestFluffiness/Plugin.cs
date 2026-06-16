@@ -163,7 +163,7 @@ public sealed class Plugin : IDalamudPlugin
                     Type      = Dalamud.Interface.ImGuiNotification.NotificationType.Info,
                     Minimized = false,
                 });
-                // Return type is ErrorCode enum — use object to avoid InvalidCastException
+                // Return type is ErrorCode enum, use object to avoid InvalidCastException
                 PluginInterface.GetIpcSubscriber<string, string, object>("Lifestream.ChangeCharacter")
                                .InvokeFunc(name, world);
                 loginInfoWindow.SetChangingState(name, world);

@@ -28,7 +28,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
     public event Action? OnInfoReady;
 
-    // Called on login — retries every second for up to 10s waiting for data to load.
+    // Called on login, retries every second for up to 10s waiting for data to load.
     public async Task RunAsync(CancellationToken token, bool instant = false)
     {
         bool characterWanted    = configuration.ShowCharacterInfo;
@@ -40,7 +40,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
         if (!characterWanted && !fcWanted && !plateWanted && !privateHouseWanted && !fcHouseWanted && !dbEnabled) return;
 
-        // Cross-world check — bail with a warning if visiting another world
+        // Cross-world check, bail with a warning if visiting another world
         bool differentWorld = false;
         await framework.RunOnFrameworkThread(() =>
         {

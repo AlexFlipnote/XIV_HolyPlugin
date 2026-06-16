@@ -6,7 +6,7 @@ using Dalamud.Plugin.Services;
 
 namespace HoliestFluffiness;
 
-// "FA" = "Find Anything" — Wotsit's actual IPC prefix (not "Wotsit.*")
+// "FA" = "Find Anything" / Wotsit's actual IPC prefix (not "Wotsit.*")
 public sealed class WotsitIpc : IDisposable
 {
     private const string DisplayName  = "The Holiest Fluffiness";
@@ -59,7 +59,7 @@ public sealed class WotsitIpc : IDisposable
             }
             catch (Exception ex)
             {
-                log.Warning(ex, "[Wotsit] FA.RegisterWithSearch failed — Wotsit not ready yet.");
+                log.Warning(ex, "[Wotsit] FA.RegisterWithSearch failed, Wotsit not ready yet.");
                 return;
             }
         }
@@ -67,7 +67,7 @@ public sealed class WotsitIpc : IDisposable
 
     private void OnAvailable()
     {
-        log.Debug("[Wotsit] FA.Available fired — re-registering entries.");
+        log.Debug("[Wotsit] FA.Available fired, re-registering entries.");
         RegisterAll();
     }
 
