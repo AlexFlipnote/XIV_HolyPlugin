@@ -1055,21 +1055,6 @@ public class ConfigWindow : Window
         }
         PopInput();
 
-        SectionRow();
-        var equipDelay = configuration.AccessoryEquipDelay;
-        ImGui.SetNextItemWidth(80);
-        PushInput();
-        if (ImGui.InputInt("Equip delay in seconds (0–10)", ref equipDelay, 1, 5))
-        {
-            configuration.AccessoryEquipDelay = Math.Clamp(equipDelay, 0, 10);
-            configuration.Save();
-        }
-        PopInput();
-        ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("(0 = instant)");
-        ImGui.PopStyleColor();
-
         ImGui.EndDisabled();
 
         DrawRestrictionsSubsection(accessoryEnabled);

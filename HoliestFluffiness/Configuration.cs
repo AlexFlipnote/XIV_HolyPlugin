@@ -14,7 +14,6 @@ public class Configuration : IPluginConfiguration
     public int Version { get; set; } = 1;
 
     public bool AccessoryEnabled { get; set; } = false;
-    public int AccessoryEquipDelay { get; set; } = 5;
     public int AccessoryInventory { get; set; } = 0;
     public int AccessoryInventoryMin { get; set; } = 0;
     public string AccessoryName { get; set; } = "Angel Wings";

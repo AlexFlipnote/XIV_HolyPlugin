@@ -65,15 +65,7 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
 
         token.ThrowIfCancellationRequested();
 
-        int delay = configuration.AccessoryEquipDelay;
-        string name = configuration.AccessoryName;
-
-        await framework.RunOnFrameworkThread(() => chatGui.Print($"Waiting {delay}s to equip '{name}'"));
-        await Task.Delay(delay * 1000, token);
-
-        token.ThrowIfCancellationRequested();
-
-        await framework.RunOnFrameworkThread(() => ExecuteCommand($"/fashion \"{name}\""));
+        await framework.RunOnFrameworkThread(() => ExecuteCommand($"/fashion \"{configuration.AccessoryName}\""));
     }
 
     private static unsafe void ExecuteCommand(string command)

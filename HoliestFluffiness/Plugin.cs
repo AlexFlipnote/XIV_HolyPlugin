@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
@@ -29,6 +30,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IPluginLog Log { get; init; } = null!;
     [PluginService] private ICommandManager CommandManager { get; init; } = null!;
     [PluginService] private IObjectTable ObjectTable { get; init; } = null!;
+    [PluginService] private ICondition Condition { get; init; } = null!;
     [PluginService] private IAddonLifecycle AddonLifecycle { get; init; } = null!;
     [PluginService] private IDataManager DataManager { get; init; } = null!;
     [PluginService] private ITitleScreenMenu TitleScreenMenu { get; init; } = null!;
@@ -250,10 +252,10 @@ public sealed class Plugin : IDalamudPlugin
         {
             while (!token.IsCancellationRequested)
             {
-                bool ready = false;
-                await Framework.RunOnFrameworkThread(() => { ready = ClientState.IsLoggedIn; });
-                if (ready) break;
-                await Task.Delay(1000, token);
+                bool loading = true;
+                await Framework.RunOnFrameworkThread(() => { loading = Condition[ConditionFlag.BetweenAreas] || Condition[ConditionFlag.BetweenAreas51]; });
+                if (!loading) break;
+                await Task.Delay(500, token);
             }
 
             token.ThrowIfCancellationRequested();
