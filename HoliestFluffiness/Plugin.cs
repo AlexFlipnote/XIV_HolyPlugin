@@ -92,7 +92,8 @@ public sealed class Plugin : IDalamudPlugin
         var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.images.menu_icon.png");
         TitleScreenMenu.AddEntry("Holy Plugin", icon, OpenMainUi);
 
-        ClientState.Login += OnLogin;
+        ClientState.Login  += OnLogin;
+        ClientState.Logout += OnLogout;
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
@@ -223,6 +224,16 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private void OnLogout(int type, int code)
+    {
+        lock (ctsLock)
+        {
+            loginCts?.Cancel();
+            loginCts?.Dispose();
+            loginCts = null;
+        }
+    }
+
     private void OnLogin()
     {
         CancellationTokenSource newCts;
@@ -273,7 +284,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
-        ClientState.Login -= OnLogin;
+        ClientState.Login  -= OnLogin;
+        ClientState.Logout -= OnLogout;
         lock (ctsLock)
         {
             loginCts?.Cancel();

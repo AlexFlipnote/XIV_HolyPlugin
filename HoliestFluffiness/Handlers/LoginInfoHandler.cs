@@ -70,24 +70,65 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         string?   privateHouse = needPrivateHouse ? await CollectPrivateHouseAsync(token) : null;
         string?   fcHouse      = needFcHouse      ? await CollectFcHouseAsync(token)      : null;
         long      gil          = dbEnabled         ? await CollectGilAsync(token)          : 0;
-        FcData?   fc           = null;
-        SeString? plate        = null;
+        FcData?   fc    = null;
+        SeString? plate = null;
 
-        if ((needFc || needPlate) && !instant)
+        if (needFc) fc = await CollectFcAsync(token, instant); // self-contained retry until definitive
+
+        // Load existing record once — used for cached plate display and as fallback for uncertain values.
+        CharacterRecord? existing = (dbEnabled && charInfo != null)
+            ? await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token)
+            : null;
+
+        if (needPlate && !instant)
         {
-            // Attempt 10 times (1 try = 500ms = 5 second wait)
-            for (var attempt = 0; attempt < 10; attempt++)
+            // If we have a cached value in the DB, show it immediately and verify live in background.
+            // Otherwise fall through to a normal live retry.
+            string? cachedPlate = existing?.SearchInfo;
+
+            if (cachedPlate != null)
             {
-                if (needFc    && fc    == null) fc    = await CollectFcAsync(token);
-                if (needPlate && plate == null) plate = await CollectPlateAsync(token);
-                if ((!needFc || fc != null) && (!needPlate || plate != null)) break;
-                await Task.Delay(500, token);
+                plate = new SeStringBuilder().AddText(cachedPlate).Build();
+
+                _ = Task.Run(async () =>
+                {
+                    var deadline = DateTime.UtcNow.AddSeconds(10);
+                    while (DateTime.UtcNow < deadline)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var live = await CollectPlateAsync(token);
+                        var liveText = live?.TextValue;
+
+                        if (!string.IsNullOrEmpty(liveText))
+                        {
+                            if (liveText == cachedPlate) return; // unchanged, nothing to do
+                            var rec = await Task.Run(() => characterDb.GetByKey(charInfo!.DbKey), token);
+                            if (rec != null) { rec.SearchInfo = liveText; await Task.Run(() => characterDb.Upsert(rec), token); }
+                            return;
+                        }
+
+                        await Task.Delay(500, token);
+                    }
+
+                    // Still empty after 10s — player cleared their search info
+                    var r = await Task.Run(() => characterDb.GetByKey(charInfo!.DbKey), token);
+                    if (r != null) { r.SearchInfo = null; await Task.Run(() => characterDb.Upsert(r), token); }
+                }, token);
+            }
+            else
+            {
+                // No cached value — FC resolution above already took a few seconds, plate likely ready.
+                for (var attempt = 0; attempt < 10; attempt++)
+                {
+                    plate = await CollectPlateAsync(token);
+                    if (plate != null) break;
+                    await Task.Delay(500, token);
+                }
             }
         }
-        else
+        else if (needPlate)
         {
-            if (needFc)    fc    = await CollectFcAsync(token);
-            if (needPlate) plate = await CollectPlateAsync(token);
+            plate = await CollectPlateAsync(token);
         }
 
         // Display (filtered by per-toggle settings)
@@ -100,7 +141,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         if (displayChar != null || displayFc != null || displayPl != null || displayPH != null || displayFcH != null)
             await ShowData(displayChar, displayFc, displayPl, displayPH, displayFcH);
 
-        // Persist to DB
+        // Persist to DB — fall back to existing record values for anything that didn't load confidently
         if (dbEnabled && charInfo != null)
         {
             var record = new CharacterRecord
@@ -109,11 +150,11 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 Name         = charInfo.Name,
                 World        = charInfo.World,
                 DataCenter   = charInfo.Dc,
-                FreeCompany  = fc?.Display,
-                SearchInfo   = plate?.TextValue,
-                PrivateHouse = privateHouse,
-                FcHouse      = fcHouse,
-                Gil          = gil,
+                FreeCompany  = fc?.Display          ?? existing?.FreeCompany,
+                SearchInfo   = plate?.TextValue      ?? existing?.SearchInfo,
+                PrivateHouse = privateHouse          ?? existing?.PrivateHouse,
+                FcHouse      = fcHouse               ?? existing?.FcHouse,
+                Gil          = gil >= 0 ? gil        : existing?.Gil ?? 0,
                 LastSeen     = DateTime.UtcNow,
             };
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
@@ -144,18 +185,18 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey));
         if (existing == null) return;
 
-        var newFc           = await CollectFcAsync(CancellationToken.None);
+        var newFc           = await CollectFcAsync(CancellationToken.None, instant: true);
         var newPrivateHouse = await CollectPrivateHouseAsync(CancellationToken.None);
         var newFcHouse      = await CollectFcHouseAsync(CancellationToken.None);
         var newGil          = await CollectGilAsync(CancellationToken.None);
         var newPlate        = await CollectPlateAsync(CancellationToken.None);
 
-        existing.FreeCompany  = newFc?.Display;
-        existing.PrivateHouse = newPrivateHouse;
-        existing.FcHouse      = newFcHouse;
-        existing.Gil          = newGil;
-        existing.SearchInfo   = newPlate?.TextValue;
-        existing.LastSeen     = DateTime.UtcNow;
+        if (newFc?.Display    != null) existing.FreeCompany  = newFc.Display;
+        if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
+        if (newFcHouse        != null) existing.FcHouse      = newFcHouse;
+        if (newGil            >= 0)    existing.Gil          = newGil;
+        if (newPlate?.TextValue != null) existing.SearchInfo = newPlate.TextValue;
+        existing.LastSeen = DateTime.UtcNow;
         await Task.Run(() => characterDb.Upsert(existing));
         log.Debug("Quick save written for {Key} before character switch.", charInfo.DbKey);
     }
@@ -178,7 +219,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             {
                 if (await IsOnDifferentWorldAsync()) continue;
 
-                var newFc           = await CollectFcAsync(token);
+                var newFc           = await CollectFcAsync(token, instant: true);
                 var newPrivateHouse = await CollectPrivateHouseAsync(token);
                 var newFcHouse      = await CollectFcHouseAsync(token);
                 var newGil          = await CollectGilAsync(token);
@@ -187,20 +228,24 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token);
                 if (existing == null) continue;
 
-                var newFcDisplay = newFc?.Display;
-                var newPlateText = newPlate?.TextValue;
+                // Only accept confident values; fall back to existing for anything that didn't load
+                var newFcDisplay  = newFc?.Display          ?? existing.FreeCompany;
+                var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
+                var newPlateText  = newPlate?.TextValue      ?? existing.SearchInfo;
+                var newPH         = newPrivateHouse          ?? existing.PrivateHouse;
+                var newFcH        = newFcHouse               ?? existing.FcHouse;
 
-                if (existing.FreeCompany  == newFcDisplay   &&
-                    existing.PrivateHouse == newPrivateHouse &&
-                    existing.FcHouse      == newFcHouse      &&
-                    existing.Gil          == newGil          &&
+                if (existing.FreeCompany  == newFcDisplay  &&
+                    existing.PrivateHouse == newPH         &&
+                    existing.FcHouse      == newFcH        &&
+                    existing.Gil          == newGilValue   &&
                     existing.SearchInfo   == newPlateText)
                     continue;
 
                 existing.FreeCompany  = newFcDisplay;
-                existing.PrivateHouse = newPrivateHouse;
-                existing.FcHouse      = newFcHouse;
-                existing.Gil          = newGil;
+                existing.PrivateHouse = newPH;
+                existing.FcHouse      = newFcH;
+                existing.Gil          = newGilValue;
                 existing.SearchInfo   = newPlateText;
                 existing.LastSeen     = DateTime.UtcNow;
                 await Task.Run(() => characterDb.Upsert(existing), token);
@@ -299,29 +344,42 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    private async Task<FcData?> CollectFcAsync(CancellationToken token)
+    // Blocks until FC state is definitive: tag present (has FC) or proxy gone (no FC).
+    // Pass instant=true to skip the wait (single read, used when data is guaranteed loaded).
+    private async Task<FcData?> CollectFcAsync(CancellationToken token, bool instant = false)
     {
         if (!configuration.InfoEnabled && !configuration.CharactersDbEnabled) return null;
 
         token.ThrowIfCancellationRequested();
 
-        string tag  = string.Empty;
-        string name = string.Empty;
-
-        await framework.RunOnFrameworkThread(() =>
+        var attempts = instant ? 1 : 10;
+        for (var i = 0; i < attempts; i++)
         {
-            if (objectTable[0] is IPlayerCharacter pc)
-                tag = pc.CompanyTag.ToString();
+            string tag       = string.Empty;
+            string name      = string.Empty;
+            bool   proxyNull = false;
 
-            unsafe
+            await framework.RunOnFrameworkThread(() =>
             {
-                var fc = InfoProxyFreeCompany.Instance();
-                if (fc != null) name = fc->NameString;
-            }
-        });
+                if (objectTable[0] is IPlayerCharacter pc)
+                    tag = pc.CompanyTag.ToString();
 
-        if (string.IsNullOrEmpty(tag)) return null;
-        return new FcData(tag, name);
+                unsafe
+                {
+                    var fc = InfoProxyFreeCompany.Instance();
+                    proxyNull = fc == null;
+                    if (fc != null) name = fc->NameString;
+                }
+            });
+
+            if (tag.Length > 0) return new FcData(tag, name); // has FC
+            if (proxyNull)      return null;                   // definitively no FC
+
+            // proxy present but name still empty — still loading, wait and retry
+            if (i < attempts - 1) await Task.Delay(500, token);
+        }
+
+        return null; // timed out
     }
 
     private async Task<SeString?> CollectPlateAsync(CancellationToken token)
