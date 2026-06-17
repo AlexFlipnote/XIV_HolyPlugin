@@ -26,7 +26,6 @@ public class ConfigWindow : Window
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly IClientState clientState;
     private readonly Action<string, string> onSwitchCharacter;
-    private readonly WotsitIpc wotsitIpc;
     private readonly Action<CharacterRecord, HousingBidRecord> onGoToBid;
     private readonly FileDialogManager fileDialogManager = new() { AddedWindowFlags = ImGuiWindowFlags.NoCollapse };
 
@@ -71,7 +70,7 @@ public class ConfigWindow : Window
     private static readonly Vector4 ColGoldMid  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.35f);
     private static readonly Vector4 ColNone     = new(0f, 0f, 0f, 0f);
 
-    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, WotsitIpc wotsitIpc, Action<CharacterRecord, HousingBidRecord> onGoToBid)
+    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, Action<CharacterRecord, HousingBidRecord> onGoToBid)
         : base($"The Holiest Fluffiness##Config")
     {
         this.configuration = configuration;
@@ -82,7 +81,6 @@ public class ConfigWindow : Window
         this.pluginInterface = pluginInterface;
         this.clientState = clientState;
         this.onSwitchCharacter = onSwitchCharacter;
-        this.wotsitIpc = wotsitIpc;
         this.onGoToBid = onGoToBid;
         selectedSection = configuration.LastSelectedSection;
 
@@ -639,16 +637,7 @@ public class ConfigWindow : Window
             ? $"{localPlayer.Name.TextValue}@{localPlayer.HomeWorld.ValueNullable?.Name.ExtractText()}"
             : null;
 
-        BeginSection("Characters", () =>
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
-            ImGui.TextUnformatted("[ Lifestream ]");
-            ImGui.PopStyleColor();
-            ImGui.SameLine();
-            ImGui.PushStyleColor(ImGuiCol.Text, wotsitIpc.IsAvailable ? ColGreen : ColRed);
-            ImGui.TextUnformatted("[ Wotsit ]");
-            ImGui.PopStyleColor();
-        });
+        BeginSection("Characters");
 
         var cols = configuration.CharactersColumns;
 
@@ -800,12 +789,7 @@ public class ConfigWindow : Window
             ? $"{localPlayer.Name.TextValue}@{localPlayer.HomeWorld.ValueNullable?.Name.ExtractText()}"
             : null;
 
-        BeginSection("Bids", () =>
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
-            ImGui.TextUnformatted("[ Lifestream ]");
-            ImGui.PopStyleColor();
-        });
+        BeginSection("Bids");
 
         ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
         ImGui.TextUnformatted("Track housing lottery bids across your characters.");
@@ -1200,6 +1184,18 @@ public class ConfigWindow : Window
             "experience and should look the part. As for why it exists: we have too many alts and other plugins " +
             "couldn't keep up with how we play, so we took matters into our own hands.");
         ImGui.PopTextWrapPos();
+        ImGui.PopStyleColor();
+
+        ImGui.Dummy(new Vector2(0, 10));
+        SubsectionLabel("Optional 3rd party plugins");
+        SectionRow();
+        bool lifestreamOn = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
+        ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
+        ImGui.TextUnformatted("Lifestream");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted(lifestreamOn ? "Enables switching to characters and travelling to housing plots directly from this plugin." : "Install Lifestream to enable character switching and housing plot travel.");
         ImGui.PopStyleColor();
 
         ImGui.Dummy(new Vector2(0, 10));

@@ -43,7 +43,6 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LoginInfoHandler loginInfoHandler;
     private readonly CharacterDb characterDb;
     private readonly CharaSelectHandler charaSelectHandler;
-    private readonly WotsitIpc wotsitIpc;
 
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
@@ -61,10 +60,7 @@ public sealed class Plugin : IDalamudPlugin
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(3); });
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log, NotificationManager);
         charaSelectHandler  = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework);
-        wotsitIpc              = new WotsitIpc(PluginInterface, Log, characterDb, SwitchToCharacter);
-        characterDb.Changed   += wotsitIpc.RegisterAll;
-
-        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, wotsitIpc, GoToBid);
+        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
 
@@ -300,9 +296,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
         windowSystem.RemoveAllWindows();
-        characterDb.Changed   -= wotsitIpc.RegisterAll;
         charaSelectHandler.Dispose();
-        wotsitIpc.Dispose();
         characterDb.Dispose();
     }
 }
