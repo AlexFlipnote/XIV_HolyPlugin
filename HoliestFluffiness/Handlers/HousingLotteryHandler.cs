@@ -81,6 +81,7 @@ public sealed class HousingLotteryHandler : IDisposable
         if (!isResult) return;
 
         if (addon->YesButton == null || addon->YesButton->OwnerNode == null) return;
+        if (_resultYesHandle != null) { addonEventManager.RemoveEvent(_resultYesHandle); _resultYesHandle = null; }
         _resultYesHandle = addonEventManager.AddEvent(
             (nint)addon, (nint)addon->YesButton->OwnerNode,
             AddonEventType.ButtonClick, OnResultYesClicked);
