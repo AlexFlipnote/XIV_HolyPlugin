@@ -29,9 +29,6 @@ public class HousingBidRecord
     [Column("bid_type")]
     public BidType BidType { get; set; }
 
-    [Column("bid_cost")]
-    public long BidCost { get; set; }
-
     [Column("bid_date")]
     public DateTime BidDate { get; set; }
 }

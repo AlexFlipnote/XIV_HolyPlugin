@@ -32,6 +32,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IObjectTable ObjectTable { get; init; } = null!;
     [PluginService] private ICondition Condition { get; init; } = null!;
     [PluginService] private IAddonLifecycle AddonLifecycle { get; init; } = null!;
+    [PluginService] private IAddonEventManager AddonEventManager { get; init; } = null!;
     [PluginService] private IDataManager DataManager { get; init; } = null!;
     [PluginService] private ITitleScreenMenu TitleScreenMenu { get; init; } = null!;
     [PluginService] private ITextureProvider TextureProvider { get; init; } = null!;
@@ -45,6 +46,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LoginInfoHandler loginInfoHandler;
     private readonly CharacterDb characterDb;
     private readonly CharaSelectHandler charaSelectHandler;
+    private readonly HousingLotteryHandler housingLotteryHandler;
 
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
@@ -61,7 +63,8 @@ public sealed class Plugin : IDalamudPlugin
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(3); });
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log, NotificationManager);
-        charaSelectHandler  = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework);
+        charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework);
+        housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, NotificationManager, Log);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
@@ -299,6 +302,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
         windowSystem.RemoveAllWindows();
         charaSelectHandler.Dispose();
+        housingLotteryHandler.Dispose();
         characterDb.Dispose();
     }
 }

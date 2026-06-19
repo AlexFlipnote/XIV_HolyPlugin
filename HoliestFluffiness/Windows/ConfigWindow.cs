@@ -45,16 +45,6 @@ public class ConfigWindow : Window
 
     // Bids section state
     private List<(HousingBidRecord Bid, CharacterRecord? Char)>? cachedBids;
-    private List<CharacterRecord>? bidsCharList;
-    private bool addBidFormOpen;
-    private int  addBidCharIdx;
-    private int  addBidDistrictIdx;
-    private int  addBidWard   = 1;
-    private int  addBidPlot   = 1;
-    private int  addBidNumber = 1;
-    private int  addBidTypeInt;
-    private string addBidCostStr = "0";
-    private string addBidDateStr = "";
 
     private static readonly Vector4 ColBg       = new(30f / 255f,  30f / 255f,  30f / 255f,  1f);
     private static readonly Vector4 ColSidebar  = new(48f / 255f,  48f / 255f,  48f / 255f,  1f);
@@ -174,9 +164,8 @@ public class ConfigWindow : Window
         SidebarItem("Database", 2);
         if (SidebarItem("Characters", 3))
             LoadCharacters();
-        ImGui.BeginDisabled(true);
-        SidebarItem("[WIP] House bids", 4);
-        ImGui.EndDisabled();
+        if (SidebarItem("House bids", 4))
+            LoadBids();
 
         ImGui.SetCursorPosY(ImGui.GetContentRegionMax().Y - 36f);
         SidebarItem("About", 5);
@@ -420,7 +409,6 @@ public class ConfigWindow : Window
         var allBids  = characterDb.GetAllBids();
         var allChars = characterDb.GetAll();
         cachedBids   = [.. allBids.Select(b => (b, allChars.FirstOrDefault(c => c.Key == b.CharacterKey))).OrderBy(x => x.Item1.BidDate)];
-        bidsCharList = [.. allChars.OrderBy(c => c.World).ThenBy(c => c.Slot == 0 ? int.MaxValue : c.Slot)];
     }
 
     private void DrawCharacterNameCell(CharacterRecord rec, bool lifestreamOn, string? currentKey)
@@ -792,29 +780,14 @@ public class ConfigWindow : Window
         BeginSection("Bids");
 
         ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Track housing lottery bids across your characters.");
+        ImGui.TextUnformatted("Housing lottery bids are tracked automatically when you place or confirm a bid.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
         PushButton();
-        if (ImGui.Button("+ Add bid##bidadd"))
-        {
-            addBidFormOpen    = true;
-            addBidCharIdx     = 0;
-            addBidDistrictIdx = 0;
-            addBidWard        = 1;
-            addBidPlot        = 1;
-            addBidNumber      = 1;
-            addBidTypeInt     = 0;
-            addBidCostStr     = "0";
-            addBidDateStr     = DateTime.Now.ToString("yyyy-MM-dd");
-        }
-        ImGui.SameLine(0, 4);
         if (ImGui.Button("Refresh##bidrefresh")) LoadBids();
         PopButton();
-
-        if (addBidFormOpen) DrawAddBidForm();
 
         ImGui.Dummy(new Vector2(0, 2));
 
@@ -822,16 +795,15 @@ public class ConfigWindow : Window
         var tableFlags = ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersOuter | ImGuiTableFlags.BordersInnerV
                        | ImGuiTableFlags.RowBg   | ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("##bidtable", 7, tableFlags, new Vector2(0, tableH)))
+        if (ImGui.BeginTable("##bidtable", 6, tableFlags, new Vector2(0, tableH)))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Location",  ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Bid#",      ImGuiTableColumnFlags.WidthFixed, 40f);
             ImGui.TableSetupColumn("Type",      ImGuiTableColumnFlags.WidthFixed, 60f);
-            ImGui.TableSetupColumn("Cost",      ImGuiTableColumnFlags.WidthFixed, 100f);
             ImGui.TableSetupColumn("Date",      ImGuiTableColumnFlags.WidthFixed, 90f);
-            ImGui.TableSetupColumn("##bidacts", ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.WidthFixed, 55f);
+            ImGui.TableSetupColumn("##bidacts", ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.WidthFixed, 26f);
             ImGui.TableHeadersRow();
 
             int? pendingDelete = null;
@@ -843,9 +815,24 @@ public class ConfigWindow : Window
                 if (rec != null)
                 {
                     bool isCurrent = currentKey != null && rec.Key == currentKey;
-                    ImGui.PushStyleColor(ImGuiCol.Text, isCurrent ? ColGreen : ColWhite);
-                    ImGui.TextUnformatted($"{rec.Name} @ {rec.World}");
-                    ImGui.PopStyleColor();
+                    if (isCurrent)
+                    {
+                        ImGui.PushStyleColor(ImGuiCol.Text, ColGreen);
+                        ImGui.TextUnformatted($"{rec.Name} @ {rec.World}");
+                        ImGui.PopStyleColor();
+                    }
+                    else if (lifestreamOn)
+                    {
+                        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+                        if (ImGui.Selectable($"{rec.Name} @ {rec.World}##sel{bid.Id}", false, ImGuiSelectableFlags.None))
+                            onGoToBid(rec, bid);
+                        ImGui.PopStyleColor();
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Switch to {rec.Name} and teleport to {bid.District} W{bid.Ward} P{bid.Plot}");
+                    }
+                    else
+                    {
+                        ImGui.TextUnformatted($"{rec.Name} @ {rec.World}");
+                    }
                 }
                 else
                 {
@@ -864,21 +851,10 @@ public class ConfigWindow : Window
                 ImGui.TextUnformatted(bid.BidType == BidType.Private ? "Private" : "FC");
 
                 ImGui.TableSetColumnIndex(4);
-                ImGui.TextUnformatted(bid.BidCost.ToString("N0", CultureInfo.InvariantCulture));
-
-                ImGui.TableSetColumnIndex(5);
                 ImGui.TextUnformatted(bid.BidDate.ToLocalTime().ToString("yyyy-MM-dd"));
 
-                ImGui.TableSetColumnIndex(6);
+                ImGui.TableSetColumnIndex(5);
                 PushButton();
-                bool canGo = lifestreamOn && rec != null;
-                ImGui.BeginDisabled(!canGo);
-                if (ImGui.SmallButton($"Go##{bid.Id}"))
-                    onGoToBid(rec!, bid);
-                ImGui.EndDisabled();
-                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !canGo)
-                    ImGui.SetTooltip(lifestreamOn ? "Character not found in database" : "Lifestream not available");
-                ImGui.SameLine(0, 2);
                 ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
                 if (ImGui.SmallButton($"X##{bid.Id}")) pendingDelete = bid.Id;
                 ImGui.PopStyleColor();
@@ -892,120 +868,6 @@ public class ConfigWindow : Window
         }
 
         EndSection();
-    }
-
-    private void DrawAddBidForm()
-    {
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
-
-        var charNames = bidsCharList?.Select(c => $"{c.Name} @ {c.World}").ToArray() ?? [];
-        if (charNames.Length == 0)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-            ImGui.TextUnformatted("No characters in database. Enable the character database and log in first.");
-            ImGui.PopStyleColor();
-            return;
-        }
-
-        addBidCharIdx = Math.Clamp(addBidCharIdx, 0, charNames.Length - 1);
-
-        // Row 1: character, district, ward, plot
-        PushInput();
-        ImGui.SetNextItemWidth(220);
-        ImGui.Combo("##bidchar", ref addBidCharIdx, charNames, charNames.Length);
-        ImGui.SameLine(0, 6);
-        ImGui.SetNextItemWidth(130);
-        ImGui.Combo("##biddistrict", ref addBidDistrictIdx, Districts, Districts.Length);
-        ImGui.SameLine(0, 6);
-        ImGui.SetNextItemWidth(50);
-        if (ImGui.InputInt("##bidward", ref addBidWard, 1, 5)) addBidWard = Math.Clamp(addBidWard, 1, 30);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Ward (1–30)");
-        ImGui.SameLine(0, 6);
-        ImGui.SetNextItemWidth(50);
-        if (ImGui.InputInt("##bidplot", ref addBidPlot, 1, 5)) addBidPlot = Math.Clamp(addBidPlot, 1, 60);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Plot (1–60)");
-        PopInput();
-
-        SectionRow();
-
-        // Row 2: bid#, type, cost, date
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Bid#");
-        ImGui.PopStyleColor();
-        ImGui.SameLine(0, 4);
-        PushInput();
-        ImGui.SetNextItemWidth(55);
-        if (ImGui.InputInt("##bidnum", ref addBidNumber, 1, 10)) addBidNumber = Math.Max(1, addBidNumber);
-        PopInput();
-
-        ImGui.SameLine(0, 12);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Type:");
-        ImGui.PopStyleColor();
-        ImGui.SameLine(0, 4);
-        PushCheckbox();
-        if (ImGui.RadioButton("Private##brt0", addBidTypeInt == 0)) addBidTypeInt = 0;
-        ImGui.SameLine(0, 6);
-        if (ImGui.RadioButton("FC##brt1", addBidTypeInt == 1)) addBidTypeInt = 1;
-        PopCheckbox();
-
-        ImGui.SameLine(0, 12);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Cost:");
-        ImGui.PopStyleColor();
-        ImGui.SameLine(0, 4);
-        PushInput();
-        ImGui.SetNextItemWidth(100);
-        ImGui.InputText("##bidcost", ref addBidCostStr, 12);
-        ImGui.SameLine(0, 12);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Date:");
-        ImGui.PopStyleColor();
-        ImGui.SameLine(0, 4);
-        ImGui.SetNextItemWidth(90);
-        ImGui.InputText("##biddate", ref addBidDateStr, 10);
-        PopInput();
-        ImGui.SameLine(0, 4);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("(yyyy-MM-dd)");
-        ImGui.PopStyleColor();
-
-        SectionRow();
-
-        bool costOk = long.TryParse(addBidCostStr, out _);
-        bool dateOk = DateTime.TryParseExact(addBidDateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
-        bool canAdd = charNames.Length > 0 && costOk && dateOk;
-
-        PushButton();
-        ImGui.BeginDisabled(!canAdd);
-        if (ImGui.Button("Add##bidconfirm"))
-        {
-            var selectedChar = bidsCharList![addBidCharIdx];
-            long.TryParse(addBidCostStr, out var cost);
-            DateTime.TryParseExact(addBidDateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date);
-            characterDb.AddBid(new HousingBidRecord
-            {
-                CharacterKey = selectedChar.Key,
-                District     = Districts[addBidDistrictIdx],
-                Ward         = addBidWard,
-                Plot         = addBidPlot,
-                BidNumber    = addBidNumber,
-                BidType      = (BidType)addBidTypeInt,
-                BidCost      = cost,
-                BidDate      = date.ToUniversalTime(),
-            });
-            addBidFormOpen = false;
-            LoadBids();
-        }
-        ImGui.EndDisabled();
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !canAdd)
-            ImGui.SetTooltip(!costOk ? "Cost must be a number" : "Date must be yyyy-MM-dd");
-        ImGui.SameLine(0, 4);
-        if (ImGui.Button("Cancel##bidcancel")) addBidFormOpen = false;
-        PopButton();
-
-        ImGui.Dummy(new Vector2(0, 4));
     }
 
     private void DrawAccessorySection()

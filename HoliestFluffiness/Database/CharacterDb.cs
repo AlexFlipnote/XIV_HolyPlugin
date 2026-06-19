@@ -131,9 +131,10 @@ public sealed class CharacterDb : IDisposable
         Changed?.Invoke();
     }
 
-    public List<HousingBidRecord> GetAllBids() => [.. db.Table<HousingBidRecord>()];
-    public void AddBid(HousingBidRecord bid)    => db.Insert(bid);
-    public void DeleteBid(int id)               => db.Delete<HousingBidRecord>(id);
+    public List<HousingBidRecord> GetAllBids()                  => [.. db.Table<HousingBidRecord>()];
+    public List<HousingBidRecord> GetBidsByCharacter(string key) => [.. db.Table<HousingBidRecord>().Where(b => b.CharacterKey == key)];
+    public void AddBid(HousingBidRecord bid)                     => db.Insert(bid);
+    public void DeleteBid(int id)                                => db.Delete<HousingBidRecord>(id);
 
     public void Dispose() => db.Close();
 }
