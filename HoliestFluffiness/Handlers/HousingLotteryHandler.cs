@@ -62,6 +62,7 @@ public sealed class HousingLotteryHandler : IDisposable
 
         addonLifecycle.RegisterListener(AddonEvent.PostSetup,    AddonName, OnAddon);
         addonLifecycle.RegisterListener(AddonEvent.PostRefresh,  AddonName, OnAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PreFinalize,  AddonName, OnAddonFinalize);
         addonLifecycle.RegisterListener(AddonEvent.PostSetup,    "SelectYesNoTextScroll", OnBidConfirmSetup);
         addonLifecycle.RegisterListener(AddonEvent.PostSetup,    "SelectYesno", OnResultYesnoSetup);
         addonLifecycle.RegisterListener(AddonEvent.PreFinalize,  "SelectYesno", OnResultYesnoFinalize);
@@ -86,6 +87,13 @@ public sealed class HousingLotteryHandler : IDisposable
             (nint)addon, (nint)addon->YesButton->OwnerNode,
             AddonEventType.ButtonClick, OnResultYesClicked);
         log.Debug("[HousingLottery] Result dialog detected, hooked Yes button.");
+    }
+
+    private void OnAddonFinalize(AddonEvent type, AddonArgs args)
+    {
+        _lastLocation = string.Empty;
+        _lastBidNum   = string.Empty;
+        _lastStatus   = string.Empty;
     }
 
     private void OnResultYesnoFinalize(AddonEvent type, AddonArgs args)
@@ -369,6 +377,7 @@ public sealed class HousingLotteryHandler : IDisposable
     {
         addonLifecycle.UnregisterListener(AddonEvent.PostSetup,   AddonName, OnAddon);
         addonLifecycle.UnregisterListener(AddonEvent.PostRefresh, AddonName, OnAddon);
+        addonLifecycle.UnregisterListener(AddonEvent.PreFinalize, AddonName, OnAddonFinalize);
         addonLifecycle.UnregisterListener(AddonEvent.PostSetup,   "SelectYesNoTextScroll", OnBidConfirmSetup);
         addonLifecycle.UnregisterListener(AddonEvent.PostSetup,   "SelectYesno", OnResultYesnoSetup);
         addonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "SelectYesno", OnResultYesnoFinalize);
