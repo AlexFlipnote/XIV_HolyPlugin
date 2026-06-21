@@ -72,7 +72,8 @@ def main():
         if k not in manifest:
             manifest[k] = v
 
-    download_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{version}/latest.zip"
+    tag = os.environ.get("RELEASE_TAG", version)
+    download_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{tag}/latest.zip"
     manifest["DownloadLinkInstall"] = download_url
     manifest["DownloadLinkTesting"] = download_url
     manifest["DownloadLinkUpdate"] = download_url
