@@ -38,4 +38,7 @@ public class CharacterRecord
 
     [Column("slot")]
     public int Slot { get; set; }
+
+    [Column("inventory")]
+    public string? Inventory { get; set; }
 }

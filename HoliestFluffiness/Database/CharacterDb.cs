@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using SQLite;
 
 namespace HoliestFluffiness;
@@ -22,6 +23,7 @@ public sealed class CharacterDb : IDisposable
         db.CreateTable<CharacterRecord>();
         db.CreateTable<HousingBidRecord>();
         AddColumnIfMissing("slot", "INTEGER");
+        AddColumnIfMissing("inventory", "TEXT");
     }
 
     private void AddColumnIfMissing(string column, string type)
@@ -65,6 +67,20 @@ public sealed class CharacterDb : IDisposable
     {
         var list = db.Table<CharacterRecord>().ToList().Where(r => r.Gil >= 0).ToList();
         return list.Count == 0 ? 0 : (long)list.Average(r => r.Gil);
+    }
+
+    public Dictionary<uint, long> TotalInventoryItems()
+    {
+        var totals = new Dictionary<uint, long>();
+        foreach (var rec in db.Table<CharacterRecord>())
+        {
+            if (rec.Inventory == null) continue;
+            var items = JsonSerializer.Deserialize<Dictionary<uint, int>>(rec.Inventory);
+            if (items == null) continue;
+            foreach (var (id, qty) in items)
+                totals[id] = totals.GetValueOrDefault(id) + qty;
+        }
+        return totals;
     }
 
     public event Action? Changed;
@@ -127,6 +143,7 @@ public sealed class CharacterDb : IDisposable
         rec.PrivateHouse = null;
         rec.FcHouse      = null;
         rec.Gil          = -1;
+        rec.Inventory    = null;
         db.Update(rec);
         Changed?.Invoke();
     }

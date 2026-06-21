@@ -17,8 +17,8 @@ pack: release
 	cp $(OUT_REL)/$(PLUGIN).dll  $(DIST)/
 	cp $(OUT_REL)/$(PLUGIN).pdb  $(DIST)/ 2>/dev/null || true
 	cp $(PLUGIN)/$(PLUGIN).json  $(DIST)/
-	mkdir -p $(DIST)/images
-	cp $(PLUGIN)/images/icon.png $(DIST)/images/
+	mkdir -p $(DIST)/Images
+	cp $(PLUGIN)/Images/icon.png $(DIST)/Images/
 
 clean:
 	dotnet clean $(PROJ)

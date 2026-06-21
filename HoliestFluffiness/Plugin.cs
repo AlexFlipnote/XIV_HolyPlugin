@@ -1,10 +1,16 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.Chat;
+using Dalamud.Game.Gui.Dtr;
+using Dalamud.Hooking;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
+using Dalamud.Game.Text;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -13,6 +19,7 @@ using HoliestFluffiness.Handlers;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using HoliestFluffiness.Windows;
 using System.Reflection;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace HoliestFluffiness;
 
@@ -37,41 +44,97 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private ITitleScreenMenu TitleScreenMenu { get; init; } = null!;
     [PluginService] private ITextureProvider TextureProvider { get; init; } = null!;
     [PluginService] private INotificationManager NotificationManager { get; init; } = null!;
+    [PluginService] private IGameInteropProvider GameInterop { get; init; } = null!;
+    [PluginService] private IDtrBar DtrBar { get; init; } = null!;
+    [PluginService] private ISigScanner SigScanner { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
     private readonly ConfigWindow configWindow;
     private readonly LoginInfoWindow loginInfoWindow;
+    private readonly NoKillWindow noKillWindow;
     private readonly AccessoryHandler accessoryHandler;
     private readonly LoginInfoHandler loginInfoHandler;
     private readonly CharacterDb characterDb;
     private readonly CharaSelectHandler charaSelectHandler;
     private readonly HousingLotteryHandler housingLotteryHandler;
+    private readonly ServerInfoHandler serverInfoHandler;
+    private readonly RepairHandler repairHandler;
+    private readonly NoKillHandler noKillHandler;
+    private readonly PhysicsHandler physicsHandler;
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetWindowText(IntPtr hwnd, string lpString);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true)]
+    private static extern IntPtr GetForegroundWindow();
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FLASHWINFO
+    {
+        public uint cbSize;
+        public IntPtr hwnd;
+        public uint dwFlags;
+        public uint uCount;
+        public uint dwTimeout;
+    }
+
+    private const uint FLASHW_ALL       = 3;
+    private const uint FLASHW_TIMERNOFG = 12;
+
+    private unsafe delegate void InitiateReadyCheckDelegate(AgentReadyCheck* self);
+    private Hook<InitiateReadyCheckDelegate>? readyCheckHook;
+
+    private readonly IntPtr windowHandle;
+    private readonly string originalTitle;
+    private uint? lastTitleWorldId;
 
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
     private string? pendingLifestreamArgs;
+    private string? lastKnownName;
+    private string? lastKnownWorld;
 
     public Plugin()
     {
         configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         configuration.Initialize(PluginInterface);
 
+        using var proc = Process.GetCurrentProcess();
+        windowHandle  = proc.MainWindowHandle;
+        originalTitle = proc.MainWindowTitle;
+        ApplyClientTitle();
+        Framework.Update += OnClientTitleFrameworkUpdate;
+
         var dbPath = Path.Combine(PluginInterface.GetPluginConfigDirectory(), "storage.db");
         characterDb = new CharacterDb(dbPath);
 
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
-        loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(3); });
+        loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(5); });
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log, NotificationManager);
-        charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework);
+        noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
+        physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
+        noKillWindow           = new NoKillWindow();
+        noKillHandler.OnLobbyError += () =>
+        {
+            if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld);
+        };
+        charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, noKillHandler, SwitchToCharacter);
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, NotificationManager, Log);
-        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid);
+        serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
+        repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
+        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
+        windowSystem.AddWindow(noKillWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open The Holiest Fluffiness settings."
+            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' to open the about page."
         });
         CommandManager.AddHandler(HwCommand, new CommandInfo(OnHwCommand)
         {
@@ -90,18 +153,35 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
-        var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.images.menu_icon.png");
+        var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.Images.menu_icon.png");
         TitleScreenMenu.AddEntry("Holy Plugin", icon, OpenMainUi);
 
         ClientState.Login  += OnLogin;
         ClientState.Logout += OnLogout;
+
+        ChatGui.ChatMessage += OnChatMessageFlash;
+        unsafe
+        {
+            readyCheckHook = GameInterop.HookFromAddress<InitiateReadyCheckDelegate>(
+                AgentReadyCheck.MemberFunctionPointers.InitiateReadyCheck,
+                OnReadyCheckInitiated);
+        }
+        readyCheckHook.Enable();
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
-    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(3); }
+    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(7); }
 
-    private void OnCommand(string command, string args) =>
+    private void OnCommand(string command, string args)
+    {
+        if (args.Trim().Equals("about", StringComparison.OrdinalIgnoreCase))
+        {
+            configWindow.IsOpen = true;
+            configWindow.NavigateTo(7);
+            return;
+        }
         configWindow.IsOpen = !configWindow.IsOpen;
+    }
 
     private void OnHwCommand(string command, string args)
     {
@@ -227,16 +307,32 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnLogout(int type, int code)
     {
+        lastTitleWorldId = null;
+        ApplyClientTitle();
         lock (ctsLock)
         {
             loginCts?.Cancel();
             loginCts?.Dispose();
             loginCts = null;
         }
+
+        if (configuration.NoKillEnabled && (code == 90001 || code == 90002 || code == 90006 || code == 90007))
+        {
+            if (!string.IsNullOrEmpty(lastKnownName) && !string.IsNullOrEmpty(lastKnownWorld))
+                noKillHandler.SetAutoLoginTarget(lastKnownName, lastKnownWorld);
+        }
     }
 
     private void OnLogin()
     {
+        var player = ObjectTable[0] as IPlayerCharacter;
+        if (player != null)
+        {
+            lastKnownName  = player.Name.TextValue;
+            lastKnownWorld = player.HomeWorld.ValueNullable?.Name.ExtractText();
+        }
+        noKillHandler.ClearReconnecting();
+        UpdateClientTitle();
         CancellationTokenSource newCts;
         lock (ctsLock)
         {
@@ -283,10 +379,69 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private void FlashTaskbar()
+    {
+        if (GetForegroundWindow() == windowHandle) return;
+        var fi = new FLASHWINFO
+        {
+            cbSize   = (uint)Marshal.SizeOf<FLASHWINFO>(),
+            hwnd     = windowHandle,
+            dwFlags  = FLASHW_ALL | FLASHW_TIMERNOFG,
+            uCount   = uint.MaxValue,
+            dwTimeout = 0,
+        };
+        FlashWindowEx(ref fi);
+    }
+
+    private void OnChatMessageFlash(IHandleableChatMessage message)
+    {
+        if (configuration.ClientFlashOnTell && message.LogKind == XivChatType.TellIncoming)
+            FlashTaskbar();
+    }
+
+    private unsafe void OnReadyCheckInitiated(AgentReadyCheck* self)
+    {
+        readyCheckHook!.Original(self);
+        if (configuration.ClientFlashOnReadyCheck)
+            FlashTaskbar();
+    }
+
+    private void ApplyClientTitle()
+    {
+        var prefix = configuration.ClientTitlePrefix.Trim();
+        SetWindowText(windowHandle, string.IsNullOrEmpty(prefix) ? "FINAL FANTASY XIV" : prefix);
+    }
+
+    private void UpdateClientTitle()
+    {
+        if (!configuration.ClientAppendNameOnLogin) { ApplyClientTitle(); return; }
+        var player = ObjectTable[0] as IPlayerCharacter;
+        if (player == null) { ApplyClientTitle(); return; }
+        var world  = player.CurrentWorld.ValueNullable?.Name.ExtractText() ?? "";
+        var prefix = configuration.ClientTitlePrefix.Trim();
+        SetWindowText(windowHandle, string.IsNullOrEmpty(prefix)
+            ? $"{player.Name.TextValue} @ {world}"
+            : $"{prefix} / {player.Name.TextValue} @ {world}");
+    }
+
+    private void OnClientTitleFrameworkUpdate(IFramework fw)
+    {
+        if (!configuration.ClientAppendNameOnLogin) return;
+        var player  = ObjectTable[0] as IPlayerCharacter;
+        var worldId = player?.CurrentWorld.IsValid == true ? (uint?)player.CurrentWorld.RowId : null;
+        if (worldId == lastTitleWorldId) return;
+        lastTitleWorldId = worldId;
+        UpdateClientTitle();
+    }
+
     public void Dispose()
     {
+        Framework.Update -= OnClientTitleFrameworkUpdate;
+        SetWindowText(windowHandle, originalTitle);
         ClientState.Login  -= OnLogin;
         ClientState.Logout -= OnLogout;
+        ChatGui.ChatMessage -= OnChatMessageFlash;
+        readyCheckHook?.Dispose();
         lock (ctsLock)
         {
             loginCts?.Cancel();
@@ -303,6 +458,10 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.RemoveAllWindows();
         charaSelectHandler.Dispose();
         housingLotteryHandler.Dispose();
+        serverInfoHandler.Dispose();
+        repairHandler.Dispose();
+        noKillHandler.Dispose();
+        physicsHandler.Dispose();
         characterDb.Dispose();
     }
 }

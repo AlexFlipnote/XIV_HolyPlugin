@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -15,6 +18,11 @@ namespace HoliestFluffiness;
 
 public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log, INotificationManager notificationManager)
 {
+    public static readonly Dictionary<uint, string> TrackedItems = new()
+    {
+        { 10155u, "Ceruleum" },
+        { 10373u, "Magitek" },
+    };
     private record FcData(string Tag, string Name)
     {
         public string Display => $"«{Tag}» {Name}";
@@ -92,6 +100,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         string?   privateHouse = needPrivateHouse ? await CollectPrivateHouseAsync(token) : null;
         string?   fcHouse      = needFcHouse      ? await CollectFcHouseAsync(token)      : null;
         long      gil          = dbEnabled         ? await CollectGilAsync(token)          : 0;
+        string?   inventory    = dbEnabled         ? await CollectInventoryAsync(token)    : null;
         FcData?   fc    = null;
         SeString? plate = null;
 
@@ -177,6 +186,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 PrivateHouse = privateHouse          ?? existing?.PrivateHouse,
                 FcHouse      = fcHouse               ?? existing?.FcHouse,
                 Gil          = gil >= 0 ? gil        : existing?.Gil ?? 0,
+                Inventory    = inventory              ?? existing?.Inventory,
                 LastSeen     = DateTime.UtcNow,
             };
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
@@ -212,12 +222,14 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var newFcHouse      = await CollectFcHouseAsync(CancellationToken.None);
         var newGil          = await CollectGilAsync(CancellationToken.None);
         var newPlate        = await CollectPlateAsync(CancellationToken.None);
+        var newInventory    = await CollectInventoryAsync(CancellationToken.None);
 
         if (newFc?.Display    != null) existing.FreeCompany  = newFc.Display;
         if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
         if (newFcHouse        != null) existing.FcHouse      = newFcHouse;
         if (newGil            >= 0)    existing.Gil          = newGil;
         if (newPlate?.TextValue != null) existing.SearchInfo = newPlate.TextValue;
+        if (newInventory      != null) existing.Inventory    = newInventory;
         existing.LastSeen = DateTime.UtcNow;
         await Task.Run(() => characterDb.Upsert(existing));
         log.Debug("Quick save written for {Key} before character switch.", charInfo.DbKey);
@@ -246,6 +258,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var newFcHouse      = await CollectFcHouseAsync(token);
                 var newGil          = await CollectGilAsync(token);
                 var newPlate        = await CollectPlateAsync(token);
+                var newInventory    = await CollectInventoryAsync(token);
 
                 var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token);
                 if (existing == null) continue;
@@ -256,12 +269,14 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var newPlateText  = newPlate?.TextValue      ?? existing.SearchInfo;
                 var newPH         = newPrivateHouse          ?? existing.PrivateHouse;
                 var newFcH        = newFcHouse               ?? existing.FcHouse;
+                var newInv        = newInventory             ?? existing.Inventory;
 
                 if (existing.FreeCompany  == newFcDisplay  &&
                     existing.PrivateHouse == newPH         &&
                     existing.FcHouse      == newFcH        &&
                     existing.Gil          == newGilValue   &&
-                    existing.SearchInfo   == newPlateText)
+                    existing.SearchInfo   == newPlateText  &&
+                    existing.Inventory    == newInv)
                     continue;
 
                 existing.FreeCompany  = newFcDisplay;
@@ -269,6 +284,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 existing.FcHouse      = newFcH;
                 existing.Gil          = newGilValue;
                 existing.SearchInfo   = newPlateText;
+                existing.Inventory    = newInv;
                 existing.LastSeen     = DateTime.UtcNow;
                 await Task.Run(() => characterDb.Upsert(existing), token);
                 log.Debug("Periodic DB update written for {Key}", charInfo.DbKey);
@@ -500,6 +516,40 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         });
 
         return result;
+    }
+
+    private async Task<string?> CollectInventoryAsync(CancellationToken token)
+    {
+        if (!configuration.CharactersDbEnabled) return null;
+        token.ThrowIfCancellationRequested();
+
+        // null return = inventory manager unavailable (not logged in yet); caller preserves existing value
+        // non-null return always includes every tracked item, 0 if not found, so the UI can distinguish
+        // "never scanned" (rec.Inventory == null) from "scanned, found zero" (item present with value 0)
+        Dictionary<uint, int>? counts = null;
+        await framework.RunOnFrameworkThread(() =>
+        {
+            unsafe
+            {
+                var inv = InventoryManager.Instance();
+                if (inv == null) return;
+                counts = TrackedItems.Keys.ToDictionary(id => id, _ => 0);
+                foreach (var bag in new[] { InventoryType.Inventory1, InventoryType.Inventory2, InventoryType.Inventory3, InventoryType.Inventory4 })
+                {
+                    var container = inv->GetInventoryContainer(bag);
+                    if (container == null) continue;
+                    for (int i = 0; i < (int)container->Size; i++)
+                    {
+                        var slot = container->GetInventorySlot(i);
+                        if (slot == null || slot->ItemId == 0) continue;
+                        if (counts.ContainsKey(slot->ItemId))
+                            counts[slot->ItemId] += (int)slot->Quantity;
+                    }
+                }
+            }
+        });
+
+        return counts == null ? null : JsonSerializer.Serialize(counts);
     }
 
     private static string? GetDistrictName(ushort territoryTypeId) => territoryTypeId switch

@@ -65,7 +65,7 @@ def main():
     manifest["InternalName"] = PLUGIN_NAME
     manifest["AssemblyVersion"] = version
     manifest["DalamudApiLevel"] = get_dalamud_api_level()
-    manifest.setdefault("IconUrl", f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/master/{PLUGIN_NAME}/images/icon.png")
+    manifest.setdefault("IconUrl", f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/master/{PLUGIN_NAME}/Images/icon.png")
     manifest.setdefault("ImageUrls", [])
 
     for k, v in DEFAULTS.items():

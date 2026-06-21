@@ -7,6 +7,7 @@ using Dalamud.Plugin;
 namespace HoliestFluffiness;
 
 public enum LoginInfoDisplay { Echo = 0, Popup = 1, Toast = 2 }
+public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -30,6 +31,31 @@ public class Configuration : IPluginConfiguration
     // Visibility of the 9 Characters table columns: LastSeen, Name, World, DC, FC, SearchInfo, PrivateHouse, FcHouse, Gil
     public bool[] CharactersColumns { get; set; } = [true, true, true, true, true, true, true, true, true];
     public int LastSelectedSection { get; set; } = 0;
+
+    // Server info section
+    public bool ServerInfoPingEnabled { get; set; } = false;
+    public PingDisplay ServerInfoPingDisplay { get; set; } = PingDisplay.Last;
+    public bool ServerInfoFpsEnabled { get; set; } = false;
+
+    // Repair section
+    public bool RepairLowEnabled { get; set; } = false;
+    public float RepairLowThreshold { get; set; } = 50f;
+    public bool RepairCriticalEnabled { get; set; } = true;
+    public float RepairCriticalThreshold { get; set; } = 25f;
+
+    // Client section
+    public string ClientTitlePrefix { get; set; } = "";
+    public bool ClientAppendNameOnLogin { get; set; } = false;
+    public bool ClientFlashOnTell { get; set; } = false;
+    public bool ClientFlashOnReadyCheck { get; set; } = false;
+
+    // NoKill section
+    public bool NoKillEnabled { get; set; } = true;
+    public bool NoKillDisablePopup { get; set; } = false;
+
+    // Physics section
+    public bool PhysicsEnabled { get; set; } = false;
+    public float PhysicsTargetFps { get; set; } = 60f;
 
     private IDalamudPluginInterface pluginInterface = null!;
 

@@ -42,11 +42,11 @@ jobs:
 
       - name: Pack Plugin
         run: |
-          mkdir -p dist/HoliestFluffiness/images
+          mkdir -p dist/HoliestFluffiness/Images
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
           cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
-          cp HoliestFluffiness/images/icon.png dist/HoliestFluffiness/images/
+          cp HoliestFluffiness/Images/icon.png dist/HoliestFluffiness/Images/
 
       - name: Generate repo.json
         env:
