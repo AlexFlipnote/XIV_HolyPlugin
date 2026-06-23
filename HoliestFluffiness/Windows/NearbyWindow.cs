@@ -422,10 +422,7 @@ public sealed class NearbyWindow : Window, IDisposable
         if (ImGui.MenuItem("Target") && obj != null)
             targetManager.Target = obj;
 
-        if (ImGui.MenuItem("Focus Target") && obj != null)
-            targetManager.FocusTarget = obj;
-
-        if (ImGui.MenuItem("Send Tell"))
+if (ImGui.MenuItem("Send Tell"))
             SendTell(name, world);
 
         if (!forTargeter)
