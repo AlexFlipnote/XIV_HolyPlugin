@@ -121,7 +121,7 @@ public sealed class NearbyHandler : IDisposable
             ));
         }
 
-        // Party first, then friends, then local FC, then rest — alphabetical within each group
+        // Party first, then friends, then local FC, then rest,  alphabetical within each group
         NearbyPlayers = [.. players
             .OrderByDescending(p => p.IsParty ? 3 : p.IsFriend ? 2 : p.IsLocalFc ? 1 : 0)
             .ThenBy(p => p.Name)];

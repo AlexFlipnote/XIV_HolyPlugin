@@ -1,7 +1,7 @@
 # The Holiest Fluffiness
 A [Dalamud](https://github.com/goatcorp/Dalamud) tweak plugin born for the FFXIV Free Company "The Holiest Fluffiness", now open for all to enjoy.
 
-Yes, this is vibe coded. Deal with it.
+Yes, this project uses AI heavily, mostly to get things done quickly since I barely know C#. It works, and that's what matters.
 
 ## Installation
 Add the repo URL to your Dalamud custom plugin repositories:
@@ -15,7 +15,7 @@ Then find "The Holiest Fluffiness" in the plugin installer.
 ## What it does
 Way too many things, including:
 
-- **Login info** - shows your character name, world, data center, FC tag, search info (adventure plate), private house location, and FC house location on login. Displayed as a chat message, toast notification, or popup window — your choice.
+- **Login info** - shows your character name, world, data center, FC tag, search info (adventure plate), private house location, and FC house location on login. Displayed as a chat message, toast notification, or popup window,  your choice.
 - **Accessory auto-equip** - automatically equips a fashion accessory (glamour item) on login via `/fashion`. Supports a configurable delay, skips if already equipped, and can skip based on inventory slot thresholds.
 - **Anti-AFK** - sends a silent keypress to the game window when the AFK timer gets too high, so you don't get kicked while you're just vibing.
 - **No-kill / auto-reconnect** - intercepts lobby disconnects and automatically reconnects you instead of booting you to the title screen. Works with [Lifestream](https://github.com/NightmareXIV/Lifestream) to log back into the right character.

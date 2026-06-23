@@ -72,7 +72,7 @@ public sealed class NoKillHandler : IDisposable
         {
             InterceptCount++;
             OnLobbyError?.Invoke(v4_16 == 0x332C);
-            if (v4_16 != 0x332C) // skip auth errors — they require re-login anyway
+            if (v4_16 != 0x332C) // skip auth errors,  they require re-login anyway
                 Marshal.WriteInt64(p3 + 8, 0x3E80); // server connection lost
         }
         return hook!.Original(a1, a2, a3);
