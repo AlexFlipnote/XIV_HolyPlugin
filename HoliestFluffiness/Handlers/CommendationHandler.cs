@@ -15,6 +15,7 @@ public sealed class CommendationHandler : IDisposable
     private int   currentPartySize;
     private int   largestPartySize;
     private int   lastAreaPartySize;
+    private bool  justLoggedIn;
 
     public event Action<int, int>? OnCommendation; // commendCount, matchmadePlayers
 
@@ -36,6 +37,7 @@ public sealed class CommendationHandler : IDisposable
     {
         lastCommendationCount = GetCommendations();
         currentPartySize = largestPartySize = lastAreaPartySize = Math.Max(partyList.Length, 1);
+        justLoggedIn = true;
     }
 
     private void OnUpdate(IFramework fw)
@@ -49,8 +51,9 @@ public sealed class CommendationHandler : IDisposable
     {
         if (!clientState.IsLoggedIn) return;
         var current = GetCommendations();
-        if (current > lastCommendationCount && configuration.CommendationEnabled)
+        if (!justLoggedIn && current > lastCommendationCount && configuration.CommendationEnabled)
             OnCommendation?.Invoke(current - lastCommendationCount, Math.Max(largestPartySize - lastAreaPartySize, 1));
+        justLoggedIn          = false;
         lastCommendationCount = current;
         lastAreaPartySize     = currentPartySize;
         currentPartySize      = Math.Max(partyList.Length, 1);
