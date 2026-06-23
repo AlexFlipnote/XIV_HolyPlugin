@@ -11,6 +11,10 @@
     <Reference Include="SQLite-net" Private="false" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Images\icon.png">
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

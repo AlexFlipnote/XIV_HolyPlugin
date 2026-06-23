@@ -45,6 +45,8 @@ jobs:
           mkdir -p dist/HoliestFluffiness/Images
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
+          cp HoliestFluffiness/bin/Release/NAudio.Core.dll dist/HoliestFluffiness/
+          cp HoliestFluffiness/bin/Release/NAudio.Wasapi.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
           cp HoliestFluffiness/Images/icon.png dist/HoliestFluffiness/Images/
 

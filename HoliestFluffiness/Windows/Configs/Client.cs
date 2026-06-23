@@ -156,6 +156,44 @@ public partial class ConfigWindow
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
 
+        ImGui.Dummy(new Vector2(0, 8));
+        SubsectionLabel("Anti-AFK");
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextWrapped("Periodically presses LCtrl when the AFK timer exceeds the threshold to prevent being kicked.");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 4));
+        SectionRow();
+
+        PushCheckbox();
+        var antiAfkEnabled = configuration.AntiAfkEnabled;
+        if (ImGui.Checkbox("Enable anti-AFK##antiafk", ref antiAfkEnabled))
+        {
+            configuration.AntiAfkEnabled = antiAfkEnabled;
+            configuration.Save();
+            antiAfkHandler.SetEnabled(antiAfkEnabled);
+        }
+        PopCheckbox();
+
+        ImGui.Dummy(new Vector2(0, 4));
+        SectionRow();
+
+        var timerLimit = configuration.AntiAfkTimerLimit;
+        ImGui.SetNextItemWidth(220);
+        PushInput();
+        if (ImGui.SliderInt("AFK timer threshold (s)##antiafklimit", ref timerLimit, 5, 60))
+        {
+            configuration.AntiAfkTimerLimit = Math.Clamp(timerLimit, 5, 60);
+            configuration.Save();
+        }
+        PopInput();
+        ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("(default 30)");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 4));
+
         EndSection();
     }
 }

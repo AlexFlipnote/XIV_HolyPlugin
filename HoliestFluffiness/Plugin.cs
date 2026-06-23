@@ -29,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string HwCommand     = "/hw";
     private const string HwPlusCommand = "/hw+";
     private const string HwMinCommand  = "/hw-";
+    private const string NearbyCommand = "/nearby";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -47,6 +48,9 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IGameInteropProvider GameInterop { get; init; } = null!;
     [PluginService] private IDtrBar DtrBar { get; init; } = null!;
     [PluginService] private ISigScanner SigScanner { get; init; } = null!;
+    [PluginService] private IGameGui GameGui { get; init; } = null!;
+    [PluginService] private IPartyList PartyList { get; init; } = null!;
+    [PluginService] private ITargetManager TargetManager { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -62,6 +66,11 @@ public sealed class Plugin : IDalamudPlugin
     private readonly RepairHandler repairHandler;
     private readonly NoKillHandler noKillHandler;
     private readonly PhysicsHandler physicsHandler;
+    private readonly AntiAfkHandler antiAfkHandler;
+    private readonly ReadyCheckHandler readyCheckHandler;
+    private readonly ReadyCheckOverlay readyCheckOverlay;
+    private readonly NearbyHandler nearbyHandler;
+    private readonly NearbyWindow nearbyWindow;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -118,19 +127,30 @@ public sealed class Plugin : IDalamudPlugin
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log, NotificationManager);
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
+        antiAfkHandler         = new AntiAfkHandler(configuration, Framework, Log, windowHandle);
+        readyCheckHandler      = new ReadyCheckHandler(configuration, GameInterop, ClientState, ChatGui, Framework, ObjectTable, Log);
+        readyCheckOverlay      = new ReadyCheckOverlay(configuration, readyCheckHandler, GameGui, TextureProvider, DataManager);
         noKillWindow           = new NoKillWindow();
-        noKillHandler.OnLobbyError += () =>
+        noKillHandler.OnLobbyError += (isAuth) =>
         {
             if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld);
+            if (!isAuth && !string.IsNullOrEmpty(lastKnownName) && !string.IsNullOrEmpty(lastKnownWorld))
+                noKillHandler.SetAutoLoginTarget(lastKnownName, lastKnownWorld);
         };
         charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, noKillHandler, SwitchToCharacter);
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, NotificationManager, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
-        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
+        nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
+        nearbyHandler.NewTargeter += OnNewTargeter;
+        nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
+        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
+        configWindow.SetNearbyHandler(nearbyHandler);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
         windowSystem.AddWindow(noKillWindow);
+        windowSystem.AddWindow(readyCheckOverlay);
+        windowSystem.AddWindow(nearbyWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -148,13 +168,18 @@ public sealed class Plugin : IDalamudPlugin
         {
             HelpMessage = "Switch to the previous character on your current world (cycles through slots 1–8)."
         });
+        CommandManager.AddHandler(NearbyCommand, new CommandInfo(OnNearbyCommand)
+        {
+            HelpMessage = "Toggle the Nearby Players window."
+        });
 
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
+        PluginInterface.UiBuilder.Draw += nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
         var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.Images.menu_icon.png");
-        TitleScreenMenu.AddEntry("Holy Plugin", icon, OpenMainUi);
+        TitleScreenMenu.AddEntry("Change Character", icon, OpenMainUi);
 
         ClientState.Login  += OnLogin;
         ClientState.Logout += OnLogout;
@@ -170,7 +195,7 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
-    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(7); }
+    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(5); }
 
     private void OnCommand(string command, string args)
     {
@@ -225,6 +250,22 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnHwPlusCommand(string command, string args)  => CycleCharacter(+1);
     private void OnHwMinusCommand(string command, string args) => CycleCharacter(-1);
+
+    private void OnNearbyCommand(string command, string args)
+    {
+        if (!configuration.NearbyEnabled)
+        {
+            configuration.NearbyEnabled = true;
+            configuration.Save();
+        }
+        nearbyWindow.IsOpen = !nearbyWindow.IsOpen;
+    }
+
+    private void OnNewTargeter(Handlers.Targeter t)
+    {
+        if (!configuration.NearbyTargeterSound) return;
+        SoundEngine.Play(configuration.NearbyTargeterSoundPath, configuration.NearbyTargeterSoundVolume);
+    }
 
     private void CycleCharacter(int direction)
     {
@@ -404,6 +445,7 @@ public sealed class Plugin : IDalamudPlugin
         readyCheckHook!.Original(self);
         if (configuration.ClientFlashOnReadyCheck)
             FlashTaskbar();
+        readyCheckHandler.OnBegin();
     }
 
     private void ApplyClientTitle()
@@ -452,6 +494,8 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(HwCommand);
         CommandManager.RemoveHandler(HwPlusCommand);
         CommandManager.RemoveHandler(HwMinCommand);
+        CommandManager.RemoveHandler(NearbyCommand);
+        PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
@@ -462,6 +506,11 @@ public sealed class Plugin : IDalamudPlugin
         repairHandler.Dispose();
         noKillHandler.Dispose();
         physicsHandler.Dispose();
+        antiAfkHandler.Dispose();
+        readyCheckHandler.Dispose();
+        readyCheckOverlay.Dispose();
+        nearbyHandler.NewTargeter -= OnNewTargeter;
+        nearbyHandler.Dispose();
         characterDb.Dispose();
     }
 }

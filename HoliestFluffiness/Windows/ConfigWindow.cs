@@ -18,6 +18,8 @@ public partial class ConfigWindow : Window
     private readonly RepairHandler repairHandler;
     private readonly NoKillHandler noKillHandler;
     private readonly PhysicsHandler physicsHandler;
+    private readonly AntiAfkHandler antiAfkHandler;
+    private readonly ReadyCheckHandler readyCheckHandler;
     private readonly IObjectTable objectTable;
     private readonly CharacterDb characterDb;
     private readonly IDalamudPluginInterface pluginInterface;
@@ -43,7 +45,7 @@ public partial class ConfigWindow : Window
     private static readonly Vector4 ColGoldMid  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.35f);
     private static readonly Vector4 ColNone     = new(0f, 0f, 0f, 0f);
 
-    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, RepairHandler repairHandler, NoKillHandler noKillHandler, PhysicsHandler physicsHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, Action<CharacterRecord, HousingBidRecord> onGoToBid, Action onClientSettingsChanged)
+    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, RepairHandler repairHandler, NoKillHandler noKillHandler, PhysicsHandler physicsHandler, AntiAfkHandler antiAfkHandler, ReadyCheckHandler readyCheckHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, Action<CharacterRecord, HousingBidRecord> onGoToBid, Action onClientSettingsChanged)
         : base($"The Holiest Fluffiness##Config")
     {
         this.configuration = configuration;
@@ -52,6 +54,8 @@ public partial class ConfigWindow : Window
         this.repairHandler = repairHandler;
         this.noKillHandler = noKillHandler;
         this.physicsHandler = physicsHandler;
+        this.antiAfkHandler = antiAfkHandler;
+        this.readyCheckHandler = readyCheckHandler;
         this.objectTable = objectTable;
         this.characterDb = characterDb;
         this.pluginInterface = pluginInterface;
@@ -115,6 +119,7 @@ public partial class ConfigWindow : Window
         testAllCts?.Cancel();
         accessoryCts?.Cancel();
         bulkUpdateCts?.Cancel();
+        repairHandler.TestPct = null;
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────────
@@ -130,15 +135,13 @@ public partial class ConfigWindow : Window
         ImGui.BeginChild("##sidebar", new Vector2(width, height), false);
 
         ImGui.Dummy(new Vector2(0, 4));
-        SidebarHeader("SETTINGS");
         SidebarItem("Client", 0);
-        SidebarItem("Server info", 1);
-        SidebarItem("Repair", 8);
-        SidebarItem("Login info", 2);
-        SidebarItem("Fashion accessory", 3);
+        SidebarItem("Login", 1);
+        SidebarItem("Indicators", 2);
+        SidebarItem("Players", 8);
 
         ImGui.Dummy(new Vector2(0, 4));
-        SidebarHeader("DATA");
+        SidebarSeparator();
         SidebarItem("Database", 4);
         if (SidebarItem("Characters", 5))
             LoadCharacters();
@@ -147,18 +150,22 @@ public partial class ConfigWindow : Window
         if (SidebarItem("House bids", 6))
             LoadBids();
 
+        ImGui.Dummy(new Vector2(0, 4));
+        SidebarSeparator();
+        SidebarItem("About", 7);
+
         ImGui.EndChild();
         ImGui.PopStyleVar();
         ImGui.PopStyleColor(5);
     }
 
-    private void SidebarHeader(string label)
+    private void SidebarSeparator()
     {
-        var indent = ImGui.GetStyle().FramePadding.X + ImGui.GetContentRegionAvail().X * 0.05f;
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + indent);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
-        ImGui.TextUnformatted(label);
-        ImGui.PopStyleColor();
+        var x     = ImGui.GetCursorScreenPos().X + 8f;
+        var y     = ImGui.GetCursorScreenPos().Y;
+        var width = ImGui.GetContentRegionAvail().X - 16f;
+        ImGui.GetWindowDrawList().AddLine(new Vector2(x, y), new Vector2(x + width, y), ImGui.GetColorU32(ColGoldMid), 1f);
+        ImGui.Dummy(new Vector2(0, 4));
     }
 
     private bool SidebarItem(string label, int index)
@@ -210,14 +217,13 @@ public partial class ConfigWindow : Window
         switch (selectedSection)
         {
             case 0: DrawClientSection();      break;
-            case 1: DrawServerInfoSection();  break;
-            case 8: DrawRepairSection();      break;
-            case 2: DrawLoginInfoSection();   break;
-            case 3: DrawAccessorySection();   break;
+            case 1: DrawLoginSection();       break;
+            case 2: DrawIndicatorsSection();  break;
             case 4: DrawDatabaseSection();    break;
             case 5: DrawCharactersSection();  break;
             case 6: DrawBidsSection();        break;
             case 7: DrawAboutSection();       break;
+            case 8: DrawNearbySection();      break;
             case 9: DrawInventorySection();   break;
         }
 
@@ -293,13 +299,15 @@ public partial class ConfigWindow : Window
         ImGui.PushStyleColor(ImGuiCol.ResizeGrip,          ColGoldSub);
         ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,   ColGoldMid);
         ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,    ColGold);
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,             ColBg);
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,       ColBg);
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,   new Vector2(8, 6));
     }
 
     private void PopGlobalStyle()
     {
-        ImGui.PopStyleColor(8);
+        ImGui.PopStyleColor(10);
         ImGui.PopStyleVar(2);
     }
 

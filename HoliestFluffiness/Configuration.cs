@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using Dalamud.Configuration;
 using Dalamud.Plugin;
 
@@ -56,6 +57,35 @@ public class Configuration : IPluginConfiguration
     // Physics section
     public bool PhysicsEnabled { get; set; } = false;
     public float PhysicsTargetFps { get; set; } = 60f;
+
+    // Anti-AFK section
+    public bool AntiAfkEnabled { get; set; } = false;
+    public int AntiAfkTimerLimit { get; set; } = 30;
+
+    // Party section
+    public bool ReadyCheckShowNames { get; set; } = false;
+    public bool ReadyCheckDrawOverlay { get; set; } = false;
+    public int ReadyCheckClearAfterSeconds { get; set; } = 10;
+
+    // Nearby section
+    public bool    NearbyEnabled             { get; set; } = false;
+    public bool    NearbyShowTargeters       { get; set; } = true;
+    public bool    NearbyTargeterTrackSelf   { get; set; } = false;
+    public bool    NearbyHideInCombat        { get; set; } = false;
+    public bool    NearbyHideInDuty          { get; set; } = true;
+    public bool    NearbyFilterAfk           { get; set; } = false;
+    public bool    NearbyFilterLowLevel      { get; set; } = false;
+    public bool    NearbyDebugSelf           { get; set; } = false;
+    public int     NearbyDebugSelfAs         { get; set; } = 0; // 0=Friend 1=FC 2=Party 3=TargetingYou
+    public Vector4 NearbyColParty            { get; set; } = new(100/255f, 180/255f, 255/255f, 1f);
+    public Vector4 NearbyColFriend           { get; set; } = new(1f, 127/255f, 0f, 1f);
+    public Vector4 NearbyColLocalFc          { get; set; } = new(220/255f, 200/255f,  80/255f, 1f);
+    public bool    NearbyMarkTargeting        { get; set; } = false;
+    public Vector4 NearbyMarkTargetingColour { get; set; } = new(235/255f, 130/255f, 80/255f, 1f);
+    public int     NearbyMarkTargetingSize   { get; set; } = 5;
+    public bool    NearbyTargeterSound       { get; set; } = false;
+    public string  NearbyTargeterSoundPath   { get; set; } = "";
+    public float   NearbyTargeterSoundVolume { get; set; } = 0.5f;
 
     private IDalamudPluginInterface pluginInterface = null!;
 

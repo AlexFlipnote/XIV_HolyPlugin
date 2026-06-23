@@ -60,9 +60,9 @@ public class LoginInfoWindow : Window
     {
         ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
         ImGui.PushStyleColor(ImGuiCol.Text,              ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,          ColBg);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,           ColSection);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     ColSection);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,          ColSection);
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,           ColBg);
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     ColBg);
         ImGui.PushStyleColor(ImGuiCol.TableBorderLight,  ColGoldMid);
         ImGui.PushStyleColor(ImGuiCol.TableBorderStrong, ColGold);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12, 10));

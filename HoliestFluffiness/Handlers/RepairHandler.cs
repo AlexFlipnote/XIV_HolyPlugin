@@ -114,6 +114,16 @@ public sealed unsafe class RepairHandler : IDisposable
         receiveEventHook!.Original(a1, a2, a3, a4, a5);
     }
 
+    private void HideOurNode(AtkUnitBase* addon)
+    {
+        if (lastSlotUsed < NodeMin || lastSlotUsed >= addon->UldManager.NodeListCount) return;
+        var node = addon->UldManager.NodeList[lastSlotUsed];
+        if (node != null && node->IsVisible() && SlotIsOurs(node))
+            node->NodeFlags ^= NodeFlags.Visible;
+        lastSlotUsed = -1;
+        ourCompAddr  = 0;
+    }
+
     private void OnPostUpdate(AddonEvent _, AddonArgs args)
     {
         var addon = (AtkUnitBase*)args.Addon.Address;
@@ -121,6 +131,7 @@ public sealed unsafe class RepairHandler : IDisposable
 
         if (loadIcon == null || !clientState.IsLoggedIn || (!config.RepairLowEnabled && !config.RepairCriticalEnabled))
         {
+            HideOurNode(addon);
             HideTooltip(addon->Id);
             return;
         }
@@ -129,7 +140,7 @@ public sealed unsafe class RepairHandler : IDisposable
         var isCritical = config.RepairCriticalEnabled && lowestPct <= config.RepairCriticalThreshold;
         var isLow      = !isCritical && config.RepairLowEnabled && lowestPct <= config.RepairLowThreshold;
 
-        if (!isCritical && !isLow) { HideTooltip(addon->Id); return; }
+        if (!isCritical && !isLow) { HideOurNode(addon); HideTooltip(addon->Id); return; }
 
         // Use count from the most recent PostRequestedUpdate; fall back to live on first frame.
         var gameCount = cachedGameCount >= 0 ? cachedGameCount : CountGameNodes(addon);

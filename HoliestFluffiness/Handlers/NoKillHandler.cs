@@ -12,7 +12,7 @@ public sealed class NoKillHandler : IDisposable
     private readonly Configuration config;
     private readonly IPluginLog log;
 
-    public event Action? OnLobbyError;
+    public event Action<bool>? OnLobbyError; // bool = isAuthError
     public int    InterceptCount   { get; private set; }
     public bool   PendingAutoLogin { get; set; }
     public bool   IsReconnecting   { get; private set; }
@@ -71,7 +71,7 @@ public sealed class NoKillHandler : IDisposable
         if (v4 > 0)
         {
             InterceptCount++;
-            OnLobbyError?.Invoke();
+            OnLobbyError?.Invoke(v4_16 == 0x332C);
             if (v4_16 != 0x332C) // skip auth errors — they require re-login anyway
                 Marshal.WriteInt64(p3 + 8, 0x3E80); // server connection lost
         }
