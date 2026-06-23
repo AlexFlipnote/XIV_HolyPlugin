@@ -2,12 +2,15 @@
   "Author": "AlexFlipnote",
   "Name": "The Holiest Fluffiness",
   "InternalName": "HoliestFluffiness",
-  "Punchline": "Simple plugin that was made for the FC 'The Holiest Fluffiness'",
-  "Description": "Simple plugin that was made for the FC 'The Holiest Fluffiness'",
+  "Punchline": "A tweak plugin born for the free company 'The Holiest Fluffiness', now open for all to enjoy.",
+  "Description": "A tweak plugin born for the free company 'The Holiest Fluffiness', now open for all to enjoy.",
   "ApplicableVersion": "any",
   "LoadRequiredState": 0,
   "LoadSync": false,
   "CanUnloadAsync": true,
   "RepoUrl": "https://github.com/AlexFlipnote/XIV_HolyPlugin",
-  "Tags": ["holy", "holiest", "fluffiness", "cute"]
+  "Tags": [
+    "tweak", "utility", "login", "fc", "free company", "glamour",
+    "fashion", "accessory", "holy", "holiest", "fluffiness", "cute"
+  ]
 }
