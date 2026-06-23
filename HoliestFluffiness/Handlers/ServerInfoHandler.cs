@@ -159,7 +159,7 @@ public sealed class ServerInfoHandler : IDisposable
         cts.Cancel();
         cts.Dispose();
         ping.Dispose();
-        dtrPing.Shown = false;
-        dtrFps.Shown  = false;
+        dtrPing.Dispose();
+        dtrFps.Dispose();
     }
 }
