@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -11,6 +12,8 @@ using Dalamud.Hooking;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
 using Dalamud.Game.Text;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -148,8 +151,9 @@ public sealed class Plugin : IDalamudPlugin
         commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
         commendationHandler.OnCommendation += OnCommendationReceived;
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
-        doorbellHandler.OnEntered += OnDoorbellEntered;
-        doorbellHandler.OnLeft    += OnDoorbellLeft;
+        doorbellHandler.OnEntered     += OnDoorbellEntered;
+        doorbellHandler.OnLeft        += OnDoorbellLeft;
+        doorbellHandler.OnAlreadyHere += OnDoorbellAlreadyHere;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetNearbyHandler(nearbyHandler);
@@ -306,11 +310,67 @@ public sealed class Plugin : IDalamudPlugin
         SoundEngine.Play(ResolveSound(configPath, defaultFile), volume);
     }
 
-    private void OnDoorbellEntered(string name, string world) =>
-        SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellEnterSoundVolume);
+    private void OnDoorbellEntered(string name, string world, uint worldId)
+    {
+        if (!configuration.DoorbellEnterEnabled) return;
+        if (configuration.DoorbellEnterSound)
+            SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellEnterSoundVolume);
+        if (configuration.DoorbellEnterChat)
+            PrintDoorbellChat("<link> has come inside.", name, world, worldId);
+    }
 
-    private void OnDoorbellLeft(string name, string world) =>
-        SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav"), configuration.DoorbellLeaveSoundVolume);
+    private void OnDoorbellLeft(string name, string world, uint worldId)
+    {
+        if (!configuration.DoorbellLeaveEnabled) return;
+        if (configuration.DoorbellLeaveSound)
+            SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav"), configuration.DoorbellLeaveSoundVolume);
+        if (configuration.DoorbellLeaveChat)
+            PrintDoorbellChat("<link> has left the house.", name, world, worldId);
+    }
+
+    private void OnDoorbellAlreadyHere(List<(string Name, string World, uint WorldId)> players)
+    {
+        if (!configuration.DoorbellAlreadyHereEnabled) return;
+        if (configuration.DoorbellAlreadyHereSound)
+            SoundEngine.Play(ResolveSound(configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellAlreadyHereSoundVolume);
+        if (configuration.DoorbellAlreadyHereChat)
+            foreach (var p in players)
+                PrintDoorbellChat("<link> was here when you arrived.", p.Name, p.World, p.WorldId);
+    }
+
+    private void PrintDoorbellChat(string format, string name, string world, uint worldId)
+    {
+        var builder = new SeStringBuilder();
+        var i = 0;
+        while (i < format.Length)
+        {
+            if (format[i] == '<')
+            {
+                var end = format.IndexOf('>', i + 1);
+                if (end > i)
+                {
+                    switch (format.Substring(i, end - i + 1))
+                    {
+                        case "<link>":
+                            builder.Add(new PlayerPayload(name, worldId));
+                            i = end + 1;
+                            continue;
+                        case "<name>":
+                            builder.AddText(name);
+                            i = end + 1;
+                            continue;
+                        case "<world>":
+                            builder.AddText(world);
+                            i = end + 1;
+                            continue;
+                    }
+                }
+            }
+            builder.AddText(format[i].ToString());
+            i++;
+        }
+        ChatGui.Print(new XivChatEntry { Message = builder.Build() });
+    }
 
     private string ResolveSound(string configPath, string defaultRelative) =>
         string.IsNullOrEmpty(configPath)
@@ -563,8 +623,9 @@ public sealed class Plugin : IDalamudPlugin
         nearbyHandler.Dispose();
         commendationHandler.OnCommendation -= OnCommendationReceived;
         commendationHandler.Dispose();
-        doorbellHandler.OnEntered -= OnDoorbellEntered;
-        doorbellHandler.OnLeft    -= OnDoorbellLeft;
+        doorbellHandler.OnEntered     -= OnDoorbellEntered;
+        doorbellHandler.OnLeft        -= OnDoorbellLeft;
+        doorbellHandler.OnAlreadyHere -= OnDoorbellAlreadyHere;
         doorbellHandler.Dispose();
         characterDb.Dispose();
     }

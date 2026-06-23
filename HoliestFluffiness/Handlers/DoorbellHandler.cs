@@ -14,12 +14,15 @@ public sealed class DoorbellHandler : IDisposable
     private readonly IObjectTable  objectTable;
     private readonly IFramework    framework;
 
-    private sealed class KnownPlayer { public string Name = ""; public string World = ""; public int Unseen; }
+    private sealed class KnownPlayer { public string Name = ""; public string World = ""; public uint WorldId; public int Unseen; }
     private readonly Dictionary<uint, KnownPlayer> knownPlayers = new();
     private readonly Stopwatch timeInHouse = new();
+    private readonly List<(string Name, string World, uint WorldId)> alreadyHereQueue = new();
+    private bool alreadyHereFired;
 
-    public event Action<string, string>? OnEntered;
-    public event Action<string, string>? OnLeft;
+    public event Action<string, string, uint>? OnEntered;
+    public event Action<string, string, uint>? OnLeft;
+    public event Action<List<(string Name, string World, uint WorldId)>>? OnAlreadyHere;
 
     private static readonly HashSet<uint> HouseTerritories =
     [
@@ -46,6 +49,8 @@ public sealed class DoorbellHandler : IDisposable
     private void OnTerritoryChanged(uint territory)
     {
         knownPlayers.Clear();
+        alreadyHereQueue.Clear();
+        alreadyHereFired = false;
         timeInHouse.Stop();
         framework.Update -= OnUpdate;
 
@@ -58,8 +63,6 @@ public sealed class DoorbellHandler : IDisposable
 
     private void OnUpdate(IFramework fw)
     {
-        if (!configuration.DoorbellEnabled) return;
-
         var seen = new HashSet<uint>();
 
         foreach (var obj in objectTable)
@@ -72,11 +75,14 @@ public sealed class DoorbellHandler : IDisposable
 
             if (!knownPlayers.ContainsKey(id))
             {
-                var world = pc.HomeWorld.ValueNullable?.Name.ExtractText() ?? "";
-                knownPlayers[id] = new KnownPlayer { Name = pc.Name.TextValue, World = world };
+                var worldId = pc.HomeWorld.RowId;
+                var world   = pc.HomeWorld.ValueNullable?.Name.ExtractText() ?? "";
+                knownPlayers[id] = new KnownPlayer { Name = pc.Name.TextValue, World = world, WorldId = worldId };
 
                 if (timeInHouse.ElapsedMilliseconds > 2000)
-                    OnEntered?.Invoke(pc.Name.TextValue, world);
+                    OnEntered?.Invoke(pc.Name.TextValue, world, worldId);
+                else
+                    alreadyHereQueue.Add((pc.Name.TextValue, world, worldId));
             }
             else
             {
@@ -90,8 +96,15 @@ public sealed class DoorbellHandler : IDisposable
             var player = knownPlayers[id];
             player.Unseen++;
             if (player.Unseen <= 60) continue;
-            OnLeft?.Invoke(player.Name, player.World);
+            OnLeft?.Invoke(player.Name, player.World, player.WorldId);
             knownPlayers.Remove(id);
+        }
+
+        if (!alreadyHereFired && alreadyHereQueue.Count > 0 && timeInHouse.ElapsedMilliseconds > 2000)
+        {
+            alreadyHereFired = true;
+            OnAlreadyHere?.Invoke(alreadyHereQueue.ToList());
+            alreadyHereQueue.Clear();
         }
     }
 

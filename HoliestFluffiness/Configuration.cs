@@ -99,11 +99,21 @@ public class Configuration : IPluginConfiguration
     public float  CommendationAllSevenVolume    { get; set; } = 0.5f;
 
     // Doorbell section
-    public bool   DoorbellEnabled          { get; set; } = false;
-    public string DoorbellEnterSoundPath   { get; set; } = "";
-    public float  DoorbellEnterSoundVolume { get; set; } = 0.5f;
-    public string DoorbellLeaveSoundPath   { get; set; } = "";
-    public float  DoorbellLeaveSoundVolume { get; set; } = 0.5f;
+    public bool   DoorbellEnterEnabled       { get; set; } = false;
+    public bool   DoorbellEnterChat          { get; set; } = false;
+    public bool   DoorbellEnterSound         { get; set; } = false;
+    public string DoorbellEnterSoundPath     { get; set; } = "";
+    public float  DoorbellEnterSoundVolume   { get; set; } = 0.5f;
+    public bool   DoorbellLeaveEnabled       { get; set; } = false;
+    public bool   DoorbellLeaveChat          { get; set; } = false;
+    public bool   DoorbellLeaveSound         { get; set; } = false;
+    public string DoorbellLeaveSoundPath     { get; set; } = "";
+    public float  DoorbellLeaveSoundVolume   { get; set; } = 0.5f;
+    public bool   DoorbellAlreadyHereEnabled { get; set; } = false;
+    public bool   DoorbellAlreadyHereChat    { get; set; } = false;
+    public bool   DoorbellAlreadyHereSound   { get; set; } = false;
+    public string DoorbellAlreadyHereSoundPath   { get; set; } = "";
+    public float  DoorbellAlreadyHereSoundVolume { get; set; } = 0.5f;
 
     private IDalamudPluginInterface pluginInterface = null!;
 

@@ -243,47 +243,128 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
         ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextWrapped("Plays sounds when players enter or leave your current house.");
+        ImGui.TextWrapped("Alerts when players enter or leave a house, or are already present when you arrive.");
         ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
-
-        PushCheckbox();
-        var doorbellEnabled = configuration.DoorbellEnabled;
-        if (ImGui.Checkbox("Enable house doorbell##doorbell", ref doorbellEnabled))
-        {
-            configuration.DoorbellEnabled = doorbellEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
-
         ImGui.Dummy(new Vector2(0, 8));
-        ImGui.BeginDisabled(!configuration.DoorbellEnabled);
 
         var doorbellDefault = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Doorbell", "doorbell.wav");
 
+        // Entered
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Someone entered:");
-        ImGui.PopStyleColor();
+        PushCheckbox();
+        var enterEnabled = configuration.DoorbellEnterEnabled;
+        if (ImGui.Checkbox("Someone entered##doorbellenterenabled", ref enterEnabled))
+        {
+            configuration.DoorbellEnterEnabled = enterEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.BeginDisabled(!configuration.DoorbellEnterEnabled);
+        ImGui.SameLine();
+        PushCheckbox();
+        var enterChat = configuration.DoorbellEnterChat;
+        if (ImGui.Checkbox("Print in chat##doorbellenterchat", ref enterChat))
+        {
+            configuration.DoorbellEnterChat = enterChat;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.SameLine();
+        PushCheckbox();
+        var enterSound = configuration.DoorbellEnterSound;
+        if (ImGui.Checkbox("Play a sound##doorbellentersonud", ref enterSound))
+        {
+            configuration.DoorbellEnterSound = enterSound;
+            configuration.Save();
+        }
+        PopCheckbox();
         ImGui.Dummy(new Vector2(0, 2));
+        ImGui.BeginDisabled(!configuration.DoorbellEnterSound);
         DrawSoundPicker("doorbellenter", doorbellDefault,
             configuration.DoorbellEnterSoundPath, configuration.DoorbellEnterSoundVolume,
             p => { configuration.DoorbellEnterSoundPath  = p; configuration.Save(); },
             v => { configuration.DoorbellEnterSoundVolume = v; configuration.Save(); });
+        ImGui.EndDisabled();
+        ImGui.EndDisabled();
 
         ImGui.Dummy(new Vector2(0, 8));
 
+        // Already here
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Someone left:");
-        ImGui.PopStyleColor();
+        PushCheckbox();
+        var alreadyEnabled = configuration.DoorbellAlreadyHereEnabled;
+        if (ImGui.Checkbox("Already inside when you arrive##doorbellalreadyenabled", ref alreadyEnabled))
+        {
+            configuration.DoorbellAlreadyHereEnabled = alreadyEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereEnabled);
+        ImGui.SameLine();
+        PushCheckbox();
+        var alreadyChat = configuration.DoorbellAlreadyHereChat;
+        if (ImGui.Checkbox("Print in chat##doorbellalreadychat", ref alreadyChat))
+        {
+            configuration.DoorbellAlreadyHereChat = alreadyChat;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.SameLine();
+        PushCheckbox();
+        var alreadySound = configuration.DoorbellAlreadyHereSound;
+        if (ImGui.Checkbox("Play a sound##doorbellalreadysound", ref alreadySound))
+        {
+            configuration.DoorbellAlreadyHereSound = alreadySound;
+            configuration.Save();
+        }
+        PopCheckbox();
         ImGui.Dummy(new Vector2(0, 2));
+        ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereSound);
+        DrawSoundPicker("doorbellalready", doorbellDefault,
+            configuration.DoorbellAlreadyHereSoundPath, configuration.DoorbellAlreadyHereSoundVolume,
+            p => { configuration.DoorbellAlreadyHereSoundPath   = p; configuration.Save(); },
+            v => { configuration.DoorbellAlreadyHereSoundVolume = v; configuration.Save(); });
+        ImGui.EndDisabled();
+        ImGui.EndDisabled();
+
+        ImGui.Dummy(new Vector2(0, 8));
+
+        // Left
+        SectionRow();
+        PushCheckbox();
+        var leaveEnabled = configuration.DoorbellLeaveEnabled;
+        if (ImGui.Checkbox("Someone left##doorbelllaveenabled", ref leaveEnabled))
+        {
+            configuration.DoorbellLeaveEnabled = leaveEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.BeginDisabled(!configuration.DoorbellLeaveEnabled);
+        ImGui.SameLine();
+        PushCheckbox();
+        var leaveChat = configuration.DoorbellLeaveChat;
+        if (ImGui.Checkbox("Print in chat##doorbellleavechat", ref leaveChat))
+        {
+            configuration.DoorbellLeaveChat = leaveChat;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.SameLine();
+        PushCheckbox();
+        var leaveSound = configuration.DoorbellLeaveSound;
+        if (ImGui.Checkbox("Play a sound##doorbellleavesound", ref leaveSound))
+        {
+            configuration.DoorbellLeaveSound = leaveSound;
+            configuration.Save();
+        }
+        PopCheckbox();
+        ImGui.Dummy(new Vector2(0, 2));
+        ImGui.BeginDisabled(!configuration.DoorbellLeaveSound);
         DrawSoundPicker("doorbellleave", doorbellDefault,
             configuration.DoorbellLeaveSoundPath, configuration.DoorbellLeaveSoundVolume,
             p => { configuration.DoorbellLeaveSoundPath  = p; configuration.Save(); },
             v => { configuration.DoorbellLeaveSoundVolume = v; configuration.Save(); });
-
+        ImGui.EndDisabled();
         ImGui.EndDisabled();
 
         ImGui.Dummy(new Vector2(0, 4));
