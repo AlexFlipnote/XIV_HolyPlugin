@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using HoliestFluffiness.Handlers;
@@ -12,10 +14,10 @@ public partial class ConfigWindow
 
     private void DrawNearbySection()
     {
-        BeginSection("Players");
+        BeginSection("Social");
 
         ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Nearby players window and targeting tracker. Open with /nearby");
+        ImGui.TextUnformatted("Nearby players, targeting tracker, house doorbell, and commendation sounds.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 8));
 
@@ -223,49 +225,177 @@ public partial class ConfigWindow
 
         ImGui.Dummy(new Vector2(0, 4));
         ImGui.BeginDisabled(!configuration.NearbyTargeterSound);
-
-        SectionRow();
-        var browseW = ImGui.CalcTextSize("Browse").X + ImGui.GetStyle().FramePadding.X * 2;
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - browseW - ImGui.GetStyle().ItemSpacing.X - 8f);
-        var soundPath = configuration.NearbyTargeterSoundPath;
-        PushInput();
-        if (ImGui.InputText("##nearbysoundpath", ref soundPath, 512))
-        {
-            configuration.NearbyTargeterSoundPath = soundPath;
-            configuration.Save();
-        }
-        PopInput();
-        ImGui.SameLine();
-        PushButton();
-        if (ImGui.Button("Browse##nearbysoundbrowse"))
-            fileDialogManager.OpenFileDialog("Select sound file", ".wav,.mp3,.ogg,.aif,.aiff,.wma",
-                (ok, path) => { if (ok) { configuration.NearbyTargeterSoundPath = path; configuration.Save(); } });
-        PopButton();
-
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        ImGui.SetNextItemWidth(200);
-        var volPct = configuration.NearbyTargeterSoundVolume * 100f;
-        PushInput();
-        if (ImGui.SliderFloat("Volume##nearbysoundvol", ref volPct, 0f, 100f, "%.0f%%"))
-        {
-            configuration.NearbyTargeterSoundVolume = volPct / 100f;
-            configuration.Save();
-        }
-        PopInput();
-
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
-        PushButton();
-        if (ImGui.Button("Test sound##nearbysoundtest"))
-            HoliestFluffiness.SoundEngine.Play(configuration.NearbyTargeterSoundPath, configuration.NearbyTargeterSoundVolume);
-        PopButton();
+        DrawSoundPicker("nearbytargeter",
+            Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Targeting", "looking.mp3"),
+            configuration.NearbyTargeterSoundPath, configuration.NearbyTargeterSoundVolume,
+            p => { configuration.NearbyTargeterSoundPath  = p; configuration.Save(); },
+            v => { configuration.NearbyTargeterSoundVolume = v; configuration.Save(); });
+        ImGui.EndDisabled();
 
         ImGui.EndDisabled();
+
+        ImGui.Dummy(new Vector2(0, 4));
+
+        // ── House doorbell ────────────────────────────────────────────────────
+
+        ImGui.Dummy(new Vector2(0, 12));
+        SubsectionLabel("House doorbell");
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextWrapped("Plays sounds when players enter or leave your current house.");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 4));
+        SectionRow();
+
+        PushCheckbox();
+        var doorbellEnabled = configuration.DoorbellEnabled;
+        if (ImGui.Checkbox("Enable house doorbell##doorbell", ref doorbellEnabled))
+        {
+            configuration.DoorbellEnabled = doorbellEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+
+        ImGui.Dummy(new Vector2(0, 8));
+        ImGui.BeginDisabled(!configuration.DoorbellEnabled);
+
+        var doorbellDefault = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Doorbell", "doorbell.wav");
+
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("Someone entered:");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker("doorbellenter", doorbellDefault,
+            configuration.DoorbellEnterSoundPath, configuration.DoorbellEnterSoundVolume,
+            p => { configuration.DoorbellEnterSoundPath  = p; configuration.Save(); },
+            v => { configuration.DoorbellEnterSoundVolume = v; configuration.Save(); });
+
+        ImGui.Dummy(new Vector2(0, 8));
+
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("Someone left:");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker("doorbellleave", doorbellDefault,
+            configuration.DoorbellLeaveSoundPath, configuration.DoorbellLeaveSoundVolume,
+            p => { configuration.DoorbellLeaveSoundPath  = p; configuration.Save(); },
+            v => { configuration.DoorbellLeaveSoundVolume = v; configuration.Save(); });
+
+        ImGui.EndDisabled();
+
+        ImGui.Dummy(new Vector2(0, 4));
+
+        // ── Commendations ─────────────────────────────────────────────────────
+
+        ImGui.Dummy(new Vector2(0, 12));
+        SubsectionLabel("Commendations");
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextWrapped("Plays a sound when you receive commendations after a duty. Each tier plays a different sound based on how many you received.");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 4));
+        SectionRow();
+
+        PushCheckbox();
+        var commendEnabled = configuration.CommendationEnabled;
+        if (ImGui.Checkbox("Enable##commendation", ref commendEnabled))
+        {
+            configuration.CommendationEnabled = commendEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+
+        ImGui.Dummy(new Vector2(0, 8));
+        ImGui.BeginDisabled(!configuration.CommendationEnabled);
+
+        var cDir = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Congratulations");
+
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("1/3 commends:");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker("commendot", Path.Combine(cDir, "one-third.mp3"),
+            configuration.CommendationOneThirdPath, configuration.CommendationOneThirdVolume,
+            p => { configuration.CommendationOneThirdPath   = p; configuration.Save(); },
+            v => { configuration.CommendationOneThirdVolume = v; configuration.Save(); });
+
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("2/3 commends:");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker("commendtt", Path.Combine(cDir, "two-thirds.mp3"),
+            configuration.CommendationTwoThirdsPath, configuration.CommendationTwoThirdsVolume,
+            p => { configuration.CommendationTwoThirdsPath   = p; configuration.Save(); },
+            v => { configuration.CommendationTwoThirdsVolume = v; configuration.Save(); });
+
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("3/3 commends:");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker("commendth", Path.Combine(cDir, "three-thirds.mp3"),
+            configuration.CommendationThreeThirdsPath, configuration.CommendationThreeThirdsVolume,
+            p => { configuration.CommendationThreeThirdsPath   = p; configuration.Save(); },
+            v => { configuration.CommendationThreeThirdsVolume = v; configuration.Save(); });
+
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("All 7 (full party):");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker("commendas", Path.Combine(cDir, "all-seven.mp3"),
+            configuration.CommendationAllSevenPath, configuration.CommendationAllSevenVolume,
+            p => { configuration.CommendationAllSevenPath   = p; configuration.Save(); },
+            v => { configuration.CommendationAllSevenVolume = v; configuration.Save(); });
 
         ImGui.EndDisabled();
 
         ImGui.Dummy(new Vector2(0, 4));
         EndSection();
+    }
+
+    private void DrawSoundPicker(string id, string defaultPath, string configPath, float volume, Action<string> setPath, Action<float> setVolume)
+    {
+        // Row 1: [Reset to default] [Browse...] [Default sound / Current: filename]
+        SectionRow();
+        PushButton();
+        if (ImGui.Button($"Reset to default##{id}reset")) setPath("");
+        PopButton();
+        ImGui.SameLine();
+        PushButton();
+        if (ImGui.Button($"Browse...##{id}browse"))
+            fileDialogManager.OpenFileDialog("Select sound file", ".wav,.mp3,.ogg,.aif,.aiff,.wma",
+                (ok, p) => { if (ok) setPath(p); });
+        PopButton();
+        ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted(string.IsNullOrEmpty(configPath)
+            ? (string.IsNullOrEmpty(defaultPath) ? "No sound set" : "Default sound")
+            : $"Current: {Path.GetFileName(configPath)}");
+        ImGui.PopStyleColor();
+
+        // Row 2: [Test sound] [slider]
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+        PushButton();
+        if (ImGui.Button($"Test sound##{id}test"))
+            HoliestFluffiness.SoundEngine.Play(string.IsNullOrEmpty(configPath) ? defaultPath : configPath, volume);
+        PopButton();
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(200);
+        var vol = volume * 100f;
+        PushInput();
+        if (ImGui.SliderFloat($"##{id}vol", ref vol, 0f, 100f, "%.0f%%"))
+            setVolume(vol / 100f);
+        PopInput();
     }
 }

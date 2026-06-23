@@ -138,7 +138,7 @@ public partial class ConfigWindow : Window
         SidebarItem("Client", 0);
         SidebarItem("Login", 1);
         SidebarItem("Indicators", 2);
-        SidebarItem("Players", 8);
+        SidebarItem("Social", 8);
 
         ImGui.Dummy(new Vector2(0, 4));
         SidebarSeparator();

@@ -87,6 +87,24 @@ public class Configuration : IPluginConfiguration
     public string  NearbyTargeterSoundPath   { get; set; } = "";
     public float   NearbyTargeterSoundVolume { get; set; } = 0.5f;
 
+    // Congratulations section
+    public bool   CommendationEnabled           { get; set; } = false;
+    public string CommendationOneThirdPath      { get; set; } = "";
+    public float  CommendationOneThirdVolume    { get; set; } = 0.5f;
+    public string CommendationTwoThirdsPath     { get; set; } = "";
+    public float  CommendationTwoThirdsVolume   { get; set; } = 0.5f;
+    public string CommendationThreeThirdsPath   { get; set; } = "";
+    public float  CommendationThreeThirdsVolume { get; set; } = 0.5f;
+    public string CommendationAllSevenPath      { get; set; } = "";
+    public float  CommendationAllSevenVolume    { get; set; } = 0.5f;
+
+    // Doorbell section
+    public bool   DoorbellEnabled          { get; set; } = false;
+    public string DoorbellEnterSoundPath   { get; set; } = "";
+    public float  DoorbellEnterSoundVolume { get; set; } = 0.5f;
+    public string DoorbellLeaveSoundPath   { get; set; } = "";
+    public float  DoorbellLeaveSoundVolume { get; set; } = 0.5f;
+
     private IDalamudPluginInterface pluginInterface = null!;
 
     public void Initialize(IDalamudPluginInterface pi)

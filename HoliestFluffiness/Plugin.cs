@@ -71,6 +71,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ReadyCheckOverlay readyCheckOverlay;
     private readonly NearbyHandler nearbyHandler;
     private readonly NearbyWindow nearbyWindow;
+    private readonly CommendationHandler commendationHandler;
+    private readonly DoorbellHandler doorbellHandler;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -143,6 +145,11 @@ public sealed class Plugin : IDalamudPlugin
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
+        commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
+        commendationHandler.OnCommendation += OnCommendationReceived;
+        doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
+        doorbellHandler.OnEntered += OnDoorbellEntered;
+        doorbellHandler.OnLeft    += OnDoorbellLeft;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetNearbyHandler(nearbyHandler);
@@ -264,8 +271,51 @@ public sealed class Plugin : IDalamudPlugin
     private void OnNewTargeter(Handlers.Targeter t)
     {
         if (!configuration.NearbyTargeterSound) return;
-        SoundEngine.Play(configuration.NearbyTargeterSoundPath, configuration.NearbyTargeterSoundVolume);
+        SoundEngine.Play(ResolveSound(configuration.NearbyTargeterSoundPath, "Sounds/Targeting/looking.mp3"), configuration.NearbyTargeterSoundVolume);
     }
+
+    private void OnCommendationReceived(int count, int matchmadePlayers)
+    {
+        string configPath, defaultFile;
+        float volume;
+        var norm = count / (float)matchmadePlayers;
+        if (count == 7)
+        {
+            configPath = configuration.CommendationAllSevenPath;
+            defaultFile = "Sounds/Congratulations/all-seven.mp3";
+            volume = configuration.CommendationAllSevenVolume;
+        }
+        else if (norm > 2f / 3f)
+        {
+            configPath = configuration.CommendationThreeThirdsPath;
+            defaultFile = "Sounds/Congratulations/three-thirds.mp3";
+            volume = configuration.CommendationThreeThirdsVolume;
+        }
+        else if (norm > 1f / 3f)
+        {
+            configPath = configuration.CommendationTwoThirdsPath;
+            defaultFile = "Sounds/Congratulations/two-thirds.mp3";
+            volume = configuration.CommendationTwoThirdsVolume;
+        }
+        else
+        {
+            configPath = configuration.CommendationOneThirdPath;
+            defaultFile = "Sounds/Congratulations/one-third.mp3";
+            volume = configuration.CommendationOneThirdVolume;
+        }
+        SoundEngine.Play(ResolveSound(configPath, defaultFile), volume);
+    }
+
+    private void OnDoorbellEntered(string name, string world) =>
+        SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellEnterSoundVolume);
+
+    private void OnDoorbellLeft(string name, string world) =>
+        SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav"), configuration.DoorbellLeaveSoundVolume);
+
+    private string ResolveSound(string configPath, string defaultRelative) =>
+        string.IsNullOrEmpty(configPath)
+            ? Path.Combine(PluginInterface.AssemblyLocation.DirectoryName!, defaultRelative)
+            : configPath;
 
     private void CycleCharacter(int direction)
     {
@@ -511,6 +561,11 @@ public sealed class Plugin : IDalamudPlugin
         readyCheckOverlay.Dispose();
         nearbyHandler.NewTargeter -= OnNewTargeter;
         nearbyHandler.Dispose();
+        commendationHandler.OnCommendation -= OnCommendationReceived;
+        commendationHandler.Dispose();
+        doorbellHandler.OnEntered -= OnDoorbellEntered;
+        doorbellHandler.OnLeft    -= OnDoorbellLeft;
+        doorbellHandler.Dispose();
         characterDb.Dispose();
     }
 }

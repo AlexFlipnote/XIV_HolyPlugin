@@ -15,6 +15,11 @@
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Sounds\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Images\icon.png">
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

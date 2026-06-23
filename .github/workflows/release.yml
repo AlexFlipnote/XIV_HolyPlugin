@@ -49,6 +49,7 @@ jobs:
           cp HoliestFluffiness/bin/Release/NAudio.Wasapi.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
           cp HoliestFluffiness/Images/icon.png dist/HoliestFluffiness/Images/
+          if [ -d HoliestFluffiness/Sounds ]; then cp -r HoliestFluffiness/Sounds dist/HoliestFluffiness/Sounds; fi
 
       - name: Generate repo.json
         env:
