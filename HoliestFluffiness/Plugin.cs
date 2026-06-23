@@ -225,7 +225,7 @@ public sealed class Plugin : IDalamudPlugin
         if (string.IsNullOrEmpty(trimmed))
         {
             configWindow.IsOpen = true;
-            configWindow.NavigateTo(3);
+            configWindow.NavigateTo(5);
             return;
         }
 
