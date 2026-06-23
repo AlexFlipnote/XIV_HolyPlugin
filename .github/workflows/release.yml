@@ -42,6 +42,7 @@ jobs:
 
       - name: Pack Plugin
         run: |
+          mkdir -p dist/HoliestFluffiness
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
           cp HoliestFluffiness/bin/Release/NAudio.Core.dll dist/HoliestFluffiness/
