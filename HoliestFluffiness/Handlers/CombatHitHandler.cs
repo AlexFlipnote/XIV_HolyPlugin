@@ -31,8 +31,8 @@ public sealed unsafe class CombatHitHandler : IDisposable
     private static readonly ImmutableHashSet<FlyTextKind> HealKinds = ImmutableHashSet.Create(
         FlyTextKind.HealingCrit);
 
-    private int ownHealVal   = -1;
-    private int otherHealVal = -1;
+    private bool lastHealWasOwn       = false;
+    private bool lastHealTargetedMe   = false;
 
     private delegate void AddToScreenLogDelegate(
         Character* target, Character* source,
@@ -54,10 +54,8 @@ public sealed unsafe class CombatHitHandler : IDisposable
 
         try
         {
-            // sig points to a CALL site; resolve the actual function address
-            var callSite = sigScanner.ScanText("E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39");
-            var funcAddr = callSite + 5 + *(int*)(callSite + 1);
-            screenLogHook = gameInterop.HookFromAddress<AddToScreenLogDelegate>((nint)funcAddr, OnScreenLog);
+            var address = sigScanner.ScanText("E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39");
+            screenLogHook = gameInterop.HookFromAddress<AddToScreenLogDelegate>(address, OnScreenLog);
             screenLogHook.Enable();
         }
         catch { /* sig may change with patches; damage crits still work without this hook */ }
@@ -68,14 +66,11 @@ public sealed unsafe class CombatHitHandler : IDisposable
     {
         if (HealKinds.Contains(kind))
         {
-            ownHealVal   = -1;
-            otherHealVal = -1;
-            var localId  = objectTable.LocalPlayer?.EntityId ?? 0;
-            var isOwn    = source->GameObject.EntityId == localId ||
-                           (source->GameObject.SubKind == (int)BattleNpcSubKind.Pet &&
-                            source->CompanionOwnerId   == localId);
-            if (isOwn) ownHealVal   = val1;
-            else       otherHealVal = val1;
+            var localId       = objectTable.LocalPlayer?.EntityId ?? 0;
+            lastHealWasOwn    = source->GameObject.GetGameObjectId() == localId ||
+                                (source->GameObject.SubKind == (int)BattleNpcSubKind.Pet &&
+                                 source->CompanionOwnerId   == localId);
+            lastHealTargetedMe = target->GameObject.GetGameObjectId() == localId;
         }
         screenLogHook!.Original(target, source, kind, option, actionKind, actionId, val1, val2, damageType);
     }
@@ -96,10 +91,10 @@ public sealed unsafe class CombatHitHandler : IDisposable
                   config.CombatCSound,  "Sounds/Combat/critical.wav",        config.CombatCVol);
         else if (HealKinds.Contains(kind))
         {
-            if      (val1 == ownHealVal   && config.CombatChoEnabled)
+            if (lastHealWasOwn && config.CombatChoEnabled)
                 Apply(ref text2, config.CombatChoShowText, config.CombatChoText,
                       config.CombatChoSound, "Sounds/Combat/critical.wav", config.CombatChoVol);
-            else if (val1 == otherHealVal && config.CombatChtEnabled)
+            else if (!lastHealWasOwn && lastHealTargetedMe && config.CombatChtEnabled)
                 Apply(ref text2, config.CombatChtShowText, config.CombatChtText,
                       config.CombatChtSound, "Sounds/Combat/heal.mp3",    config.CombatChtVol);
         }
