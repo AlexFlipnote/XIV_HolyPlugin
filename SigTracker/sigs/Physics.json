@@ -1,0 +1,19 @@
+{
+  "name": "Physics",
+  "history": [
+    {
+      "pattern": "40 55 53 56 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 44 0F 29 94 24",
+      "rva": null,
+      "bytes_at_rva": null,
+      "exe_hash": null,
+      "date": null
+    },
+    {
+      "pattern": "40 55 53 56 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 44 0F 29 94 24",
+      "rva": "0x1931de0",
+      "bytes_at_rva": "40 55 53 56 41 57 48 8D AC 24 68 FC FF FF 48 81 EC 98 04 00 00 44 0F 29 94 24 30 04 00 00 44 0F",
+      "exe_hash": "c2c3f05c",
+      "date": "2026-06-24"
+    }
+  ]
+}

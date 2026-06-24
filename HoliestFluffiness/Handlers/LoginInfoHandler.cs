@@ -181,12 +181,12 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 Name         = charInfo.Name,
                 World        = charInfo.World,
                 DataCenter   = charInfo.Dc,
-                FreeCompany  = fc?.Display          ?? existing?.FreeCompany,
+                FreeCompany  = fc?.Display,
                 SearchInfo   = plate?.TextValue      ?? existing?.SearchInfo,
                 PrivateHouse = privateHouse          ?? existing?.PrivateHouse,
-                FcHouse      = fcHouse               ?? existing?.FcHouse,
-                Gil          = gil >= 0 ? gil        : existing?.Gil ?? 0,
-                Inventory    = inventory              ?? existing?.Inventory,
+                FcHouse      = fc == null ? null     : (fcHouse ?? existing?.FcHouse),
+                Gil          = gil >= 0 ? gil                    : existing?.Gil ?? 0,
+                Inventory    = inventory                         ?? existing?.Inventory,
                 LastSeen     = DateTime.UtcNow,
             };
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
@@ -224,9 +224,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var newPlate        = await CollectPlateAsync(CancellationToken.None);
         var newInventory    = await CollectInventoryAsync(CancellationToken.None);
 
-        if (newFc?.Display    != null) existing.FreeCompany  = newFc.Display;
+        existing.FreeCompany = newFc?.Display;
+        existing.FcHouse     = newFc == null ? null : (newFcHouse ?? existing.FcHouse);
         if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
-        if (newFcHouse        != null) existing.FcHouse      = newFcHouse;
         if (newGil            >= 0)    existing.Gil          = newGil;
         if (newPlate?.TextValue != null) existing.SearchInfo = newPlate.TextValue;
         if (newInventory      != null) existing.Inventory    = newInventory;
@@ -264,11 +264,11 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 if (existing == null) continue;
 
                 // Only accept confident values; fall back to existing for anything that didn't load
-                var newFcDisplay  = newFc?.Display          ?? existing.FreeCompany;
+                var newFcDisplay  = newFc?.Display;
                 var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
                 var newPlateText  = newPlate?.TextValue      ?? existing.SearchInfo;
                 var newPH         = newPrivateHouse          ?? existing.PrivateHouse;
-                var newFcH        = newFcHouse               ?? existing.FcHouse;
+                var newFcH        = newFc == null ? null     : (newFcHouse ?? existing.FcHouse);
                 var newInv        = newInventory             ?? existing.Inventory;
 
                 if (existing.FreeCompany  == newFcDisplay  &&
@@ -382,7 +382,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    // Blocks until FC state is definitive: tag present (has FC) or proxy gone (no FC).
+    // Blocks until FC state is known: tag present (has FC) or tag still empty after retries (no FC).
     // Pass instant=true to skip the wait (single read, used when data is guaranteed loaded).
     private async Task<FcData?> CollectFcAsync(CancellationToken token, bool instant = false)
     {
@@ -409,13 +409,13 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             });
 
             if (tag.Length > 0) return new FcData(tag, name); // has FC
-            if (proxyNull)      return null;                   // definitively no FC
+            if (proxyNull)      return null;                  // proxy gone — no FC
 
-            // proxy present but name still empty ,  still loading, wait and retry
+            // proxy present but tag still empty ,  still loading, wait and retry
             if (i < attempts - 1) await Task.Delay(500, token);
         }
 
-        return null; // timed out
+        return null; // tag still empty after retries — not in FC
     }
 
     private async Task<SeString?> CollectPlateAsync(CancellationToken token, bool retry = false)

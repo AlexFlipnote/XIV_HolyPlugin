@@ -1,0 +1,19 @@
+{
+  "name": "AddToScreenLog",
+  "history": [
+    {
+      "pattern": "E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39",
+      "rva": null,
+      "bytes_at_rva": null,
+      "exe_hash": null,
+      "date": null
+    },
+    {
+      "pattern": "E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39",
+      "rva": "0x8a6e69",
+      "bytes_at_rva": "E8 72 7C 3A 00 BF 45 00 00 00 EB 39 44 89 64 24 48 45 33 C9 89 44 24 40 45 33 C0 8B 84 24 A0 00",
+      "exe_hash": "c2c3f05c",
+      "date": "2026-06-24"
+    }
+  ]
+}

@@ -23,3 +23,6 @@ pack: release
 clean:
 	dotnet clean $(PROJ)
 	rm -rf dist/$(PLUGIN)
+
+scan:
+	cd SigTracker && make scan-alex

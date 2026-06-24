@@ -1,0 +1,19 @@
+{
+  "name": "LobbyError",
+  "history": [
+    {
+      "pattern": "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0",
+      "rva": null,
+      "bytes_at_rva": null,
+      "exe_hash": null,
+      "date": null
+    },
+    {
+      "pattern": "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0",
+      "rva": "0x4e5920",
+      "bytes_at_rva": "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 BF 17 15 00 8B D0 0F B7 C8 C1 EA 10 81 F9 F4 33 00 00 0F",
+      "exe_hash": "c2c3f05c",
+      "date": "2026-06-24"
+    }
+  ]
+}

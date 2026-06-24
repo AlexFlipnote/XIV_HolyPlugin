@@ -1,0 +1,19 @@
+{
+  "name": "LoadIconByID",
+  "history": [
+    {
+      "pattern": "E8 ?? ?? ?? ?? 41 8D 45 3E",
+      "rva": null,
+      "bytes_at_rva": null,
+      "exe_hash": null,
+      "date": null
+    },
+    {
+      "pattern": "E8 ?? ?? ?? ?? 41 8D 45 3E",
+      "rva": "0x13c6104",
+      "bytes_at_rva": "E8 C7 94 30 FF 41 8D 45 3E 48 8B CF 41 03 C6 48 63 D0 49 8B 47 28 83 3C 90 00 0F 9F C2 E8 2A 98",
+      "exe_hash": "c2c3f05c",
+      "date": "2026-06-24"
+    }
+  ]
+}

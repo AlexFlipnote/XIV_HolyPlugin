@@ -112,8 +112,14 @@ public sealed class Plugin : IDalamudPlugin
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
     private string? pendingLifestreamArgs;
+    private HousingBidRecord? pendingBid;
+    private (string district, int ward)? _loginZone;
     private string? lastKnownName;
     private string? lastKnownWorld;
+
+    private static readonly System.Text.RegularExpressions.Regex LoginZoneRx =
+        new(@"^(Mist|The Lavender Beds|The Goblet|Shirogane|Empyreum), Ward (\d+)$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
 
     public Plugin()
     {
@@ -200,6 +206,7 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.Logout += OnLogout;
 
         ChatGui.ChatMessage += OnChatMessageFlash;
+        ChatGui.ChatMessage += OnChatMessageZone;
         unsafe
         {
             readyCheckHook = GameInterop.HookFromAddress<InitiateReadyCheckDelegate>(
@@ -411,13 +418,34 @@ public sealed class Plugin : IDalamudPlugin
             : null;
 
         if (currentKey == rec.Key)
+        {
+            if (IsAlreadyInBidLocation(bid))
+            {
+                Log.Debug("[GoToBid] Already in {D} W{W}, skipping teleport.", bid.District, bid.Ward);
+                return;
+            }
             InvokeLifestreamTeleport(args);
+        }
         else
         {
             pendingLifestreamArgs = args;
+            pendingBid            = bid;
             SwitchToCharacter(rec.Name, rec.World);
         }
     }
+
+    private static readonly Dictionary<string, ushort> HousingTerritoryIds = new()
+    {
+        ["Mist"]          = 339,
+        ["Lavender Beds"] = 340,
+        ["The Goblet"]    = 341,
+        ["Shirogane"]     = 641,
+        ["Empyreum"]      = 979,
+    };
+
+    private bool IsAlreadyInBidLocation(HousingBidRecord bid) =>
+        HousingTerritoryIds.TryGetValue(bid.District, out var expected) &&
+        ClientState.TerritoryType == expected;
 
     private void InvokeLifestreamTeleport(string args)
     {
@@ -478,8 +506,16 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private void OnChatMessageZone(IHandleableChatMessage message)
+    {
+        var m = LoginZoneRx.Match(message.Message.ToString());
+        if (m.Success)
+            _loginZone = (m.Groups[1].Value, int.Parse(m.Groups[2].Value));
+    }
+
     private void OnLogin()
     {
+        _loginZone = null;
         var player = ObjectTable[0] as IPlayerCharacter;
         if (player != null)
         {
@@ -517,10 +553,27 @@ public sealed class Plugin : IDalamudPlugin
             await loginInfoHandler.RunAsync(token);
             await accessoryHandler.RunAsync(token);
 
-            var tp = pendingLifestreamArgs;
+            var tp  = pendingLifestreamArgs;
+            var bid = pendingBid;
             pendingLifestreamArgs = null;
+            pendingBid            = null;
+
             if (tp != null)
-                await Framework.RunOnFrameworkThread(() => InvokeLifestreamTeleport(tp));
+            {
+                if (bid != null)
+                {
+                    // Wait up to 2s for the "Shirogane, Ward 7" zone announcement chat line
+                    var deadline = Environment.TickCount64 + 2000;
+                    while (_loginZone == null && Environment.TickCount64 < deadline && !token.IsCancellationRequested)
+                        await Task.Delay(100, token);
+                }
+
+                var zone = _loginZone;
+                if (bid != null && zone.HasValue && zone.Value.district == bid.District && zone.Value.ward == bid.Ward)
+                    Log.Debug("[GoToBid] Already in {D} W{W} after login, skipping teleport.", bid.District, bid.Ward);
+                else
+                    await Framework.RunOnFrameworkThread(() => InvokeLifestreamTeleport(tp));
+            }
 
             await loginInfoHandler.RunPeriodicUpdatesAsync(token);
         }
@@ -597,6 +650,7 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.Login  -= OnLogin;
         ClientState.Logout -= OnLogout;
         ChatGui.ChatMessage -= OnChatMessageFlash;
+        ChatGui.ChatMessage -= OnChatMessageZone;
         readyCheckHook?.Dispose();
         lock (ctsLock)
         {

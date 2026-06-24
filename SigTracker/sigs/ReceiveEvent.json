@@ -1,0 +1,19 @@
+{
+  "name": "ReceiveEvent",
+  "history": [
+    {
+      "pattern": "44 0F B7 C2 4D 8B D1",
+      "rva": null,
+      "bytes_at_rva": null,
+      "exe_hash": null,
+      "date": null
+    },
+    {
+      "pattern": "44 0F B7 C2 4D 8B D1",
+      "rva": "0x6d0030",
+      "bytes_at_rva": "44 0F B7 C2 4D 8B D1 41 83 E8 06 74 65 41 83 E8 01 74 58 41 83 E8 02 74 4B 41 83 F8 03 75 6A 48",
+      "exe_hash": "c2c3f05c",
+      "date": "2026-06-24"
+    }
+  ]
+}
