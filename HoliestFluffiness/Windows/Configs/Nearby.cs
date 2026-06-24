@@ -444,7 +444,7 @@ public partial class ConfigWindow
         EndSection();
     }
 
-    private void DrawSoundPicker(string id, string defaultPath, string configPath, float volume, Action<string> setPath, Action<float> setVolume)
+    private void DrawSoundPicker(string id, string defaultPath, string configPath, float volume, Action<string> setPath, Action<float> setVolume, bool showTest = true)
     {
         // Row 1: [Reset to default] [Browse...] [Default sound / Current: filename]
         SectionRow();
@@ -467,11 +467,14 @@ public partial class ConfigWindow
         // Row 2: [Test sound] [slider]
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        PushButton();
-        if (ImGui.Button($"Test sound##{id}test"))
-            HoliestFluffiness.SoundEngine.Play(string.IsNullOrEmpty(configPath) ? defaultPath : configPath, volume);
-        PopButton();
-        ImGui.SameLine();
+        if (showTest)
+        {
+            PushButton();
+            if (ImGui.Button($"Test sound##{id}test"))
+                HoliestFluffiness.SoundEngine.Play(string.IsNullOrEmpty(configPath) ? defaultPath : configPath, volume);
+            PopButton();
+            ImGui.SameLine();
+        }
         ImGui.SetNextItemWidth(200);
         var vol = volume * 100f;
         PushInput();

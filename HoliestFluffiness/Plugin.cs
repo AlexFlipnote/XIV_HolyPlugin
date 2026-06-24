@@ -54,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IGameGui GameGui { get; init; } = null!;
     [PluginService] private IPartyList PartyList { get; init; } = null!;
     [PluginService] private ITargetManager TargetManager { get; init; } = null!;
+    [PluginService] private IFlyTextGui    FlyTextGui    { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -76,6 +77,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly NearbyWindow nearbyWindow;
     private readonly CommendationHandler commendationHandler;
     private readonly DoorbellHandler doorbellHandler;
+    private readonly CombatHitHandler combatHitHandler;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -151,12 +153,14 @@ public sealed class Plugin : IDalamudPlugin
         commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
         commendationHandler.OnCommendation += OnCommendationReceived;
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
+        combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop);
         doorbellHandler.OnEntered     += OnDoorbellEntered;
         doorbellHandler.OnLeft        += OnDoorbellLeft;
         doorbellHandler.OnAlreadyHere += OnDoorbellAlreadyHere;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetNearbyHandler(nearbyHandler);
+        configWindow.SetCombatHitHandler(combatHitHandler);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
         windowSystem.AddWindow(noKillWindow);
@@ -627,6 +631,7 @@ public sealed class Plugin : IDalamudPlugin
         doorbellHandler.OnLeft        -= OnDoorbellLeft;
         doorbellHandler.OnAlreadyHere -= OnDoorbellAlreadyHere;
         doorbellHandler.Dispose();
+        combatHitHandler.Dispose();
         characterDb.Dispose();
     }
 }

@@ -115,6 +115,38 @@ public class Configuration : IPluginConfiguration
     public string DoorbellAlreadyHereSoundPath   { get; set; } = "";
     public float  DoorbellAlreadyHereSoundVolume { get; set; } = 0.5f;
 
+    // Combat section
+    // DC – Direct Critical Damage
+    public bool   CombatDcEnabled   { get; set; } = false;
+    public string CombatDcSound     { get; set; } = "";
+    public float  CombatDcVol       { get; set; } = 0.5f;
+    public bool   CombatDcShowText  { get; set; } = false;
+    public string CombatDcText      { get; set; } = "DIRECT CRITICAL HIT!";
+    // D – Direct Damage
+    public bool   CombatDEnabled    { get; set; } = false;
+    public string CombatDSound      { get; set; } = "";
+    public float  CombatDVol        { get; set; } = 0.5f;
+    public bool   CombatDShowText   { get; set; } = false;
+    public string CombatDText       { get; set; } = "Mini crit!";
+    // C – Critical Damage
+    public bool   CombatCEnabled    { get; set; } = false;
+    public string CombatCSound      { get; set; } = "";
+    public float  CombatCVol        { get; set; } = 0.5f;
+    public bool   CombatCShowText   { get; set; } = false;
+    public string CombatCText       { get; set; } = "CRITICAL HIT!";
+    // CHO – Critical Heal (own + own fairy)
+    public bool   CombatChoEnabled  { get; set; } = false;
+    public string CombatChoSound    { get; set; } = "";
+    public float  CombatChoVol      { get; set; } = 0.5f;
+    public bool   CombatChoShowText { get; set; } = false;
+    public string CombatChoText     { get; set; } = "CRITICAL HEAL!";
+    // CHT – Critical Heal (others + their fairies)
+    public bool   CombatChtEnabled  { get; set; } = false;
+    public string CombatChtSound    { get; set; } = "";
+    public float  CombatChtVol      { get; set; } = 0.5f;
+    public bool   CombatChtShowText { get; set; } = false;
+    public string CombatChtText     { get; set; } = "THANK YOUR HEALER!";
+
     private IDalamudPluginInterface pluginInterface = null!;
 
     public void Initialize(IDalamudPluginInterface pi)

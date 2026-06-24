@@ -138,6 +138,7 @@ public partial class ConfigWindow : Window
         SidebarItem("Client", 0);
         SidebarItem("Login", 1);
         SidebarItem("Indicators", 2);
+        SidebarItem("Combat", 10);
         SidebarItem("Social", 8);
 
         ImGui.Dummy(new Vector2(0, 4));
@@ -218,7 +219,8 @@ public partial class ConfigWindow : Window
         {
             case 0: DrawClientSection();      break;
             case 1: DrawLoginSection();       break;
-            case 2: DrawIndicatorsSection();  break;
+            case 2:  DrawIndicatorsSection();  break;
+            case 10: DrawCombatSection();      break;
             case 4: DrawDatabaseSection();    break;
             case 5: DrawCharactersSection();  break;
             case 6: DrawBidsSection();        break;
