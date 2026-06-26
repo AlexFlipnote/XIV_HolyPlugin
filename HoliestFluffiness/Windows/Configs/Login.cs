@@ -141,7 +141,7 @@ public partial class ConfigWindow
         SectionRow();
 
         ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
-        ImGui.TextUnformatted("Show a character picker popup when the character select screen appears.");
+        ImGui.TextUnformatted("Show a character picker popup when you enter the main menu");
         ImGui.PopStyleColor();
 
         ImGui.Dummy(new Vector2(0, 4));
