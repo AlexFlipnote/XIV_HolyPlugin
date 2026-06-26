@@ -194,6 +194,6 @@ public partial class ConfigWindow
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
 
-        EndSection();
+        EndSection(10);
     }
 }

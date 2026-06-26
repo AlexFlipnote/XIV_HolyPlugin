@@ -133,7 +133,30 @@ public partial class ConfigWindow
 
         DrawRestrictionsSubsection(accessoryEnabled);
 
-        EndSection();
+        ImGui.Dummy(new Vector2(0, 8));
+
+        // ── Character picker ──────────────────────────────────────────────────
+        SubsectionLabel("Character picker");
+        ImGui.Dummy(new Vector2(0, 4));
+        SectionRow();
+
+        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.TextUnformatted("Show a character picker popup when the character select screen appears.");
+        ImGui.PopStyleColor();
+
+        ImGui.Dummy(new Vector2(0, 4));
+        SectionRow();
+
+        PushCheckbox();
+        var pickerEnabled = configuration.CharacterPickerOnMainMenu;
+        if (ImGui.Checkbox("Show on character select##charPicker", ref pickerEnabled))
+        {
+            configuration.CharacterPickerOnMainMenu = pickerEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+
+        EndSection(10);
     }
 
     private void DrawInfoOrderList()

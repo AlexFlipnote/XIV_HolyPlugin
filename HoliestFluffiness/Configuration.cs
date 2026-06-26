@@ -50,6 +50,9 @@ public class Configuration : IPluginConfiguration
     public bool ClientFlashOnTell { get; set; } = false;
     public bool ClientFlashOnReadyCheck { get; set; } = false;
 
+    // Character picker section
+    public bool CharacterPickerOnMainMenu { get; set; } = false;
+
     // NoKill section
     public bool NoKillEnabled { get; set; } = true;
     public bool NoKillDisablePopup { get; set; } = false;

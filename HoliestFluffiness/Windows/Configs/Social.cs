@@ -12,7 +12,7 @@ public partial class ConfigWindow
 
     internal void SetNearbyHandler(NearbyHandler handler) => nearbyHandler = handler;
 
-    private void DrawNearbySection()
+    private void DrawSocialSection()
     {
         BeginSection("Social");
 
@@ -440,8 +440,7 @@ public partial class ConfigWindow
 
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 4));
-        EndSection();
+        EndSection(10);
     }
 
     private void DrawSoundPicker(string id, string defaultPath, string configPath, float volume, Action<string> setPath, Action<float> setVolume, bool showTest = true)

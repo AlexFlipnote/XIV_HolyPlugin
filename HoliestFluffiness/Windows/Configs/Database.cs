@@ -171,7 +171,7 @@ public partial class ConfigWindow
         }
         ImGui.PopStyleColor();
 
-        EndSection();
+        EndSection(10);
     }
 
     private async Task RunBulkUpdateAsync(CancellationToken token)

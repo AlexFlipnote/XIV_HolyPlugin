@@ -25,6 +25,7 @@ public class ReadyCheckHandler : IDisposable
     private List<ReadyCheckEntry> data = [];
     private bool active;
     private CancellationTokenSource? clearCts;
+    private HashSet<ulong> savedPartyIds = [];
 
     public bool IsValid { get; private set; }
 
@@ -57,7 +58,38 @@ public class ReadyCheckHandler : IDisposable
 
     public List<ReadyCheckEntry> GetData() => data;
 
-    public void Invalidate() { IsValid = false; data.Clear(); }
+    public void Invalidate() { IsValid = false; data.Clear(); savedPartyIds.Clear(); }
+
+    private unsafe void CapturePartyIds()
+    {
+        savedPartyIds.Clear();
+        var gm = GroupManager.Instance();
+        if ((nint)gm == nint.Zero) return;
+        for (var i = 0; i < gm->MainGroup.MemberCount; i++)
+        {
+            var m = gm->MainGroup.GetPartyMemberByIndex(i);
+            if ((nint)m != nint.Zero)
+                savedPartyIds.Add((ulong)m->ContentId);
+        }
+    }
+
+    private unsafe void CheckPartyChanged()
+    {
+        if (savedPartyIds.Count == 0) return;
+        var gm = GroupManager.Instance();
+        if ((nint)gm == nint.Zero) return;
+        var count = gm->MainGroup.MemberCount;
+        if (count != savedPartyIds.Count) { Invalidate(); return; }
+        for (var i = 0; i < count; i++)
+        {
+            var m = gm->MainGroup.GetPartyMemberByIndex(i);
+            if ((nint)m == nint.Zero || !savedPartyIds.Contains((ulong)m->ContentId))
+            {
+                Invalidate();
+                return;
+            }
+        }
+    }
 
     private unsafe void OnEnd(AgentReadyCheck* ptr)
     {
@@ -65,6 +97,7 @@ public class ReadyCheckHandler : IDisposable
         if (!clientState.IsLoggedIn) return;
         active = false;
         ProcessData();
+        CapturePartyIds();
         AfterReadyCheck();
     }
 
@@ -92,6 +125,7 @@ public class ReadyCheckHandler : IDisposable
     private void OnUpdate(IFramework fw)
     {
         if (clientState.IsLoggedIn && active) ProcessData();
+        else if (IsValid && !active) CheckPartyChanged();
     }
 
     private unsafe void ProcessData()

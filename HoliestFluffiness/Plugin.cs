@@ -6,6 +6,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Chat;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Hooking;
@@ -61,6 +63,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ConfigWindow configWindow;
     private readonly LoginInfoWindow loginInfoWindow;
     private readonly NoKillWindow noKillWindow;
+    private readonly CharacterPickerWindow charPickerWindow;
     private readonly AccessoryHandler accessoryHandler;
     private readonly LoginInfoHandler loginInfoHandler;
     private readonly CharacterDb characterDb;
@@ -111,6 +114,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private CancellationTokenSource? loginCts;
     private readonly object ctsLock = new();
+    private bool switchingCharacter;
     private string? pendingLifestreamArgs;
     private HousingBidRecord? pendingBid;
     private (string district, int ward)? _loginZone;
@@ -144,6 +148,7 @@ public sealed class Plugin : IDalamudPlugin
         readyCheckHandler      = new ReadyCheckHandler(configuration, GameInterop, ClientState, ChatGui, Framework, ObjectTable, Log);
         readyCheckOverlay      = new ReadyCheckOverlay(configuration, readyCheckHandler, GameGui, TextureProvider, DataManager);
         noKillWindow           = new NoKillWindow();
+        charPickerWindow       = new CharacterPickerWindow(SwitchToCharacter);
         noKillHandler.OnLobbyError += (isAuth) =>
         {
             if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld);
@@ -171,6 +176,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
         windowSystem.AddWindow(noKillWindow);
+        windowSystem.AddWindow(charPickerWindow);
         windowSystem.AddWindow(readyCheckOverlay);
         windowSystem.AddWindow(nearbyWindow);
 
@@ -205,6 +211,9 @@ public sealed class Plugin : IDalamudPlugin
 
         ClientState.Login  += OnLogin;
         ClientState.Logout += OnLogout;
+
+        AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "_TitleMenu",           OnCharaSelectForPicker);
+        AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "_CharaSelectListMenu", OnCharaSelectListOpened);
 
         ChatGui.ChatMessage += OnChatMessageFlash;
         ChatGui.ChatMessage += OnChatMessageZone;
@@ -463,6 +472,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private async void SwitchToCharacter(string name, string world)
     {
+        switchingCharacter = true;
         try
         {
             await loginInfoHandler.QuickSaveAsync();
@@ -483,10 +493,27 @@ public sealed class Plugin : IDalamudPlugin
         }
         catch (Exception ex)
         {
+            switchingCharacter = false;
             Log.Error(ex, "Failed during character switch to {Name}@{World}", name, world);
             await Framework.RunOnFrameworkThread(() =>
                 ChatGui.PrintError($"[HF] Failed to switch to {name}@{world}. Is Lifestream installed and loaded?"));
         }
+    }
+
+    private void OnCharaSelectForPicker(AddonEvent type, AddonArgs args)
+    {
+        if (!configuration.CharacterPickerOnMainMenu) return;
+        if (switchingCharacter) return;
+        if (noKillHandler.PendingAutoLogin || noKillHandler.IsReconnecting) return;
+        var chars = characterDb.GetAll();
+        if (chars.Count == 0) return;
+        charPickerWindow.Show(chars);
+    }
+
+    private void OnCharaSelectListOpened(AddonEvent type, AddonArgs args)
+    {
+        // User navigated to the character select screen manually — dismiss the picker
+        charPickerWindow.IsOpen = false;
     }
 
     private void OnLogout(int type, int code)
@@ -516,7 +543,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnLogin()
     {
-        _loginZone = null;
+        _loginZone         = null;
+        switchingCharacter = false;
         var player = ObjectTable[0] as IPlayerCharacter;
         if (player != null)
         {
@@ -650,6 +678,8 @@ public sealed class Plugin : IDalamudPlugin
         SetWindowText(windowHandle, originalTitle);
         ClientState.Login  -= OnLogin;
         ClientState.Logout -= OnLogout;
+        AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, "_TitleMenu",           OnCharaSelectForPicker);
+        AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, "_CharaSelectListMenu", OnCharaSelectListOpened);
         ChatGui.ChatMessage -= OnChatMessageFlash;
         ChatGui.ChatMessage -= OnChatMessageZone;
         readyCheckHook?.Dispose();

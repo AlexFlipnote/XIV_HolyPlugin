@@ -69,8 +69,7 @@ public partial class ConfigWindow
             configuration.CombatChtSound,     v => { configuration.CombatChtSound    = v; configuration.Save(); },
             configuration.CombatChtVol,       v => { configuration.CombatChtVol      = v; configuration.Save(); });
 
-        ImGui.Dummy(new Vector2(0, 4));
-        EndSection();
+        EndSection(10);
     }
 
     private void DrawCombatBlock(

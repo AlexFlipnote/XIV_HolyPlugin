@@ -225,7 +225,7 @@ public partial class ConfigWindow : Window
             case 5: DrawCharactersSection();  break;
             case 6: DrawBidsSection();        break;
             case 7: DrawAboutSection();       break;
-            case 8: DrawNearbySection();      break;
+            case 8: DrawSocialSection();      break;
             case 9: DrawInventorySection();   break;
         }
 
@@ -272,8 +272,10 @@ public partial class ConfigWindow : Window
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
     }
 
-    private void EndSection()
+    private void EndSection(float bottomPadding = 0)
     {
+        if (bottomPadding > 0)
+            ImGui.Dummy(new Vector2(0, bottomPadding));
         ImGui.EndChild();
         ImGui.PopStyleColor();
     }
