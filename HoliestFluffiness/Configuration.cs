@@ -69,6 +69,7 @@ public class Configuration : IPluginConfiguration
 
     // Nearby section
     public bool    NearbyEnabled             { get; set; } = false;
+    public bool    NearbyDtrEnabled          { get; set; } = false;
     public bool    NearbyShowTargeters       { get; set; } = true;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;
     public bool    NearbyHideInCombat        { get; set; } = false;

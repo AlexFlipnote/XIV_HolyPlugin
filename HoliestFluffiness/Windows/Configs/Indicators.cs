@@ -59,6 +59,18 @@ public partial class ConfigWindow
         }
         PopCheckbox();
 
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+
+        PushCheckbox();
+        var dtrEnabled = configuration.NearbyDtrEnabled;
+        if (ImGui.Checkbox("Show nearby player count##nearbydtr", ref dtrEnabled))
+        {
+            configuration.NearbyDtrEnabled = dtrEnabled;
+            configuration.Save();
+        }
+        PopCheckbox();
+
         ImGui.Dummy(new Vector2(0, 12));
 
         // ── Repair ────────────────────────────────────────────────────────────

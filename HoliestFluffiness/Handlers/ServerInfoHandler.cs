@@ -22,6 +22,9 @@ public sealed class ServerInfoHandler : IDisposable
 
     private readonly IDtrBarEntry dtrPing;
     private readonly IDtrBarEntry dtrFps;
+    private readonly IDtrBarEntry dtrNearby;
+
+    private NearbyHandler? nearbyHandler;
 
     private readonly Ping ping = new();
     private readonly CancellationTokenSource cts = new();
@@ -54,22 +57,40 @@ public sealed class ServerInfoHandler : IDisposable
         dtrFps.Tooltip = "Holy Plugin";
         dtrFps.Shown   = false;
 
+        dtrNearby = dtrBar.Get("[HF] Nearby");
+        dtrNearby.Tooltip = "Holy Plugin – Nearby Players";
+        dtrNearby.Shown   = false;
+
         framework.Update += OnUpdate;
         Task.Run(() => PingLoop(cts.Token));
     }
+
+    public void SetNearbyHandler(NearbyHandler handler) => nearbyHandler = handler;
 
     private unsafe void OnUpdate(IFramework fw)
     {
         if (!clientState.IsLoggedIn)
         {
-            if (dtrPing.Shown) dtrPing.Shown = false;
-            if (dtrFps.Shown)  dtrFps.Shown  = false;
+            if (dtrPing.Shown)   dtrPing.Shown   = false;
+            if (dtrFps.Shown)    dtrFps.Shown    = false;
+            if (dtrNearby.Shown) dtrNearby.Shown = false;
             return;
         }
 
         UpdateDcAddress();
         UpdateFps();
         UpdatePingEntry();
+        UpdateNearbyEntry();
+    }
+
+    private void UpdateNearbyEntry()
+    {
+        var shown = config.NearbyDtrEnabled && config.NearbyEnabled;
+        if (dtrNearby.Shown != shown) dtrNearby.Shown = shown;
+        if (!shown) return;
+
+        var count = nearbyHandler?.NearbyPlayers.Count ?? 0;
+        dtrNearby.Text = $" {count}";
     }
 
     private void UpdateDcAddress()
@@ -114,7 +135,11 @@ public sealed class ServerInfoHandler : IDisposable
         if (dtrPing.Shown != shown) dtrPing.Shown = shown;
         if (!shown) return;
 
-        if (!pingDirty) return;
+        if (!pingDirty)
+        {
+            if (lastRtt == 0) dtrPing.Text = "0ms";
+            return;
+        }
         pingDirty = false;
 
         dtrPing.Text = config.ServerInfoPingDisplay switch
@@ -161,5 +186,6 @@ public sealed class ServerInfoHandler : IDisposable
         ping.Dispose();
         dtrPing.Remove();
         dtrFps.Remove();
+        dtrNearby.Remove();
     }
 }

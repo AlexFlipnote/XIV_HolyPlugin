@@ -156,6 +156,7 @@ public sealed class Plugin : IDalamudPlugin
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
+        serverInfoHandler.SetNearbyHandler(nearbyHandler);
         commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
         commendationHandler.OnCommendation += OnCommendationReceived;
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
