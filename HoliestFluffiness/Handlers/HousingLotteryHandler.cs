@@ -174,7 +174,7 @@ public sealed class HousingLotteryHandler : IDisposable
 
         int plot     = int.Parse(locMatch.Groups[1].Value);
         int ward     = int.Parse(locMatch.Groups[2].Value);
-        var district = NormalizeDistrict(locMatch.Groups[3].Value.Trim());
+        var district = HousingDistricts.Normalize(locMatch.Groups[3].Value.Trim());
         int bidNum   = int.Parse(bidNumMatch.Groups[1].Value);
 
         // Active statuses ,  bid still exists, keep tracking
@@ -223,34 +223,34 @@ public sealed class HousingLotteryHandler : IDisposable
         var text = message.Message.ToString();
         if (!text.Contains("lottery", StringComparison.OrdinalIgnoreCase)) return;
 
-        // Bid submission message ,  capture immediately when the player places the bid
+        var player = objectTable[0] as IPlayerCharacter;
+        if (player == null) return;
+        var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
+        if (string.IsNullOrEmpty(world)) return;
+        var charKey = $"{player.Name.TextValue}@{world}";
+
+        // Bid submission message, capture immediately when the player places the bid
         var sub = SubmitRx.Match(text);
         if (sub.Success)
         {
-            var p = objectTable[0] as IPlayerCharacter;
-            if (p == null) return;
-            var w = p.HomeWorld.ValueNullable?.Name.ExtractText();
-            if (string.IsNullOrEmpty(w)) return;
-            var ck = $"{p.Name.TextValue}@{w}";
+            int plot     = int.Parse(sub.Groups[1].Value);
+            int ward     = int.Parse(sub.Groups[2].Value);
+            var district = HousingDistricts.Normalize(sub.Groups[3].Value.Trim());
+            int bidNum   = int.Parse(sub.Groups[4].Value);
 
-            int plot      = int.Parse(sub.Groups[1].Value);
-            int ward      = int.Parse(sub.Groups[2].Value);
-            var district  = NormalizeDistrict(sub.Groups[3].Value.Trim());
-            int bidNum    = int.Parse(sub.Groups[4].Value);
-
-            bool exists = characterDb.GetBidsByCharacter(ck)
+            bool exists = characterDb.GetBidsByCharacter(charKey)
                 .Exists(b => b.District == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
             if (!exists)
             {
                 characterDb.AddBid(new HousingBidRecord
                 {
-                    CharacterKey = ck,
+                    CharacterKey = charKey,
                     District     = district,
                     Ward         = ward,
                     Plot         = plot,
                     BidNumber    = bidNum,
                     BidType      = _pendingBidType,
-                            BidDate      = DateTime.UtcNow,
+                    BidDate      = DateTime.UtcNow,
                 });
                 Notify($"Lottery bid tracked: {district} W{ward} P{plot} #{bidNum}.");
                 log.Debug("[HousingLottery] Captured from submission message: {D} W{W} P{P} #{N}", district, ward, plot, bidNum);
@@ -262,19 +262,13 @@ public sealed class HousingLotteryHandler : IDisposable
             !text.Contains("awarded", StringComparison.OrdinalIgnoreCase) &&
             !text.Contains("won",     StringComparison.OrdinalIgnoreCase)) return;
 
-        var player = objectTable[0] as IPlayerCharacter;
-        if (player == null) return;
-        var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
-        if (string.IsNullOrEmpty(world)) return;
-        var charKey = $"{player.Name.TextValue}@{world}";
-
         var bids = characterDb.GetBidsByCharacter(charKey);
         if (bids.Count == 0) return;
 
         foreach (var bid in bids)
             characterDb.DeleteBid(bid.Id);
 
-        Notify("Lottery concluded ,  bid(s) removed.");
+        Notify("Lottery concluded, bid(s) removed.");
         log.Debug("[HousingLottery] Removed {Count} bid(s) for {Key} on lottery conclusion message.", bids.Count, charKey);
     }
 
@@ -287,15 +281,6 @@ public sealed class HousingLotteryHandler : IDisposable
         return val->String.ToString(); // CStringPointer.ToString() handles null safely
     }
 
-    private static string NormalizeDistrict(string raw) => raw switch
-    {
-        var s when s.Contains("Mist",      StringComparison.OrdinalIgnoreCase) => "Mist",
-        var s when s.Contains("Lavender",  StringComparison.OrdinalIgnoreCase) => "Lavender Beds",
-        var s when s.Contains("Goblet",    StringComparison.OrdinalIgnoreCase) => "The Goblet",
-        var s when s.Contains("Shirogane", StringComparison.OrdinalIgnoreCase) => "Shirogane",
-        var s when s.Contains("Empyreum",  StringComparison.OrdinalIgnoreCase) => "Empyreum",
-        _                                                                       => raw,
-    };
 
     // AgentContentsTimer memory layout (discovered via CE + plugin scanning):
     //   agent->0x10 points to a data block; within that block:
@@ -330,15 +315,7 @@ public sealed class HousingLotteryHandler : IDisposable
             if (lotteryNo == 0)                  continue;
             if (status == 0)                     continue;  // no active bid
 
-            var districtName = district switch
-            {
-                1 => "Mist",
-                2 => "Lavender Beds",
-                3 => "The Goblet",
-                4 => "Shirogane",
-                5 => "Empyreum",
-                _ => $"District{district}",
-            };
+            var districtName = HousingDistricts.FromAgentIndex(district);
             int plot    = plotIdx + 1;
             var bType   = bidTyp == 2 ? BidType.FC : BidType.Private;
 

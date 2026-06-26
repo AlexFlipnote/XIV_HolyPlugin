@@ -28,7 +28,7 @@ public partial class ConfigWindow
     {
         BeginSection("Database");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Stores character info to a local SQLite database on every login.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 6));
@@ -48,7 +48,7 @@ public partial class ConfigWindow
 
         if (bulkUpdateTotal > 0)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted($"Processing {bulkUpdateProgress}/{bulkUpdateTotal}...");
             ImGui.PopStyleColor();
             ImGui.SameLine();
@@ -89,14 +89,14 @@ public partial class ConfigWindow
         {
             ImGui.Dummy(new Vector2(0, 2));
             SectionRow();
-            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted(csvExportMessage);
             ImGui.PopStyleColor();
         }
 
         ImGui.Dummy(new Vector2(0, 8));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted("Did you know?");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 2));
@@ -130,7 +130,7 @@ public partial class ConfigWindow
         };
 
         var numColW = statNums.Max(n => ImGui.CalcTextSize(n).X) + 4f;
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         if (ImGui.BeginTable("##dbstats", 2))
         {
             ImGui.TableSetupColumn("##n", ImGuiTableColumnFlags.WidthFixed, numColW);

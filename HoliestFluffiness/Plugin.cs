@@ -78,6 +78,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ReadyCheckOverlay readyCheckOverlay;
     private readonly NearbyHandler nearbyHandler;
     private readonly NearbyWindow nearbyWindow;
+    private readonly PingChartWindow pingChartWindow;
     private readonly CommendationHandler commendationHandler;
     private readonly DoorbellHandler doorbellHandler;
     private readonly CombatHitHandler combatHitHandler;
@@ -170,6 +171,9 @@ public sealed class Plugin : IDalamudPlugin
         doorbellHandler.OnLeft        += OnDoorbellLeft;
         doorbellHandler.OnAlreadyHere += OnDoorbellAlreadyHere;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
+        pingChartWindow        = new PingChartWindow(serverInfoHandler);
+        serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
+        serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetNearbyHandler(nearbyHandler);
         configWindow.SetCombatHitHandler(combatHitHandler);
@@ -179,10 +183,11 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(charPickerWindow);
         windowSystem.AddWindow(readyCheckOverlay);
         windowSystem.AddWindow(nearbyWindow);
+        windowSystem.AddWindow(pingChartWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' to open the about page."
+            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' for the about page, '/hf ping' for the ping chart."
         });
         CommandManager.AddHandler(HwCommand, new CommandInfo(OnHwCommand)
         {
@@ -231,13 +236,19 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-        if (args.Trim().Equals("about", StringComparison.OrdinalIgnoreCase))
+        switch (args.Trim().ToLowerInvariant())
         {
-            configWindow.IsOpen = true;
-            configWindow.NavigateTo(7);
-            return;
+            case "about":
+                configWindow.IsOpen = true;
+                configWindow.NavigateTo(7);
+                break;
+            case "ping":
+                pingChartWindow.IsOpen = !pingChartWindow.IsOpen;
+                break;
+            default:
+                configWindow.IsOpen = !configWindow.IsOpen;
+                break;
         }
-        configWindow.IsOpen = !configWindow.IsOpen;
     }
 
     private void OnHwCommand(string command, string args)
@@ -331,22 +342,22 @@ public sealed class Plugin : IDalamudPlugin
         SoundEngine.Play(ResolveSound(configPath, defaultFile), volume);
     }
 
-    private void OnDoorbellEntered(string name, string world, uint worldId)
+    private void OnDoorbellEntered(string name, string _, uint worldId)
     {
         if (!configuration.DoorbellEnterEnabled) return;
         if (configuration.DoorbellEnterSound)
             SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellEnterSoundVolume);
         if (configuration.DoorbellEnterChat)
-            PrintDoorbellChat("<link> has come inside.", name, world, worldId);
+            PrintDoorbellChat(name, worldId, " has come inside.");
     }
 
-    private void OnDoorbellLeft(string name, string world, uint worldId)
+    private void OnDoorbellLeft(string name, string _, uint worldId)
     {
         if (!configuration.DoorbellLeaveEnabled) return;
         if (configuration.DoorbellLeaveSound)
             SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav"), configuration.DoorbellLeaveSoundVolume);
         if (configuration.DoorbellLeaveChat)
-            PrintDoorbellChat("<link> has left the house.", name, world, worldId);
+            PrintDoorbellChat(name, worldId, " has left the house.");
     }
 
     private void OnDoorbellAlreadyHere(List<(string Name, string World, uint WorldId)> players)
@@ -356,47 +367,22 @@ public sealed class Plugin : IDalamudPlugin
             SoundEngine.Play(ResolveSound(configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellAlreadyHereSoundVolume);
         if (configuration.DoorbellAlreadyHereChat)
             foreach (var p in players)
-                PrintDoorbellChat("<link> was here when you arrived.", p.Name, p.World, p.WorldId);
+                PrintDoorbellChat(p.Name, p.WorldId, " was here when you arrived.");
     }
 
-    private void PrintDoorbellChat(string format, string name, string world, uint worldId)
+    private void PrintDoorbellChat(string name, uint worldId, string suffix)
     {
-        var builder = new SeStringBuilder();
-        var i = 0;
-        while (i < format.Length)
+        ChatGui.Print(new XivChatEntry
         {
-            if (format[i] == '<')
-            {
-                var end = format.IndexOf('>', i + 1);
-                if (end > i)
-                {
-                    switch (format.Substring(i, end - i + 1))
-                    {
-                        case "<link>":
-                            builder.Add(new PlayerPayload(name, worldId));
-                            i = end + 1;
-                            continue;
-                        case "<name>":
-                            builder.AddText(name);
-                            i = end + 1;
-                            continue;
-                        case "<world>":
-                            builder.AddText(world);
-                            i = end + 1;
-                            continue;
-                    }
-                }
-            }
-            builder.AddText(format[i].ToString());
-            i++;
-        }
-        ChatGui.Print(new XivChatEntry { Message = builder.Build() });
+            Message = new SeStringBuilder()
+                .Add(new PlayerPayload(name, worldId))
+                .AddText(suffix)
+                .Build()
+        });
     }
 
     private string ResolveSound(string configPath, string defaultRelative) =>
-        string.IsNullOrEmpty(configPath)
-            ? Path.Combine(PluginInterface.AssemblyLocation.DirectoryName!, defaultRelative)
-            : configPath;
+        SoundEngine.Resolve(configPath, defaultRelative, PluginInterface.AssemblyLocation.DirectoryName!);
 
     private void CycleCharacter(int direction)
     {
@@ -444,17 +430,8 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private static readonly Dictionary<string, ushort> HousingTerritoryIds = new()
-    {
-        ["Mist"]          = 339,
-        ["Lavender Beds"] = 340,
-        ["The Goblet"]    = 341,
-        ["Shirogane"]     = 641,
-        ["Empyreum"]      = 979,
-    };
-
     private bool IsAlreadyInBidLocation(HousingBidRecord bid) =>
-        HousingTerritoryIds.TryGetValue(bid.District, out var expected) &&
+        HousingDistricts.TerritoryIds.TryGetValue(bid.District, out var expected) &&
         ClientState.TerritoryType == expected;
 
     private void InvokeLifestreamTeleport(string args)
@@ -512,7 +489,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCharaSelectListOpened(AddonEvent type, AddonArgs args)
     {
-        // User navigated to the character select screen manually — dismiss the picker
+        // User navigated to the character select screen manually, dismiss the picker
         charPickerWindow.IsOpen = false;
     }
 

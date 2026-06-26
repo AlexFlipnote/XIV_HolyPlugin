@@ -25,13 +25,13 @@ public partial class ConfigWindow
 
         if (isCurrent)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColGreen);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
             ImGui.TextUnformatted(rec.Name);
             ImGui.PopStyleColor();
         }
         else if (lifestreamOn)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
             if (ImGui.Selectable($"{rec.Name}##sel{rec.Key}", false, ImGuiSelectableFlags.None))
                 onSwitchCharacter(rec.Name, rec.World);
             ImGui.PopStyleColor();
@@ -64,7 +64,7 @@ public partial class ConfigWindow
         ImGui.InputText("##charfilter", ref charFilter, 128);
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Filter");
         ImGui.PopStyleColor();
         ImGui.SameLine();
@@ -95,7 +95,7 @@ public partial class ConfigWindow
         int colCount = cols.Count(v => v) + 1; // +1 for Actions
         if (colCount == 1)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted("No columns selected.");
             ImGui.PopStyleColor();
         }
@@ -179,7 +179,7 @@ public partial class ConfigWindow
                     if (ImGui.SmallButton($"~##{rec.Key}")) pendingReset = rec.Key;
                     if (ImGui.IsItemHovered()) ImGui.SetTooltip("Reset cached data for this character");
                     ImGui.SameLine(0, 2);
-                    ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
+                    ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColRed);
                     if (ImGui.SmallButton($"X##{rec.Key}")) pendingDelete = rec.Key;
                     ImGui.PopStyleColor();
                     if (ImGui.IsItemHovered()) ImGui.SetTooltip("Delete this character from the database");

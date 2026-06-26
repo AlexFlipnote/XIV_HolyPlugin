@@ -10,7 +10,7 @@ public partial class ConfigWindow
     {
         BeginSection("Client");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Settings that change client/application behaviour.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 8));
@@ -30,7 +30,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("(empty = FINAL FANTASY XIV)");
         ImGui.PopStyleColor();
 
@@ -47,7 +47,7 @@ public partial class ConfigWindow
         }
         PopCheckbox();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Shows \"PREFIX / NAME @ WORLD\" while logged in");
         ImGui.PopStyleColor();
 
@@ -55,7 +55,7 @@ public partial class ConfigWindow
         SubsectionLabel("Flash taskbar on...");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped(
             "Flashes the FFXIV taskbar icon when you are alt-tabbed. Useful if you have " +
             "game sounds disabled while in the background and don't want to miss events."
@@ -88,7 +88,7 @@ public partial class ConfigWindow
         SubsectionLabel("No-kill");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Intercepts lobby errors and converts them to a reconnect attempt instead of closing the game.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -122,7 +122,7 @@ public partial class ConfigWindow
         SubsectionLabel("High FPS physics fix");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Limits physics updates to a target FPS so hair/cloth physics behave correctly at high frame rates.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -151,7 +151,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("(default 60)");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -160,7 +160,7 @@ public partial class ConfigWindow
         SubsectionLabel("Anti-AFK");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Periodically presses LCtrl when the AFK timer exceeds the threshold to prevent being kicked.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -189,7 +189,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("(default 30)");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));

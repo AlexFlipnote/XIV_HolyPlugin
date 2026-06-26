@@ -16,7 +16,7 @@ public partial class ConfigWindow
     {
         BeginSection("Combat");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped(
             "Adds audio and visual feedback to combat events like critical hits and direct hits, built to be expanded over time. " +
             "The default sounds are heavily inspired by TF2, a game near and dear to my heart."
@@ -121,7 +121,7 @@ public partial class ConfigWindow
                 (ok, p) => { if (ok) setSound(p); });
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted(string.IsNullOrEmpty(sound) ? "Default sound" : $"Current: {Path.GetFileName(sound)}");
         ImGui.PopStyleColor();
 
@@ -138,7 +138,7 @@ public partial class ConfigWindow
             combatHitHandler.TestHit(testKind, showText, text, sound, defaultSound, vol);
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Test the sound + text");
         ImGui.PopStyleColor();
 

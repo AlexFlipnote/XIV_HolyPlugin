@@ -16,7 +16,7 @@ public partial class ConfigWindow
     {
         BeginSection("Social");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Nearby players, targeting tracker, house doorbell, and commendation sounds.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 8));
@@ -242,7 +242,7 @@ public partial class ConfigWindow
         SubsectionLabel("House doorbell");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Alerts when players enter or leave a house, or are already present when you arrive.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 8));
@@ -375,7 +375,7 @@ public partial class ConfigWindow
         SubsectionLabel("Commendations");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Plays a sound when you receive commendations after a duty. Each tier plays a different sound based on how many you received.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -396,7 +396,7 @@ public partial class ConfigWindow
         var cDir = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Congratulations");
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("1/3 commends:");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 2));
@@ -407,7 +407,7 @@ public partial class ConfigWindow
 
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("2/3 commends:");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 2));
@@ -418,7 +418,7 @@ public partial class ConfigWindow
 
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("3/3 commends:");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 2));
@@ -429,7 +429,7 @@ public partial class ConfigWindow
 
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("All 7 (full party):");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 2));
@@ -457,7 +457,7 @@ public partial class ConfigWindow
                 (ok, p) => { if (ok) setPath(p); });
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted(string.IsNullOrEmpty(configPath)
             ? (string.IsNullOrEmpty(defaultPath) ? "No sound set" : "Default sound")
             : $"Current: {Path.GetFileName(configPath)}");

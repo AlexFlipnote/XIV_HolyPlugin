@@ -10,13 +10,13 @@ public partial class ConfigWindow
     {
         BeginSection("About");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("A custom plugin made mostly for our FC, but shared to others too.");
         ImGui.PopStyleColor();
 
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.PushTextWrapPos(ImGui.GetContentRegionMax().X - 8f);
         ImGui.TextUnformatted(
             "The plugin is named after our Free Company, when no existing plugin did exactly what we needed, " +
@@ -31,11 +31,11 @@ public partial class ConfigWindow
         SubsectionLabel("Optional 3rd party plugins");
         SectionRow();
         bool lifestreamOn = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
-        ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? ColGreen : ColRed);
+        ImGui.PushStyleColor(ImGuiCol.Text, lifestreamOn ? Theme.ColGreen : Theme.ColRed);
         ImGui.TextUnformatted("Lifestream");
         ImGui.PopStyleColor();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted(lifestreamOn ? "Enables switching to characters and travelling to housing plots directly from this plugin." : "Install Lifestream to enable character switching and housing plot travel.");
         ImGui.PopStyleColor();
 

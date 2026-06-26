@@ -18,7 +18,7 @@ public partial class ConfigWindow
     {
         BeginSection("Login");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Settings for what happens when you log in with a character.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 8));
@@ -29,7 +29,7 @@ public partial class ConfigWindow
         SectionRow();
 
         bool anyEnabled = configuration.ShowCharacterInfo || configuration.InfoEnabled || configuration.AdventurePlateEnabled || configuration.ShowPrivateHouseLocation || configuration.ShowFcHouseLocation;
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Simulate login:");
         ImGui.PopStyleColor();
         ImGui.SameLine();
@@ -48,7 +48,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Show as:");
         ImGui.PopStyleColor();
         ImGui.SameLine();
@@ -65,7 +65,7 @@ public partial class ConfigWindow
 
         ImGui.Dummy(new Vector2(0, 8));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted("What to show");
         ImGui.PopStyleColor();
         ImGui.SameLine();
@@ -86,7 +86,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Simulate login:");
         ImGui.PopStyleColor();
         ImGui.SameLine();
@@ -140,7 +140,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Show a character picker popup when you enter the main menu");
         ImGui.PopStyleColor();
 
@@ -237,7 +237,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("(0 = skip check)");
         ImGui.PopStyleColor();
 
@@ -252,7 +252,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("(0 = skip check)");
         ImGui.PopStyleColor();
 
@@ -262,7 +262,7 @@ public partial class ConfigWindow
         SubsectionLabel("Whitelist");
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Characters listed here will bypass all restrictions.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 2f));
@@ -274,7 +274,7 @@ public partial class ConfigWindow
         {
             SectionRow();
             PushButton();
-            ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColRed);
             if (ImGui.Button($"X##{i}", new Vector2(22, 0)))
                 removeIdx = i;
             ImGui.PopStyleColor();

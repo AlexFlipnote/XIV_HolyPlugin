@@ -32,7 +32,7 @@ public partial class ConfigWindow
 
         BeginSection("Bids");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Housing lottery bids are tracked automatically when you place or confirm a bid.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -70,13 +70,13 @@ public partial class ConfigWindow
                     bool isCurrent = currentKey != null && rec.Key == currentKey;
                     if (isCurrent)
                     {
-                        ImGui.PushStyleColor(ImGuiCol.Text, ColGreen);
+                        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
                         ImGui.TextUnformatted($"{rec.Name} @ {rec.World}");
                         ImGui.PopStyleColor();
                     }
                     else if (lifestreamOn)
                     {
-                        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+                        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
                         if (ImGui.Selectable($"{rec.Name} @ {rec.World}##sel{bid.Id}", false, ImGuiSelectableFlags.None))
                             onGoToBid(rec, bid);
                         ImGui.PopStyleColor();
@@ -89,7 +89,7 @@ public partial class ConfigWindow
                 }
                 else
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+                    ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
                     ImGui.TextUnformatted(bid.CharacterKey);
                     ImGui.PopStyleColor();
                 }
@@ -108,7 +108,7 @@ public partial class ConfigWindow
 
                 ImGui.TableSetColumnIndex(5);
                 PushButton();
-                ImGui.PushStyleColor(ImGuiCol.Text, ColRed);
+                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColRed);
                 if (ImGui.SmallButton($"X##{bid.Id}")) pendingDelete = bid.Id;
                 ImGui.PopStyleColor();
                 if (ImGui.IsItemHovered()) ImGui.SetTooltip("Delete this bid");

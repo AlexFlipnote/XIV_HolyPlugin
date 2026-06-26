@@ -49,14 +49,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         if (!characterWanted && !fcWanted && !plateWanted && !privateHouseWanted && !fcHouseWanted && !dbEnabled && !configuration.AccessoryEnabled) return;
 
         // Cross-world check, bail with a warning if visiting another world
-        bool differentWorld = false;
-        await framework.RunOnFrameworkThread(() =>
-        {
-            if (objectTable[0] is IPlayerCharacter pc)
-                differentWorld = pc.HomeWorld.RowId != pc.CurrentWorld.RowId;
-        });
-
-        if (differentWorld)
+        if (await IsOnDifferentWorldAsync())
         {
             if (characterWanted || fcWanted || plateWanted || privateHouseWanted || fcHouseWanted)
                 await framework.RunOnFrameworkThread(() =>
@@ -409,13 +402,13 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             });
 
             if (tag.Length > 0) return new FcData(tag, name); // has FC
-            if (proxyNull)      return null;                  // proxy gone — no FC
+            if (proxyNull)      return null;                  // proxy gone, no FC
 
             // proxy present but tag still empty ,  still loading, wait and retry
             if (i < attempts - 1) await Task.Delay(500, token);
         }
 
-        return null; // tag still empty after retries — not in FC
+        return null; // tag still empty after retries, not in FC
     }
 
     private async Task<SeString?> CollectPlateAsync(CancellationToken token, bool retry = false)
@@ -450,48 +443,31 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     private async Task<string?> CollectPrivateHouseAsync(CancellationToken token)
     {
         if (!configuration.ShowPrivateHouseLocation && !configuration.CharactersDbEnabled) return null;
-
-        token.ThrowIfCancellationRequested();
-
-        string? result = null;
-
-        await framework.RunOnFrameworkThread(() =>
-        {
-            unsafe
-            {
-                var id = HousingManager.GetOwnedHouseId(EstateType.PersonalEstate);
-                if (id.Id == 0 || id.TerritoryTypeId == 65535) return;
-
-                var district = GetDistrictName(id.TerritoryTypeId) ?? $"Zone {id.TerritoryTypeId}";
-                result = id.IsApartment
-                    ? $"{district} Apartment"
-                    : $"{district}, Ward {id.WardIndex + 1}, Plot {id.PlotIndex + 1}";
-            }
-        });
-
-        return result;
+        return await CollectHouseLocationAsync(token, EstateType.PersonalEstate, allowApartment: true);
     }
 
     private async Task<string?> CollectFcHouseAsync(CancellationToken token)
     {
         if (!configuration.ShowFcHouseLocation && !configuration.CharactersDbEnabled) return null;
+        return await CollectHouseLocationAsync(token, EstateType.FreeCompanyEstate, allowApartment: false);
+    }
 
+    private async Task<string?> CollectHouseLocationAsync(CancellationToken token, EstateType type, bool allowApartment)
+    {
         token.ThrowIfCancellationRequested();
-
         string? result = null;
-
         await framework.RunOnFrameworkThread(() =>
         {
             unsafe
             {
-                var id = HousingManager.GetOwnedHouseId(EstateType.FreeCompanyEstate);
+                var id = HousingManager.GetOwnedHouseId(type);
                 if (id.Id == 0 || id.TerritoryTypeId == 65535) return;
-
-                var district = GetDistrictName(id.TerritoryTypeId) ?? $"Zone {id.TerritoryTypeId}";
-                result = $"{district}, Ward {id.WardIndex + 1}, Plot {id.PlotIndex + 1}";
+                var district = HousingDistricts.FromTerritoryId(id.TerritoryTypeId) ?? $"Zone {id.TerritoryTypeId}";
+                result = allowApartment && id.IsApartment
+                    ? $"{district} Apartment"
+                    : $"{district}, Ward {id.WardIndex + 1}, Plot {id.PlotIndex + 1}";
             }
         });
-
         return result;
     }
 
@@ -552,13 +528,4 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return counts == null ? null : JsonSerializer.Serialize(counts);
     }
 
-    private static string? GetDistrictName(ushort territoryTypeId) => territoryTypeId switch
-    {
-        339 => "Mist",
-        340 => "Lavender Beds",
-        341 => "The Goblet",
-        641 => "Shirogane",
-        979 => "Empyreum",
-        _   => null,
-    };
 }

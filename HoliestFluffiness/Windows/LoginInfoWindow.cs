@@ -17,16 +17,6 @@ public class LoginInfoWindow : Window
     private bool   changingCharacter;
     private string changingToText = "Changing character...";
 
-    private static readonly Vector4 ColBg      = new(30f / 255f,  30f / 255f,  30f / 255f,  1f);
-    private static readonly Vector4 ColSection = new(40f / 255f,  40f / 255f,  40f / 255f,  1f);
-    private static readonly Vector4 ColWhite   = new(249f / 255f, 248f / 255f, 244f / 255f, 1f);
-    private static readonly Vector4 ColGold    = new(235f / 255f, 230f / 255f, 114f / 255f, 1f);
-    private static readonly Vector4 ColGoldSub = new(235f / 255f, 230f / 255f, 114f / 255f, 0.18f);
-    private static readonly Vector4 ColGoldMid = new(235f / 255f, 230f / 255f, 114f / 255f, 0.35f);
-    private static readonly Vector4 ColGrey    = new(60f / 255f,  60f / 255f,  60f / 255f,  1f);
-    private static readonly Vector4 ColGreyHov = new(80f / 255f,  80f / 255f,  80f / 255f,  1f);
-    private static readonly Vector4 ColGreyAct = new(100f / 255f, 100f / 255f, 100f / 255f, 1f);
-
     private readonly Action? onOpenCharList;
 
     public LoginInfoWindow(Action? onOpenCharList = null)
@@ -59,12 +49,12 @@ public class LoginInfoWindow : Window
     public override void PreDraw()
     {
         ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-        ImGui.PushStyleColor(ImGuiCol.Text,              ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,          ColSection);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,           ColBg);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     ColBg);
-        ImGui.PushStyleColor(ImGuiCol.TableBorderLight,  ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.TableBorderStrong, ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text,              Theme.ColWhite);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,          Theme.ColSecondary);
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,           Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.TableBorderLight,  Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.TableBorderStrong, Theme.ColGold);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12, 10));
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
         ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,   new Vector2(8, 5));
@@ -81,7 +71,7 @@ public class LoginInfoWindow : Window
         if (changingCharacter)
         {
             ImGui.Dummy(new Vector2(0, 4));
-            ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
             ImGui.TextUnformatted(changingToText);
             ImGui.PopStyleColor();
             ImGui.Dummy(new Vector2(0, 4));
@@ -112,7 +102,7 @@ public class LoginInfoWindow : Window
 
                 ImGui.TableNextRow();
                 ImGui.TableSetColumnIndex(0);
-                ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
                 ImGui.TextUnformatted(label);
                 ImGui.PopStyleColor();
                 ImGui.TableSetColumnIndex(1);
@@ -130,10 +120,10 @@ public class LoginInfoWindow : Window
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetContentRegionAvail().X - okWidth - changeWidth - gap) * 0.5f);
 
         // OK button first
-        ImGui.PushStyleColor(ImGuiCol.Button,        ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Text,          ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
         if (ImGui.Button("OK", new Vector2(okWidth, 0)))
             IsOpen = false;
         ImGui.PopStyleColor(4);
@@ -141,9 +131,9 @@ public class LoginInfoWindow : Window
         ImGui.SameLine(0, gap);
 
         // Change character button second (grey)
-        ImGui.PushStyleColor(ImGuiCol.Button,        ColGrey);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ColGreyHov);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  ColGreyAct);
+        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGrey);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreyHov);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreyAct);
         if (ImGui.Button("Change character", new Vector2(changeWidth, 0)))
             onOpenCharList?.Invoke();
         ImGui.PopStyleColor(3);

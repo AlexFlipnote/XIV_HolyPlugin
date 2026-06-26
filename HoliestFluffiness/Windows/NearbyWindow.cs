@@ -30,15 +30,6 @@ public sealed class NearbyWindow : Window, IDisposable
     private bool   hoveredNearbyRow;
     private bool   historyOpen;
 
-    // ── Colours (matching HF theme) ───────────────────────────────────────────
-    private static readonly Vector4 ColBg        = new(24 / 255f,  24 / 255f,  24 / 255f, 1f);
-    private static readonly Vector4 ColBgDeep    = new(18 / 255f,  18 / 255f,  18 / 255f, 1f);
-    private static readonly Vector4 ColSection   = new(40 / 255f,  40 / 255f,  40 / 255f, 1f);
-    private static readonly Vector4 ColWhite     = new(249/255f, 248/255f, 244/255f, 1f);
-    private static readonly Vector4 ColDim       = new(249/255f, 248/255f, 244/255f, 0.45f);
-    private static readonly Vector4 ColGold      = new(235/255f, 230/255f, 114/255f, 1f);
-    private static readonly Vector4 ColGoldMid   = new(235/255f, 230/255f, 114/255f, 0.35f);
-    private static readonly Vector4 ColGoldSub   = new(235/255f, 230/255f, 114/255f, 0.18f);
     private static readonly Vector4 ColTargeter  = new(235/255f, 130/255f,  80/255f, 1f);
     private static readonly Vector4 ColHistory   = new(235/255f, 130/255f,  80/255f, 0.4f);
 
@@ -74,27 +65,26 @@ public sealed class NearbyWindow : Window, IDisposable
 
     public override void PreDraw()
     {
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,             ColBg);
-        ImGui.PushStyleColor(ImGuiCol.Text,                 ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,              ColBg);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        ColBg);
-        ImGui.PushStyleColor(ImGuiCol.FrameBg,              ColBgDeep);
-        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       ColSection);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          ColBgDeep);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Border,               ColGoldMid);
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding,   4f);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 1f);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,             Theme.ColSecondary);
+        ImGui.PushStyleColor(ImGuiCol.Text,                 Theme.ColWhite);
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,              Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.FrameBg,              Theme.ColPrimary);
+        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     Theme.ColGold);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
     }
 
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(14);
+        ImGui.PopStyleColor(13);
         ImGui.PopStyleVar(2);
     }
 
@@ -131,7 +121,7 @@ public sealed class NearbyWindow : Window, IDisposable
 
     private void DrawNearbyTable()
     {
-        var footerH = ImGui.GetStyle().ItemSpacing.Y + ImGui.GetFrameHeightWithSpacing();
+        var footerH = ImGui.GetStyle().ItemSpacing.Y + ImGui.GetFrameHeightWithSpacing() + 4f;
         var tableH  = ImGui.GetContentRegionAvail().Y - footerH;
 
         var tableFlags = ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH |
@@ -148,9 +138,16 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthStretch, 2f);
         ImGui.TableSetupColumn("FC",    ImGuiTableColumnFlags.WidthStretch, 1f);
 
-        ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, ColSection);
-        ImGui.PushStyleColor(ImGuiCol.Text,          ColGold);
-        ImGui.TableHeadersRow();
+        ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, Theme.ColPrimary);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+        ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+        ImGui.TableSetColumnIndex(0);
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.TableHeader("Name");
+        ImGui.TableSetColumnIndex(1); ImGui.TableHeader("Job");
+        ImGui.TableSetColumnIndex(2); ImGui.TableHeader("Lv");
+        ImGui.TableSetColumnIndex(3); ImGui.TableHeader("World");
+        ImGui.TableSetColumnIndex(4); ImGui.TableHeader("FC");
         ImGui.PopStyleColor(2);
 
         var targeterIds = handler.CurrentTargeters.Select(t => t.GameObjectId).ToHashSet();
@@ -173,6 +170,7 @@ public sealed class NearbyWindow : Window, IDisposable
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
 
             var rowMin     = ImGui.GetCursorScreenPos() with { X = ImGui.GetWindowPos().X };
             var rowMax     = new Vector2(ImGui.GetWindowPos().X + ImGui.GetWindowSize().X, rowMin.Y + ImGui.GetTextLineHeightWithSpacing());
@@ -180,12 +178,12 @@ public sealed class NearbyWindow : Window, IDisposable
             var isTargeter = targeterIds.Contains(p.GameObjectId);
 
             if (rowHovered)
-                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ImGui.GetColorU32(ColGoldSub));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ImGui.GetColorU32(Theme.ColGoldSub));
 
             var col = p.IsParty   ? config.NearbyColParty
                     : p.IsFriend  ? config.NearbyColFriend
                     : p.IsLocalFc ? config.NearbyColLocalFc
-                    : ColWhite;
+                    : Theme.ColWhite;
 
             ImGui.PushStyleColor(ImGuiCol.Text, col);
             ImGui.TextUnformatted(isTargeter ? $"+ {p.Name}" : p.Name);
@@ -203,22 +201,22 @@ public sealed class NearbyWindow : Window, IDisposable
             }
 
             ImGui.TableNextColumn();
-            ImGui.PushStyleColor(ImGuiCol.Text, ColDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted(p.JobAbbr);
             ImGui.PopStyleColor();
 
             ImGui.TableNextColumn();
-            ImGui.PushStyleColor(ImGuiCol.Text, ColDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted(p.Level.ToString());
             ImGui.PopStyleColor();
 
             ImGui.TableNextColumn();
-            ImGui.PushStyleColor(ImGuiCol.Text, ColDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted(p.HomeWorld);
             ImGui.PopStyleColor();
 
             ImGui.TableNextColumn();
-            ImGui.PushStyleColor(ImGuiCol.Text, ColDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted(p.CompanyTag);
             ImGui.PopStyleColor();
         }
@@ -234,12 +232,14 @@ public sealed class NearbyWindow : Window, IDisposable
     private void DrawFooter()
     {
         const string historyLabel = "Target History";
+        const float  margin       = 24f;
         var buttonW   = ImGui.CalcTextSize(historyLabel).X + ImGui.GetStyle().FramePadding.X * 2;
         var hasActive = handler.CurrentTargeters.Count > 0;
 
-        ImGui.PushStyleColor(ImGuiCol.Border, ColGoldMid);
+        ImGui.SetCursorPosX(margin);
+        ImGui.PushStyleColor(ImGuiCol.Border, Theme.ColGoldMid);
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - buttonW - ImGui.GetStyle().ItemSpacing.X);
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - margin - buttonW - ImGui.GetStyle().ItemSpacing.X);
         ImGui.InputTextWithHint("##nearbysearch", $"Search... ({handler.NearbyPlayers.Count} nearby)", ref searchText, 64);
         ImGui.PopStyleVar();
         ImGui.PopStyleColor();
@@ -249,17 +249,17 @@ public sealed class NearbyWindow : Window, IDisposable
         var isActive = historyOpen || hasActive;
         if (isActive)
         {
-            ImGui.PushStyleColor(ImGuiCol.Button,        ColGoldSub);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ColGoldMid);
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  ColGold);
-            ImGui.PushStyleColor(ImGuiCol.Text,          ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
         }
         else
         {
-            ImGui.PushStyleColor(ImGuiCol.Button,        ColBgDeep);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ColSection);
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  ColSection);
-            ImGui.PushStyleColor(ImGuiCol.Text,          ColDim);
+            ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGrey);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreyHov);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreyAct);
+            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
         }
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
         if (ImGui.Button(historyLabel))
@@ -280,12 +280,10 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.SetNextWindowPos(new Vector2(mainPos.X + mainSize.X + 2, mainPos.Y), ImGuiCond.Always);
         ImGui.SetNextWindowSize(new Vector2(275, mainSize.Y), ImGuiCond.Always);
 
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,      ColBg);
-        ImGui.PushStyleColor(ImGuiCol.Border,        ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.Text,          ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   ColBgDeep);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, ColGoldMid);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 1f);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.ColSecondary);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, Theme.ColGoldMid);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 10));
 
         const ImGuiWindowFlags flags =
@@ -299,15 +297,15 @@ public sealed class NearbyWindow : Window, IDisposable
             DrawHistoryPanel();
         ImGui.End();
 
-        ImGui.PopStyleColor(5);
-        ImGui.PopStyleVar(2);
+        ImGui.PopStyleColor(4);
+        ImGui.PopStyleVar(1);
     }
 
     // ── History panel content ─────────────────────────────────────────────────
 
     private void DrawHistoryPanel()
     {
-        ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted("Target History");
         ImGui.PopStyleColor();
         ImGui.Separator();
@@ -326,7 +324,7 @@ public sealed class NearbyWindow : Window, IDisposable
 
         if (current.Count == 0 && previous.Count == 0)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ColDim);
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
             ImGui.TextUnformatted("No one is targeting you.");
             ImGui.PopStyleColor();
         }
@@ -334,7 +332,7 @@ public sealed class NearbyWindow : Window, IDisposable
         {
             if (current.Count > 0)
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
                 ImGui.TextUnformatted("Currently targeting you");
                 ImGui.PopStyleColor();
                 ImGui.Separator();
@@ -345,7 +343,7 @@ public sealed class NearbyWindow : Window, IDisposable
             if (previous.Count > 0)
             {
                 if (current.Count > 0) ImGui.Spacing();
-                ImGui.PushStyleColor(ImGuiCol.Text, ColDim);
+                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
                 ImGui.TextUnformatted("Previously");
                 ImGui.PopStyleColor();
                 ImGui.Separator();
@@ -361,10 +359,10 @@ public sealed class NearbyWindow : Window, IDisposable
 
         var clearW = ImGui.CalcTextSize("Clear history").X + ImGui.GetStyle().FramePadding.X * 2 + 16;
         ImGui.SetCursorPosX((ImGui.GetContentRegionAvail().X - clearW) * 0.5f);
-        ImGui.PushStyleColor(ImGuiCol.Button,        ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Text,          ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
         if (ImGui.Button("Clear history##histclear", new Vector2(clearW, 0)))
             handler.ClearTargeterHistory();
         ImGui.PopStyleColor(4);
@@ -387,7 +385,7 @@ public sealed class NearbyWindow : Window, IDisposable
         var rightX = ImGui.GetWindowPos().X + ImGui.GetWindowSize().X - ImGui.GetStyle().WindowPadding.X - timeW;
         ImGui.GetWindowDrawList().AddText(
             new Vector2(rightX, ImGui.GetItemRectMin().Y),
-            ImGui.GetColorU32(ColDim), timeStr);
+            ImGui.GetColorU32(Theme.ColWhiteDim), timeStr);
 
         if (ImGui.IsItemHovered())
         {
@@ -403,7 +401,10 @@ public sealed class NearbyWindow : Window, IDisposable
 
     private void DrawContextMenu(string name, string world, ulong gameObjectId, bool forTargeter)
     {
-        if (!ImGui.BeginPopup($"##ctx{gameObjectId}")) return;
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8, 6));
+        bool open = ImGui.BeginPopup($"##ctx{gameObjectId}");
+        ImGui.PopStyleVar();
+        if (!open) return;
 
         ImGui.TextDisabled($"{name} @ {world}");
         ImGui.Separator();

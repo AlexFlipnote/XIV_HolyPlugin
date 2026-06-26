@@ -7,6 +7,9 @@ namespace HoliestFluffiness;
 
 internal static class SoundEngine
 {
+    internal static string Resolve(string configPath, string defaultRelative, string baseDir) =>
+        string.IsNullOrEmpty(configPath) ? Path.Combine(baseDir, defaultRelative) : configPath;
+
     internal static void Play(string path, float volume)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;

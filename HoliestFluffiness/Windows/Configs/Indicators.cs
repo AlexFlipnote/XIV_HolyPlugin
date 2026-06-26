@@ -10,7 +10,7 @@ public partial class ConfigWindow
     {
         BeginSection("Indicators");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Settings for in-game indicators and HUD additions.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 8));
@@ -19,7 +19,7 @@ public partial class ConfigWindow
         SubsectionLabel("Server info");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Adds entries to the server info bar (the row of icons at the top right).");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -77,7 +77,7 @@ public partial class ConfigWindow
         SubsectionLabel("Repair");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Adds a debuff icon to Status (Other) when your gear durability drops below a threshold. " +
                           "Critical takes priority over Low, only one icon appears at a time. " +
                           "The main difference between them is the icon displayed and the message shown on hover.");
@@ -106,7 +106,7 @@ public partial class ConfigWindow
         PopInput();
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Shows: \"Gear at X%, consider repairing\"");
         ImGui.PopStyleColor();
 
@@ -134,7 +134,7 @@ public partial class ConfigWindow
         PopInput();
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Shows: \"Gear really damaged (X%), repair now!!\"");
         ImGui.PopStyleColor();
 
@@ -147,7 +147,7 @@ public partial class ConfigWindow
             repairHandler.TestPct = testing ? null : 69f;
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Simulates 69% gear condition to preview the debuff icon.");
         ImGui.PopStyleColor();
 
@@ -167,7 +167,7 @@ public partial class ConfigWindow
         }
         PopCheckbox();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Prints who is not ready after a ready check");
         ImGui.PopStyleColor();
 
@@ -183,7 +183,7 @@ public partial class ConfigWindow
         }
         PopCheckbox();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Shows ready/not-ready icons on the party list");
         ImGui.PopStyleColor();
 
@@ -201,7 +201,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("(default 10)");
         ImGui.PopStyleColor();
 
@@ -212,7 +212,7 @@ public partial class ConfigWindow
             readyCheckHandler.Simulate();
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextUnformatted("Simulates a ready check for 1 second (requires a party)");
         ImGui.PopStyleColor();
         ImGui.EndDisabled();

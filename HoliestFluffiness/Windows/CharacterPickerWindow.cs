@@ -9,15 +9,6 @@ namespace HoliestFluffiness.Windows;
 
 public class CharacterPickerWindow : Window
 {
-    private static readonly Vector4 ColBg       = new(24f / 255f,  24f / 255f,  24f / 255f,  1f);
-    private static readonly Vector4 ColBgDeep   = new(18f / 255f,  18f / 255f,  18f / 255f,  1f);
-    private static readonly Vector4 ColSection  = new(40f / 255f,  40f / 255f,  40f / 255f,  1f);
-    private static readonly Vector4 ColWhite    = new(249f / 255f, 248f / 255f, 244f / 255f, 1f);
-    private static readonly Vector4 ColWhiteDim = new(249f / 255f, 248f / 255f, 244f / 255f, 0.55f);
-    private static readonly Vector4 ColGold     = new(235f / 255f, 230f / 255f, 114f / 255f, 1f);
-    private static readonly Vector4 ColGoldSub  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.18f);
-    private static readonly Vector4 ColGoldMid  = new(235f / 255f, 230f / 255f, 114f / 255f, 0.35f);
-
     private List<CharacterRecord> records = [];
     private string search = "";
     private readonly Action<string, string> onLogin;
@@ -61,30 +52,28 @@ public class CharacterPickerWindow : Window
         // forceCenter=true on first Show() so re-opens always land on center even within the same session
         ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), forceCenter ? ImGuiCond.Always : ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
         forceCenter = false;
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,             ColBg);
-        ImGui.PushStyleColor(ImGuiCol.Text,                 ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,              ColBg);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        ColBg);
-        ImGui.PushStyleColor(ImGuiCol.FrameBg,              ColBgDeep);
-        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       ColSection);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          ColBgDeep);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Border,               ColGoldMid);
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding,    4f);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize,  1f);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,     new Vector2(10, 10));
-        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,       new Vector2(8, 5));
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,             Theme.ColSecondary);
+        ImGui.PushStyleColor(ImGuiCol.Text,                 Theme.ColWhite);
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,              Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.FrameBg,              Theme.ColPrimary);
+        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     Theme.ColGold);
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding,  4f);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,  Vector2.Zero);
+        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,    new Vector2(8, 5));
     }
 
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(14);
-        ImGui.PopStyleVar(4);
+        ImGui.PopStyleColor(13);
+        ImGui.PopStyleVar(3);
     }
 
     public override void Draw()
@@ -115,17 +104,22 @@ public class CharacterPickerWindow : Window
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             // 3rd param = initial fixed width, 4th = user ID for sort specs
-            // Measured pixel widths used as proportional stretch weights — all columns scale together
+            // Measured pixel widths used as proportional stretch weights, all columns scale together
             ImGui.TableSetupColumn("Last login", ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, col0Width, 0);
             ImGui.TableSetupColumn("Name",       ImGuiTableColumnFlags.None,                                                     col1Width, 1);
             ImGui.TableSetupColumn("World/Slot", ImGuiTableColumnFlags.None,                                                     col2Width, 2);
 
-            ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, ColSection);
-            ImGui.PushStyleColor(ImGuiCol.Text,          ColGold);
-            ImGui.TableHeadersRow();
+            ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, Theme.ColPrimary);
+            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+            ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+            ImGui.TableSetColumnIndex(0);
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+            ImGui.TableHeader("Last login");
+            ImGui.TableSetColumnIndex(1); ImGui.TableHeader("Name");
+            ImGui.TableSetColumnIndex(2); ImGui.TableHeader("World/Slot");
             ImGui.PopStyleColor(2);
 
-            // Sort — must happen after TableHeadersRow so specs are populated
+            // Sort, must happen after TableHeadersRow so specs are populated
             var sortSpecs = ImGui.TableGetSortSpecs();
             if (sortSpecs.SpecsDirty && sortSpecs.SpecsCount > 0)
             {
@@ -155,12 +149,13 @@ public class CharacterPickerWindow : Window
             {
                 ImGui.TableNextRow();
                 ImGui.TableSetColumnIndex(0);
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
 
                 // SpanAllColumns covers the full row for hover highlight and click
-                ImGui.PushStyleColor(ImGuiCol.Header,        ColGoldSub);
-                ImGui.PushStyleColor(ImGuiCol.HeaderHovered, ColGoldSub);
-                ImGui.PushStyleColor(ImGuiCol.HeaderActive,  ColGoldMid);
-                ImGui.PushStyleColor(ImGuiCol.Text,          ColWhiteDim);
+                ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
+                ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldSub);
+                ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGoldMid);
+                ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhiteDim);
                 bool clicked = ImGui.Selectable(
                     $"{rec.LastSeen.ToLocalTime():yyyy-MM-dd HH:mm}##pick{rec.Key}",
                     false,
@@ -170,12 +165,12 @@ public class CharacterPickerWindow : Window
                 if (clicked) { nextName = rec.Name; nextWorld = rec.World; }
 
                 ImGui.TableSetColumnIndex(1);
-                ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
                 ImGui.TextUnformatted(rec.Name);
                 ImGui.PopStyleColor();
 
                 ImGui.TableSetColumnIndex(2);
-                ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
                 ImGui.TextUnformatted(rec.Slot > 0 ? $"{rec.World}/{rec.Slot}" : rec.World);
                 ImGui.PopStyleColor();
             }
@@ -183,8 +178,10 @@ public class CharacterPickerWindow : Window
             ImGui.EndTable();
         }
 
-        ImGui.SetNextItemWidth(-1);
-        ImGui.PushStyleColor(ImGuiCol.Border, ColGoldMid);
+        const float margin = 30f;
+        ImGui.SetCursorPosX(margin);
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - margin);
+        ImGui.PushStyleColor(ImGuiCol.Border, Theme.ColGoldMid);
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
         ImGui.InputTextWithHint("##pickersearch", "Search...", ref search, 128);
         ImGui.PopStyleVar();
@@ -215,7 +212,6 @@ public class CharacterPickerWindow : Window
         var style   = ImGui.GetStyle();
         float total = col0Width + col1Width + col2Width
                     + style.ScrollbarSize
-                    + style.WindowPadding.X * 2
                     + 4f; // outer borders
 
         Size          = new Vector2(Math.Max(280f, total), Size?.Y ?? 310f);

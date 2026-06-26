@@ -28,13 +28,19 @@ public sealed class ServerInfoHandler : IDisposable
 
     private readonly Ping ping = new();
     private readonly CancellationTokenSource cts = new();
-    private readonly Queue<float> rttHistory = new();
-    private const int HistorySize = 20;
+    // null entry = timed out, ulong = RTT in ms
+    private readonly Queue<ulong?> pingHistory = new();
+    private const int HistorySize = 30;
 
     // Written from background thread, read on Framework.Update (guarded by pingDirty)
     private ulong lastRtt;
     private ulong avgRtt;
+    private int recentTimeouts;
+    private float[] pendingChartData = [];
     private volatile bool pingDirty;
+
+    // Updated on Framework.Update, safe to read from Draw
+    public float[] PingChartData { get; private set; } = [];
 
     private int lastFps;
     private uint lastDcId;
@@ -49,23 +55,24 @@ public sealed class ServerInfoHandler : IDisposable
         this.objectTable = objectTable;
         this.log         = log;
 
-        dtrPing = dtrBar.Get("[HF] Ping");
-        dtrPing.Tooltip = "Holy Plugin";
-        dtrPing.Shown   = false;
+        dtrPing   = dtrBar.Get("[HF] Ping");
+        dtrPing.Shown = false;
 
-        dtrFps = dtrBar.Get("[HF] FPS");
-        dtrFps.Tooltip = "Holy Plugin";
-        dtrFps.Shown   = false;
+        dtrFps   = dtrBar.Get("[HF] FPS");
+        dtrFps.Shown = false;
 
         dtrNearby = dtrBar.Get("[HF] Nearby");
-        dtrNearby.Tooltip = "Holy Plugin – Nearby Players";
-        dtrNearby.Shown   = false;
+        dtrNearby.Shown = false;
 
         framework.Update += OnUpdate;
         Task.Run(() => PingLoop(cts.Token));
     }
 
     public void SetNearbyHandler(NearbyHandler handler) => nearbyHandler = handler;
+
+    public void SetNearbyClickAction(Action action) => dtrNearby.OnClick = _ => action();
+
+    public void SetPingClickAction(Action action) => dtrPing.OnClick = _ => action();
 
     private unsafe void OnUpdate(IFramework fw)
     {
@@ -90,7 +97,8 @@ public sealed class ServerInfoHandler : IDisposable
         if (!shown) return;
 
         var count = nearbyHandler?.NearbyPlayers.Count ?? 0;
-        dtrNearby.Text = $" {count}";
+        dtrNearby.Text    = $"\U0000e033 {count}";
+        dtrNearby.Tooltip = $"{count} nearby";
     }
 
     private void UpdateDcAddress()
@@ -125,8 +133,9 @@ public sealed class ServerInfoHandler : IDisposable
 
         var fps = (int)(GameFramework.Instance()->FrameRate + 0.5f);
         if (fps == lastFps) return;
-        lastFps  = fps;
-        dtrFps.Text = $"{fps} fps";
+        lastFps        = fps;
+        dtrFps.Text    = $"{fps} fps";
+        dtrFps.Tooltip = $"{fps} fps";
     }
 
     private void UpdatePingEntry()
@@ -137,17 +146,38 @@ public sealed class ServerInfoHandler : IDisposable
 
         if (!pingDirty)
         {
-            if (lastRtt == 0) dtrPing.Text = "0ms";
+            if (lastRtt == 0) { dtrPing.Text = "0ms"; dtrPing.Tooltip = "0ms"; }
             return;
         }
         pingDirty = false;
 
-        dtrPing.Text = config.ServerInfoPingDisplay switch
+        PingChartData = pendingChartData;
+
+        var pingText = config.ServerInfoPingDisplay switch
         {
             PingDisplay.Average => $"{avgRtt}ms",
             PingDisplay.Both    => $"{lastRtt}/{avgRtt}ms",
             _                   => $"{lastRtt}ms",
         };
+        if (recentTimeouts > 0)
+            pingText += $" / {recentTimeouts}TO";
+
+        dtrPing.Text    = pingText;
+        dtrPing.Tooltip = pingText;
+    }
+
+    // Called only from the background PingLoop thread
+    private void RecordPing(ulong? rtt)
+    {
+        if (rtt.HasValue) lastRtt = rtt.Value;
+        pingHistory.Enqueue(rtt);
+        if (pingHistory.Count > HistorySize) pingHistory.Dequeue();
+
+        var successes = pingHistory.Where(v => v.HasValue).ToList();
+        avgRtt         = successes.Count > 0 ? (ulong)successes.Average(v => (double)v!.Value) : 0;
+        recentTimeouts = pingHistory.Count - successes.Count;
+        pendingChartData = [.. pingHistory.Select(v => v.HasValue ? (float)v.Value : 0f)];
+        pingDirty      = true;
     }
 
     private async Task PingLoop(CancellationToken token)
@@ -159,18 +189,12 @@ public sealed class ServerInfoHandler : IDisposable
                 try
                 {
                     var reply = await ping.SendPingAsync(serverAddress).ConfigureAwait(false);
-                    if (reply.Status == IPStatus.Success)
-                    {
-                        lastRtt = (ulong)reply.RoundtripTime;
-                        rttHistory.Enqueue(lastRtt);
-                        if (rttHistory.Count > HistorySize) rttHistory.Dequeue();
-                        avgRtt    = (ulong)rttHistory.Average();
-                        pingDirty = true;
-                    }
+                    RecordPing(reply.Status == IPStatus.Success ? (ulong)reply.RoundtripTime : null);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     log.Warning(ex, "[HF] Ping failed.");
+                    RecordPing(null);
                 }
             }
 

@@ -31,8 +31,8 @@ public sealed unsafe class CombatHitHandler : IDisposable
     private static readonly ImmutableHashSet<FlyTextKind> HealKinds = ImmutableHashSet.Create(
         FlyTextKind.HealingCrit);
 
-    private bool lastHealWasOwn       = false;
-    private bool lastHealTargetedMe   = false;
+    private bool lastHealWasOwn;
+    private bool lastHealTargetedMe;
 
     private delegate void AddToScreenLogDelegate(
         Character* target, Character* source,
@@ -119,9 +119,7 @@ public sealed unsafe class CombatHitHandler : IDisposable
     }
 
     private string Resolve(string configPath, string defaultRelative) =>
-        string.IsNullOrEmpty(configPath)
-            ? Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, defaultRelative)
-            : configPath;
+        SoundEngine.Resolve(configPath, defaultRelative, pluginInterface.AssemblyLocation.DirectoryName!);
 
     public void Dispose()
     {

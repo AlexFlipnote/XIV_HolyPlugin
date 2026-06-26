@@ -39,7 +39,7 @@ public partial class ConfigWindow
 
         BeginSection("Inventory");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         ImGui.TextWrapped("Tracks special items in the inventory across all your cached caracters, mainly right now, FC submarine items.");
         ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
@@ -102,13 +102,13 @@ public partial class ConfigWindow
                 bool isCurrent = currentKey != null && row.Rec.Key == currentKey;
                 if (isCurrent)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ColGreen);
+                    ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
                     ImGui.TextUnformatted(row.Rec.Name);
                     ImGui.PopStyleColor();
                 }
                 else if (lifestreamOn)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ColGold);
+                    ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
                     if (ImGui.Selectable($"{row.Rec.Name}##invsel{row.Rec.Key}", false, ImGuiSelectableFlags.None))
                         onSwitchCharacter(row.Rec.Name, row.Rec.World);
                     ImGui.PopStyleColor();
@@ -130,7 +130,7 @@ public partial class ConfigWindow
                         ImGui.TextUnformatted(qty.ToString("N0", CultureInfo.InvariantCulture));
                     else
                     {
-                        ImGui.PushStyleColor(ImGuiCol.Text, ColWhiteDim);
+                        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
                         ImGui.TextUnformatted("-");
                         ImGui.PopStyleColor();
                     }
