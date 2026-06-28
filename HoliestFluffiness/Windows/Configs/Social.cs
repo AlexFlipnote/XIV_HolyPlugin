@@ -14,83 +14,59 @@ public partial class ConfigWindow
 
     private void DrawSocialSection()
     {
-        BeginSection("Social");
+        BeginSection("Social", "Nearby players, targeting tracker, house doorbell, commendation sounds, and nameplate tweaks.");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Nearby players, targeting tracker, house doorbell, and commendation sounds.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 8));
+        // ── Dynamic Traveler ──────────────────────────────────────────────────
+        SubsectionLabel("Dynamic Traveler");
+
+        ConfigCheckbox(
+            "Replace Wanderer / Traveller with home world##dynamictraveler",
+            configuration.DynamicTravelerEnabled,
+            v => configuration.DynamicTravelerEnabled = v,
+            "Replaces the Wanderer / Traveller FC tags on cross-world nameplates with the player's home world.");
+
+        // ── Echo Party Finder ─────────────────────────────────────────────────
+        SubsectionLabel("Echo Party Finder");
+
+        ConfigCheckbox(
+            "Echo party finder description##echopartyfinder",
+            configuration.EchoPartyFinderEnabled,
+            v => configuration.EchoPartyFinderEnabled = v,
+            "Prints the party finder listing description to chat when you join, and again when you enter the duty.");
 
         // ── Nearby players ────────────────────────────────────────────────────
         SubsectionLabel("Nearby players");
-        ImGui.Dummy(new Vector2(0, 4));
+        ConfigCheckbox(
+            "Enable nearby players window##nearbyenabled",
+            configuration.NearbyEnabled,
+            v => configuration.NearbyEnabled = v);
 
-        SectionRow();
-        PushCheckbox();
-        var enabled = configuration.NearbyEnabled;
-        if (ImGui.Checkbox("Enable nearby players window##nearbyenabled", ref enabled))
-        {
-            configuration.NearbyEnabled = enabled;
-            configuration.Save();
-        }
-        PopCheckbox();
-
-        ImGui.Dummy(new Vector2(0, 4));
         ImGui.BeginDisabled(!configuration.NearbyEnabled);
 
-        SectionRow();
-        PushCheckbox();
-        var hideInCombat = configuration.NearbyHideInCombat;
-        if (ImGui.Checkbox("Hide while in combat##nearbyhidecombat", ref hideInCombat))
-        {
-            configuration.NearbyHideInCombat = hideInCombat;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Hide while in combat##nearbyhidecombat",
+            configuration.NearbyHideInCombat,
+            v => configuration.NearbyHideInCombat = v);
 
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        PushCheckbox();
-        var hideInDuty = configuration.NearbyHideInDuty;
-        if (ImGui.Checkbox("Hide while in duty##nearbyhideduty", ref hideInDuty))
-        {
-            configuration.NearbyHideInDuty = hideInDuty;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Hide while in duty##nearbyhideduty",
+            configuration.NearbyHideInDuty,
+            v => configuration.NearbyHideInDuty = v);
 
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        PushCheckbox();
-        var filterAfk = configuration.NearbyFilterAfk;
-        if (ImGui.Checkbox("Filter AFK players##nearbyafk", ref filterAfk))
-        {
-            configuration.NearbyFilterAfk = filterAfk;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Filter AFK players##nearbyafk",
+            configuration.NearbyFilterAfk,
+            v => configuration.NearbyFilterAfk = v);
 
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        PushCheckbox();
-        var filterLow = configuration.NearbyFilterLowLevel;
-        if (ImGui.Checkbox("Filter low-level players (≤ 3)##nearbylowlevel", ref filterLow))
-        {
-            configuration.NearbyFilterLowLevel = filterLow;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Filter low-level players (≤ 3)##nearbylowlevel",
+            configuration.NearbyFilterLowLevel,
+            v => configuration.NearbyFilterLowLevel = v);
 
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        PushCheckbox();
-        var debugSelf = configuration.NearbyDebugSelf;
-        if (ImGui.Checkbox("Debug: add yourself to nearby list##nearbydebugself", ref debugSelf))
-        {
-            configuration.NearbyDebugSelf = debugSelf;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Debug: add yourself to nearby list##nearbydebugself",
+            configuration.NearbyDebugSelf,
+            v => configuration.NearbyDebugSelf = v);
         ImGui.SameLine(0, 12);
         ImGui.BeginDisabled(!configuration.NearbyDebugSelf);
         ImGui.SetNextItemWidth(140);
@@ -106,14 +82,11 @@ public partial class ConfigWindow
 
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 12));
-
         // ── Colours ───────────────────────────────────────────────────────────
-        SubsectionLabel("Colours");
-        ImGui.Dummy(new Vector2(0, 4));
-
-        SectionRow();
         var colParty = configuration.NearbyColParty;
+        RowGap(2);
+        Common.DimmedTextWrapped("Colours of names inside if the character is...");
+        SectionRow();
         if (ImGui.ColorEdit4("Party##nearbycolparty", ref colParty, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
         {
             configuration.NearbyColParty = colParty;
@@ -134,8 +107,7 @@ public partial class ConfigWindow
             configuration.Save();
         }
 
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
+        RowGap();
         PushButton();
         if (ImGui.Button("Set to default##nearbycoldefault"))
         {
@@ -146,49 +118,28 @@ public partial class ConfigWindow
         }
         PopButton();
 
-        ImGui.Dummy(new Vector2(0, 12));
-
         // ── Targeting you ─────────────────────────────────────────────────────
         SubsectionLabel("Targeting you");
-        ImGui.Dummy(new Vector2(0, 4));
+        ConfigCheckbox(
+            "Track who's targeting you##nearbytargeters",
+            configuration.NearbyShowTargeters,
+            v => configuration.NearbyShowTargeters = v);
 
-        SectionRow();
-        PushCheckbox();
-        var showTargeters = configuration.NearbyShowTargeters;
-        if (ImGui.Checkbox("Track who's targeting you##nearbytargeters", ref showTargeters))
-        {
-            configuration.NearbyShowTargeters = showTargeters;
-            configuration.Save();
-        }
-        PopCheckbox();
-
-        ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.NearbyShowTargeters);
-        SectionRow();
-        PushCheckbox();
-        var trackSelf = configuration.NearbyTargeterTrackSelf;
-        if (ImGui.Checkbox("Debug: Track yourself##nearbytracksself", ref trackSelf))
-        {
-            configuration.NearbyTargeterTrackSelf = trackSelf;
-            configuration.Save();
-        }
-        PopCheckbox();
+
+        ConfigCheckbox(
+            "Debug: Track yourself##nearbytracksself",
+            configuration.NearbyTargeterTrackSelf,
+            v => configuration.NearbyTargeterTrackSelf = v);
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 4));
         ImGui.BeginDisabled(!configuration.NearbyShowTargeters);
 
-        SectionRow();
-        PushCheckbox();
-        var markTargeting = configuration.NearbyMarkTargeting;
-        if (ImGui.Checkbox("Mark targeting you in-world##nearbymarktargeting", ref markTargeting))
-        {
-            configuration.NearbyMarkTargeting = markTargeting;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Mark targeting you in-world##nearbymarktargeting",
+            configuration.NearbyMarkTargeting,
+            v => configuration.NearbyMarkTargeting = v);
 
-        ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.NearbyMarkTargeting);
         SectionRow();
         var markCol = configuration.NearbyMarkTargetingColour;
@@ -198,91 +149,62 @@ public partial class ConfigWindow
             configuration.Save();
         }
         ImGui.SameLine(0, 20);
-        ImGui.SetNextItemWidth(200);
-        var markSize = configuration.NearbyMarkTargetingSize;
-        PushInput();
-        if (ImGui.SliderInt("Mark size##nearbymarksize", ref markSize, 1, 20))
-        {
-            configuration.NearbyMarkTargetingSize = markSize;
-            configuration.Save();
-        }
-        PopInput();
+        ConfigSliderInt("Mark size##nearbymarksize", configuration.NearbyMarkTargetingSize, 1, 20,
+            v => configuration.NearbyMarkTargetingSize = v, width: 200);
         ImGui.EndDisabled();
-
-        ImGui.Dummy(new Vector2(0, 4));
 
         // ── Sound ─────────────────────────────────────────────────────────────
 
-        SectionRow();
-        PushCheckbox();
-        var soundEnabled = configuration.NearbyTargeterSound;
-        if (ImGui.Checkbox("Play sound when someone targets you##nearbysound", ref soundEnabled))
-        {
-            configuration.NearbyTargeterSound = soundEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Play sound when someone targets you##nearbysound",
+            configuration.NearbyTargeterSound,
+            v => configuration.NearbyTargeterSound = v);
 
-        ImGui.Dummy(new Vector2(0, 4));
+        ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.NearbyTargeterSound);
-        DrawSoundPicker("nearbytargeter",
+        DrawSoundPicker(
+            "nearbytargeter",
             Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Targeting", "looking.mp3"),
-            configuration.NearbyTargeterSoundPath, configuration.NearbyTargeterSoundVolume,
-            p => { configuration.NearbyTargeterSoundPath  = p; configuration.Save(); },
+            configuration.NearbyTargeterSoundPath,
+            configuration.NearbyTargeterSoundVolume,
+            p => { configuration.NearbyTargeterSoundPath   = p; configuration.Save(); },
             v => { configuration.NearbyTargeterSoundVolume = v; configuration.Save(); });
         ImGui.EndDisabled();
-
         ImGui.EndDisabled();
-
-        ImGui.Dummy(new Vector2(0, 4));
-
         // ── House doorbell ────────────────────────────────────────────────────
 
-        ImGui.Dummy(new Vector2(0, 12));
-        SubsectionLabel("House doorbell");
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextWrapped("Alerts when players enter or leave a house, or are already present when you arrive.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 8));
+        SubsectionLabel("House doorbell",
+            "Alerts when players enter or leave a house, or are already present when you arrive.");
 
-        var doorbellDefault = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Doorbell", "doorbell.wav");
+        var doorbellDefault = Path.Combine(
+            pluginInterface.AssemblyLocation.DirectoryName!,
+            "Sounds", "Doorbell", "doorbell.wav"
+        );
 
         // Entered
-        SectionRow();
-        PushCheckbox();
-        var enterEnabled = configuration.DoorbellEnterEnabled;
-        if (ImGui.Checkbox("Someone entered##doorbellenterenabled", ref enterEnabled))
-        {
-            configuration.DoorbellEnterEnabled = enterEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Someone entered##doorbellenterenabled",
+            configuration.DoorbellEnterEnabled,
+            v => configuration.DoorbellEnterEnabled = v);
         ImGui.BeginDisabled(!configuration.DoorbellEnterEnabled);
         ImGui.SameLine();
-        PushCheckbox();
-        var enterChat = configuration.DoorbellEnterChat;
-        if (ImGui.Checkbox("Print in chat##doorbellenterchat", ref enterChat))
-        {
-            configuration.DoorbellEnterChat = enterChat;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Print in chat##doorbellenterchat",
+            configuration.DoorbellEnterChat,
+            v => configuration.DoorbellEnterChat = v);
         ImGui.SameLine();
-        PushCheckbox();
-        var enterSound = configuration.DoorbellEnterSound;
-        if (ImGui.Checkbox("Play a sound##doorbellentersonud", ref enterSound))
-        {
-            configuration.DoorbellEnterSound = enterSound;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Play a sound##doorbellentersonud",
+            configuration.DoorbellEnterSound,
+            v => configuration.DoorbellEnterSound = v);
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.DoorbellEnterSound);
-        DrawSoundPicker("doorbellenter", doorbellDefault,
-            configuration.DoorbellEnterSoundPath, configuration.DoorbellEnterSoundVolume,
-            p => { configuration.DoorbellEnterSoundPath  = p; configuration.Save(); },
+        DrawSoundPicker(
+            "doorbellenter",
+            doorbellDefault,
+            configuration.DoorbellEnterSoundPath,
+            configuration.DoorbellEnterSoundVolume,
+            p => { configuration.DoorbellEnterSoundPath   = p; configuration.Save(); },
             v => { configuration.DoorbellEnterSoundVolume = v; configuration.Save(); });
         ImGui.EndDisabled();
         ImGui.EndDisabled();
@@ -290,38 +212,28 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 8));
 
         // Already here
-        SectionRow();
-        PushCheckbox();
-        var alreadyEnabled = configuration.DoorbellAlreadyHereEnabled;
-        if (ImGui.Checkbox("Already inside when you arrive##doorbellalreadyenabled", ref alreadyEnabled))
-        {
-            configuration.DoorbellAlreadyHereEnabled = alreadyEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Already inside when you arrive##doorbellalreadyenabled",
+            configuration.DoorbellAlreadyHereEnabled,
+            v => configuration.DoorbellAlreadyHereEnabled = v);
         ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereEnabled);
         ImGui.SameLine();
-        PushCheckbox();
-        var alreadyChat = configuration.DoorbellAlreadyHereChat;
-        if (ImGui.Checkbox("Print in chat##doorbellalreadychat", ref alreadyChat))
-        {
-            configuration.DoorbellAlreadyHereChat = alreadyChat;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Print in chat##doorbellalreadychat",
+            configuration.DoorbellAlreadyHereChat,
+            v => configuration.DoorbellAlreadyHereChat = v);
         ImGui.SameLine();
-        PushCheckbox();
-        var alreadySound = configuration.DoorbellAlreadyHereSound;
-        if (ImGui.Checkbox("Play a sound##doorbellalreadysound", ref alreadySound))
-        {
-            configuration.DoorbellAlreadyHereSound = alreadySound;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Play a sound##doorbellalreadysound",
+            configuration.DoorbellAlreadyHereSound,
+            v => configuration.DoorbellAlreadyHereSound = v);
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereSound);
-        DrawSoundPicker("doorbellalready", doorbellDefault,
-            configuration.DoorbellAlreadyHereSoundPath, configuration.DoorbellAlreadyHereSoundVolume,
+        DrawSoundPicker(
+            "doorbellalready",
+            doorbellDefault,
+            configuration.DoorbellAlreadyHereSoundPath,
+            configuration.DoorbellAlreadyHereSoundVolume,
             p => { configuration.DoorbellAlreadyHereSoundPath   = p; configuration.Save(); },
             v => { configuration.DoorbellAlreadyHereSoundVolume = v; configuration.Save(); });
         ImGui.EndDisabled();
@@ -330,39 +242,29 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 8));
 
         // Left
-        SectionRow();
-        PushCheckbox();
-        var leaveEnabled = configuration.DoorbellLeaveEnabled;
-        if (ImGui.Checkbox("Someone left##doorbelllaveenabled", ref leaveEnabled))
-        {
-            configuration.DoorbellLeaveEnabled = leaveEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Someone left##doorbelllaveenabled",
+            configuration.DoorbellLeaveEnabled,
+            v => configuration.DoorbellLeaveEnabled = v);
         ImGui.BeginDisabled(!configuration.DoorbellLeaveEnabled);
         ImGui.SameLine();
-        PushCheckbox();
-        var leaveChat = configuration.DoorbellLeaveChat;
-        if (ImGui.Checkbox("Print in chat##doorbellleavechat", ref leaveChat))
-        {
-            configuration.DoorbellLeaveChat = leaveChat;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Print in chat##doorbellleavechat",
+            configuration.DoorbellLeaveChat,
+            v => configuration.DoorbellLeaveChat = v);
         ImGui.SameLine();
-        PushCheckbox();
-        var leaveSound = configuration.DoorbellLeaveSound;
-        if (ImGui.Checkbox("Play a sound##doorbellleavesound", ref leaveSound))
-        {
-            configuration.DoorbellLeaveSound = leaveSound;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Play a sound##doorbellleavesound",
+            configuration.DoorbellLeaveSound,
+            v => configuration.DoorbellLeaveSound = v);
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.DoorbellLeaveSound);
-        DrawSoundPicker("doorbellleave", doorbellDefault,
-            configuration.DoorbellLeaveSoundPath, configuration.DoorbellLeaveSoundVolume,
-            p => { configuration.DoorbellLeaveSoundPath  = p; configuration.Save(); },
+        DrawSoundPicker(
+            "doorbellleave",
+            doorbellDefault,
+            configuration.DoorbellLeaveSoundPath,
+            configuration.DoorbellLeaveSoundVolume,
+            p => { configuration.DoorbellLeaveSoundPath   = p; configuration.Save(); },
             v => { configuration.DoorbellLeaveSoundVolume = v; configuration.Save(); });
         ImGui.EndDisabled();
         ImGui.EndDisabled();
@@ -371,24 +273,13 @@ public partial class ConfigWindow
 
         // ── Commendations ─────────────────────────────────────────────────────
 
-        ImGui.Dummy(new Vector2(0, 12));
         SubsectionLabel("Commendations");
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextWrapped("Plays a sound when you receive commendations after a duty. Each tier plays a different sound based on how many you received.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
 
-        PushCheckbox();
-        var commendEnabled = configuration.CommendationEnabled;
-        if (ImGui.Checkbox("Enable##commendation", ref commendEnabled))
-        {
-            configuration.CommendationEnabled = commendEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Enable commendation sounds##commendation",
+            configuration.CommendationEnabled,
+            v => configuration.CommendationEnabled = v,
+            "Plays a sound when you receive commendations after a duty, based on how many you received.");
 
         ImGui.Dummy(new Vector2(0, 8));
         ImGui.BeginDisabled(!configuration.CommendationEnabled);
@@ -396,45 +287,46 @@ public partial class ConfigWindow
         var cDir = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Congratulations");
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("1/3 commends:");
-        ImGui.PopStyleColor();
+        Common.DimmedText("1/3 commends:");
         ImGui.Dummy(new Vector2(0, 2));
-        DrawSoundPicker("commendot", Path.Combine(cDir, "one-third.mp3"),
-            configuration.CommendationOneThirdPath, configuration.CommendationOneThirdVolume,
+        DrawSoundPicker(
+            "commendot",
+            Path.Combine(cDir, "one-third.mp3"),
+            configuration.CommendationOneThirdPath,
+            configuration.CommendationOneThirdVolume,
             p => { configuration.CommendationOneThirdPath   = p; configuration.Save(); },
             v => { configuration.CommendationOneThirdVolume = v; configuration.Save(); });
 
-        ImGui.Dummy(new Vector2(0, 8));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("2/3 commends:");
-        ImGui.PopStyleColor();
+        RowGap(8);
+        Common.DimmedText("2/3 commends:");
         ImGui.Dummy(new Vector2(0, 2));
-        DrawSoundPicker("commendtt", Path.Combine(cDir, "two-thirds.mp3"),
-            configuration.CommendationTwoThirdsPath, configuration.CommendationTwoThirdsVolume,
+        DrawSoundPicker(
+            "commendtt",
+            Path.Combine(cDir, "two-thirds.mp3"),
+            configuration.CommendationTwoThirdsPath,
+            configuration.CommendationTwoThirdsVolume,
             p => { configuration.CommendationTwoThirdsPath   = p; configuration.Save(); },
             v => { configuration.CommendationTwoThirdsVolume = v; configuration.Save(); });
 
-        ImGui.Dummy(new Vector2(0, 8));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("3/3 commends:");
-        ImGui.PopStyleColor();
+        RowGap(8);
+        Common.DimmedText("3/3 commends:");
         ImGui.Dummy(new Vector2(0, 2));
-        DrawSoundPicker("commendth", Path.Combine(cDir, "three-thirds.mp3"),
-            configuration.CommendationThreeThirdsPath, configuration.CommendationThreeThirdsVolume,
+        DrawSoundPicker(
+            "commendth",
+            Path.Combine(cDir, "three-thirds.mp3"),
+            configuration.CommendationThreeThirdsPath,
+            configuration.CommendationThreeThirdsVolume,
             p => { configuration.CommendationThreeThirdsPath   = p; configuration.Save(); },
             v => { configuration.CommendationThreeThirdsVolume = v; configuration.Save(); });
 
-        ImGui.Dummy(new Vector2(0, 8));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("All 7 (full party):");
-        ImGui.PopStyleColor();
+        RowGap(8);
+        Common.DimmedText("All 7 (full party):");
         ImGui.Dummy(new Vector2(0, 2));
-        DrawSoundPicker("commendas", Path.Combine(cDir, "all-seven.mp3"),
-            configuration.CommendationAllSevenPath, configuration.CommendationAllSevenVolume,
+        DrawSoundPicker(
+            "commendas",
+            Path.Combine(cDir, "all-seven.mp3"),
+            configuration.CommendationAllSevenPath,
+            configuration.CommendationAllSevenVolume,
             p => { configuration.CommendationAllSevenPath   = p; configuration.Save(); },
             v => { configuration.CommendationAllSevenVolume = v; configuration.Save(); });
 
@@ -453,19 +345,18 @@ public partial class ConfigWindow
         ImGui.SameLine();
         PushButton();
         if (ImGui.Button($"Browse...##{id}browse"))
-            fileDialogManager.OpenFileDialog("Select sound file", ".wav,.mp3,.ogg,.aif,.aiff,.wma",
+            fileDialogManager.OpenFileDialog(
+                "Select sound file",
+                ".wav,.mp3,.ogg,.aif,.aiff,.wma",
                 (ok, p) => { if (ok) setPath(p); });
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted(string.IsNullOrEmpty(configPath)
+        Common.DimmedText(string.IsNullOrEmpty(configPath)
             ? (string.IsNullOrEmpty(defaultPath) ? "No sound set" : "Default sound")
             : $"Current: {Path.GetFileName(configPath)}");
-        ImGui.PopStyleColor();
 
         // Row 2: [Test sound] [slider]
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
+        RowGap(1);
         if (showTest)
         {
             PushButton();

@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace HoliestFluffiness.Windows;
 
@@ -14,7 +13,7 @@ public partial class ConfigWindow
     private string charFilter = "";
     private string? csvExportMessage;
 
-    private static readonly string[] DbColNames = ["Last Seen", "Character", "World", "DC", "FC", "Search Info", "Private House", "FC House", "Gil"];
+    private static readonly string[] DbColNames = ["Last Seen", "Character", "World", "DC", "FC", "Search Info", "Private House", "FC House", "Gil", "MGP"];
 
     private void LoadCharacters() =>
         cachedRecords = [.. characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)];
@@ -25,9 +24,7 @@ public partial class ConfigWindow
 
         if (isCurrent)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
-            ImGui.TextUnformatted(rec.Name);
-            ImGui.PopStyleColor();
+            Common.GreenText(rec.Name);
         }
         else if (lifestreamOn)
         {
@@ -48,11 +45,8 @@ public partial class ConfigWindow
     {
         if (cachedRecords == null) LoadCharacters();
 
-        bool lifestreamOn = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
-        var localPlayer = objectTable[0] as IPlayerCharacter;
-        string? currentKey = localPlayer != null
-            ? $"{localPlayer.Name.TextValue}@{localPlayer.HomeWorld.ValueNullable?.Name.ExtractText()}"
-            : null;
+        bool lifestreamOn = Common.IsPluginLoaded(pluginInterface, "Lifestream");
+        string? currentKey = Common.GetCurrentPlayerKey(objectTable);
 
         BeginSection("Characters");
 
@@ -64,9 +58,7 @@ public partial class ConfigWindow
         ImGui.InputText("##charfilter", ref charFilter, 128);
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Filter");
-        ImGui.PopStyleColor();
+        Common.DimmedText("Filter");
         ImGui.SameLine();
         PushButton();
         if (ImGui.Button("Columns##charcolsbtn")) ImGui.OpenPopup("##charcolspopup");
@@ -95,9 +87,7 @@ public partial class ConfigWindow
         int colCount = cols.Count(v => v) + 1; // +1 for Actions
         if (colCount == 1)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-            ImGui.TextUnformatted("No columns selected.");
-            ImGui.PopStyleColor();
+            Common.DimmedText("No columns selected.");
         }
         else
         {
@@ -121,7 +111,8 @@ public partial class ConfigWindow
                 if (cols[6]) ImGui.TableSetupColumn("Private House", ImGuiTableColumnFlags.None, 0, 6);
                 if (cols[7]) ImGui.TableSetupColumn("FC House",      ImGuiTableColumnFlags.None, 0, 7);
                 if (cols[8]) ImGui.TableSetupColumn("Gil",           ImGuiTableColumnFlags.None, 0, 8);
-                ImGui.TableSetupColumn("##actions", ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.WidthFixed, 60f, 9);
+                if (cols[9]) ImGui.TableSetupColumn("MGP",           ImGuiTableColumnFlags.None, 0, 9);
+                ImGui.TableSetupColumn("##actions", ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.WidthFixed, 60f, 10);
                 ImGui.TableHeadersRow();
 
                 var sortSpecs = ImGui.TableGetSortSpecs();
@@ -140,6 +131,7 @@ public partial class ConfigWindow
                         6 => [.. (desc ? cachedRecords.OrderByDescending(r => r.PrivateHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot) : cachedRecords.OrderBy(r => r.PrivateHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
                         7 => [.. (desc ? cachedRecords.OrderByDescending(r => r.FcHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)      : cachedRecords.OrderBy(r => r.FcHouse).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
                         8 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Gil).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)          : cachedRecords.OrderBy(r => r.Gil).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
+                        9 => [.. (desc ? cachedRecords.OrderByDescending(r => r.Mgp).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)          : cachedRecords.OrderBy(r => r.Mgp).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))],
                         _ => cachedRecords,
                     };
                     sortSpecs.SpecsDirty = false;
@@ -173,6 +165,7 @@ public partial class ConfigWindow
                     if (cols[6]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.PrivateHouse ?? ""); }
                     if (cols[7]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.FcHouse ?? ""); }
                     if (cols[8]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Gil < 0 ? "" : rec.Gil.ToString("N0", CultureInfo.InvariantCulture)); }
+                    if (cols[9]) { ImGui.TableSetColumnIndex(c++); ImGui.TextUnformatted(rec.Mgp < 0 ? "" : rec.Mgp.ToString("N0", CultureInfo.InvariantCulture)); }
 
                     ImGui.TableSetColumnIndex(c);
                     PushButton();

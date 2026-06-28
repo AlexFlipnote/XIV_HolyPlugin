@@ -71,9 +71,7 @@ public class LoginInfoWindow : Window
         if (changingCharacter)
         {
             ImGui.Dummy(new Vector2(0, 4));
-            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-            ImGui.TextUnformatted(changingToText);
-            ImGui.PopStyleColor();
+            Common.GoldText(changingToText);
             ImGui.Dummy(new Vector2(0, 4));
             return;
         }
@@ -102,9 +100,7 @@ public class LoginInfoWindow : Window
 
                 ImGui.TableNextRow();
                 ImGui.TableSetColumnIndex(0);
-                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-                ImGui.TextUnformatted(label);
-                ImGui.PopStyleColor();
+                Common.GoldText(label);
                 ImGui.TableSetColumnIndex(1);
                 ImGui.TextUnformatted(value!);
             }
@@ -117,25 +113,19 @@ public class LoginInfoWindow : Window
         const float okWidth     = 60f;
         const float changeWidth = 136f;
         const float gap         = 8f;
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetContentRegionAvail().X - okWidth - changeWidth - gap) * 0.5f);
+        Common.CenterCursorForWidth(okWidth + changeWidth + gap);
 
-        // OK button first
-        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+        Common.PushGoldButton();
         if (ImGui.Button("OK", new Vector2(okWidth, 0)))
             IsOpen = false;
-        ImGui.PopStyleColor(4);
+        Common.PopGoldButton();
 
         ImGui.SameLine(0, gap);
 
         // Change character button second (grey)
-        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGrey);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreyHov);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreyAct);
+        Common.PushGreyButton();
         if (ImGui.Button("Change character", new Vector2(changeWidth, 0)))
             onOpenCharList?.Invoke();
-        ImGui.PopStyleColor(3);
+        Common.PopGreyButton();
     }
 }

@@ -4,11 +4,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using HoliestFluffiness.Handlers;
 
 namespace HoliestFluffiness.Windows;
 
 public partial class ConfigWindow
 {
+    private LoginEnhancementHandler loginEnhancementHandler = null!;
+    internal void SetLoginEnhancementHandler(LoginEnhancementHandler handler) => loginEnhancementHandler = handler;
+
     private CancellationTokenSource? testAllCts;
     private CancellationTokenSource? accessoryCts;
 
@@ -16,22 +20,18 @@ public partial class ConfigWindow
 
     private void DrawLoginSection()
     {
-        BeginSection("Login");
-
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Settings for what happens when you log in with a character.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 8));
+        BeginSection("Login", "Settings for what happens when you log in with a character.");
 
         // ── Login info ────────────────────────────────────────────────────────
         SubsectionLabel("Login info");
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
 
-        bool anyEnabled = configuration.ShowCharacterInfo || configuration.InfoEnabled || configuration.AdventurePlateEnabled || configuration.ShowPrivateHouseLocation || configuration.ShowFcHouseLocation;
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Simulate login:");
-        ImGui.PopStyleColor();
+        bool anyEnabled = configuration.ShowCharacterInfo
+            || configuration.InfoEnabled
+            || configuration.AdventurePlateEnabled
+            || configuration.ShowPrivateHouseLocation
+            || configuration.ShowFcHouseLocation;
+        SectionRow();
+        Common.DimmedText("Simulate login:");
         ImGui.SameLine();
         ImGui.BeginDisabled(!anyEnabled);
         PushButton();
@@ -45,14 +45,16 @@ public partial class ConfigWindow
         PopButton();
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
+        RowGap();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Show as:");
-        ImGui.PopStyleColor();
+        Common.DimmedText("Show as:");
         ImGui.SameLine();
-        foreach (var (label, val) in new (string, LoginInfoDisplay)[] { ("Echo text", LoginInfoDisplay.Echo), ("Popup", LoginInfoDisplay.Popup), ("Toast", LoginInfoDisplay.Toast) })
+        foreach (var (label, val) in new (string, LoginInfoDisplay)[]
+        {
+            ("Echo text", LoginInfoDisplay.Echo),
+            ("Popup",     LoginInfoDisplay.Popup),
+            ("Toast",     LoginInfoDisplay.Toast),
+        })
         {
             if (ImGui.RadioButton(label, configuration.LoginInfoDisplay == val))
             {
@@ -65,9 +67,7 @@ public partial class ConfigWindow
 
         ImGui.Dummy(new Vector2(0, 8));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-        ImGui.TextUnformatted("What to show");
-        ImGui.PopStyleColor();
+        Common.GoldText("What to show");
         ImGui.SameLine();
         PushButton();
         if (ImGui.Button("Reset order##loginorder"))
@@ -79,16 +79,11 @@ public partial class ConfigWindow
 
         DrawInfoOrderList();
 
-        ImGui.Dummy(new Vector2(0, 8));
-
         // ── Fashion accessory ─────────────────────────────────────────────────
         SubsectionLabel("Fashion accessory");
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Simulate login:");
-        ImGui.PopStyleColor();
+        SectionRow();
+        Common.DimmedText("Simulate login:");
         ImGui.SameLine();
         ImGui.BeginDisabled(!configuration.AccessoryEnabled);
         PushButton();
@@ -102,8 +97,7 @@ public partial class ConfigWindow
         PopButton();
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 6));
-        SectionRow();
+        RowGap(6);
 
         PushCheckbox();
         var accessoryEnabled = configuration.AccessoryEnabled;
@@ -133,28 +127,29 @@ public partial class ConfigWindow
 
         DrawRestrictionsSubsection(accessoryEnabled);
 
-        ImGui.Dummy(new Vector2(0, 8));
+        // ── Login enhancements ────────────────────────────────────────────────
+        SubsectionLabel("Login enhancements");
+
+        ConfigCheckbox(
+            "Skip logo on launch##skiplogo",
+            configuration.LoginSkipLogo,
+            v => configuration.LoginSkipLogo = v,
+            "Jumps straight to the title screen, skipping the intro movie");
+
+        ConfigCheckbox(
+            "Preload territory on character select##preloadterritory",
+            configuration.PreloadTerritory,
+            v => configuration.PreloadTerritory = v,
+            "Starts loading the destination zone in the background while in the login queue");
 
         // ── Character picker ──────────────────────────────────────────────────
         SubsectionLabel("Character picker");
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Show a character picker popup when you enter the main menu");
-        ImGui.PopStyleColor();
-
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
-
-        PushCheckbox();
-        var pickerEnabled = configuration.CharacterPickerOnMainMenu;
-        if (ImGui.Checkbox("Show on character select##charPicker", ref pickerEnabled))
-        {
-            configuration.CharacterPickerOnMainMenu = pickerEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Show on character select##charPicker",
+            configuration.CharacterPickerOnMainMenu,
+            v => configuration.CharacterPickerOnMainMenu = v,
+            "Shows a character picker popup when you enter the main menu");
 
         EndSection(10);
     }
@@ -211,7 +206,7 @@ public partial class ConfigWindow
                     case 3: configuration.InfoEnabled                = newEnabled; break;
                     case 4: configuration.ShowFcHouseLocation        = newEnabled; break;
                 }
-                configuration.Save();
+                configuration.Save();ImGui.Dummy(new Vector2(0, 6));
             }
             PopCheckbox();
         }
@@ -221,11 +216,9 @@ public partial class ConfigWindow
 
     private void DrawRestrictionsSubsection(bool enabled)
     {
-        ImGui.Dummy(new Vector2(0, 8f));
         SubsectionLabel("Restrictions");
 
         ImGui.BeginDisabled(!enabled);
-
         SectionRow();
         var maxFreeSlots = configuration.AccessoryInventory;
         ImGui.SetNextItemWidth(90);
@@ -237,9 +230,7 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("(0 = skip check)");
-        ImGui.PopStyleColor();
+        Common.DimmedText("(0 = skip check)");
 
         SectionRow();
         var minFreeSlots = configuration.AccessoryInventoryMin;
@@ -252,21 +243,11 @@ public partial class ConfigWindow
         }
         PopInput();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("(0 = skip check)");
-        ImGui.PopStyleColor();
+        Common.DimmedText("(0 = skip check)");
 
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 8f));
-        SubsectionLabel("Whitelist");
-
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Characters listed here will bypass all restrictions.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 2f));
-
+        SubsectionLabel("Whitelist", "Characters listed here will bypass all restrictions.");
         ImGui.BeginDisabled(!enabled);
 
         int removeIdx = -1;

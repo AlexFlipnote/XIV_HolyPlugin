@@ -29,14 +29,15 @@ public class Configuration : IPluginConfiguration
     // Order of the 5 info items: 0=Character, 1=SearchInfo, 2=PrivateHouse, 3=FreeCompany, 4=FcHouse
     public List<int> LoginInfoOrder { get; set; } = [0, 1, 2, 3, 4];
     public bool CharactersDbEnabled { get; set; } = false;
-    // Visibility of the 9 Characters table columns: LastSeen, Name, World, DC, FC, SearchInfo, PrivateHouse, FcHouse, Gil
-    public bool[] CharactersColumns { get; set; } = [true, true, true, true, true, true, true, true, true];
+    // Visibility of the 10 Characters table columns: LastSeen, Name, World, DC, FC, SearchInfo, PrivateHouse, FcHouse, Gil, MGP
+    public bool[] CharactersColumns { get; set; } = [true, true, true, true, true, true, true, true, true, true];
     public int LastSelectedSection { get; set; } = 0;
 
     // Server info section
     public bool ServerInfoPingEnabled { get; set; } = false;
     public PingDisplay ServerInfoPingDisplay { get; set; } = PingDisplay.Last;
     public bool ServerInfoFpsEnabled { get; set; } = false;
+    public int PingChartScaleMax { get; set; } = 0; // 0 = auto
 
     // Repair section
     public bool RepairLowEnabled { get; set; } = false;
@@ -47,9 +48,13 @@ public class Configuration : IPluginConfiguration
     // Client section
     public string ClientTitlePrefix { get; set; } = "";
     public bool ClientAppendNameOnLogin { get; set; } = false;
-    public bool ClientFlashOnTell { get; set; } = false;
+    public bool ClientFlashOnTell      { get; set; } = false;
     public bool ClientFlashOnReadyCheck { get; set; } = false;
-
+    public bool ClientFlashOnAlarm     { get; set; } = false;
+    public bool ClientFlashOnCombat    { get; set; } = false;
+    public bool ClientFlashOnSynthesis { get; set; } = false;
+    public bool TitleMovieDisabled { get; set; } = false;
+    public bool HotbarLockHidden { get; set; } = false;
     // Character picker section
     public bool CharacterPickerOnMainMenu { get; set; } = false;
 
@@ -64,6 +69,10 @@ public class Configuration : IPluginConfiguration
     // Anti-AFK section
     public bool AntiAfkEnabled { get; set; } = false;
     public int AntiAfkTimerLimit { get; set; } = 30;
+
+    // Duty timer + cast bar (Indicators)
+    public bool DutyTimerEnabled       { get; set; } = false;
+    public bool CastBarAetheryteEnabled { get; set; } = false;
 
     // Party section
     public bool ReadyCheckShowNames { get; set; } = false;
@@ -119,6 +128,14 @@ public class Configuration : IPluginConfiguration
     public string DoorbellAlreadyHereSoundPath   { get; set; } = "";
     public float  DoorbellAlreadyHereSoundVolume { get; set; } = 0.5f;
 
+    // Dynamic traveler (Social)
+    public bool DynamicTravelerEnabled    { get; set; } = false;
+    public bool EchoPartyFinderEnabled    { get; set; } = false;
+
+    // Login enhancements (Login)
+    public bool LoginSkipLogo    { get; set; } = false;
+    public bool PreloadTerritory { get; set; } = false;
+
     // Combat section
     // DC – Direct Critical Damage
     public bool   CombatDcEnabled   { get; set; } = false;
@@ -162,8 +179,8 @@ public class Configuration : IPluginConfiguration
         if (LoginInfoOrder.Count != 5 || !expected.All(LoginInfoOrder.Contains))
             LoginInfoOrder = expected;
 
-        if (CharactersColumns == null || CharactersColumns.Length != 9)
-            CharactersColumns = [true, true, true, true, true, true, true, true, true];
+        if (CharactersColumns == null || CharactersColumns.Length != 10)
+            CharactersColumns = [true, true, true, true, true, true, true, true, true, true];
     }
 
     public void Save()

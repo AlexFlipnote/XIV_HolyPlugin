@@ -11,6 +11,7 @@ public sealed class PhysicsHandler : IDisposable
     private readonly IFramework framework;
     private readonly Configuration config;
 
+    private volatile bool disposed;
     private bool executePhysics;
     private long expectedFrameTime;
     private long sliceStart, sliceEnd;
@@ -82,12 +83,13 @@ public sealed class PhysicsHandler : IDisposable
 
     private void Detour(nint a1, nint a2)
     {
-        if (executePhysics)
+        if (!disposed && executePhysics)
             hook!.Original(a1, a2);
     }
 
     public void Dispose()
     {
+        disposed = true;
         framework.Update -= OnUpdate;
         hook?.Dispose();
     }

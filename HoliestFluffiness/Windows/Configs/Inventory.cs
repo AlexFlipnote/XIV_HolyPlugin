@@ -5,7 +5,6 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace HoliestFluffiness.Windows;
 
@@ -31,20 +30,13 @@ public partial class ConfigWindow
     {
         if (cachedInventory == null) LoadInventory();
 
-        bool lifestreamOn  = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
-        var  localPlayer   = objectTable[0] as IPlayerCharacter;
-        string? currentKey = localPlayer != null
-            ? $"{localPlayer.Name.TextValue}@{localPlayer.HomeWorld.ValueNullable?.Name.ExtractText()}"
-            : null;
+        bool lifestreamOn  = Common.IsPluginLoaded(pluginInterface, "Lifestream");
+        string? currentKey = Common.GetCurrentPlayerKey(objectTable);
 
-        BeginSection("Inventory");
+        BeginSection("Inventory", "Tracks special items in the inventory across all your cached caracters, mainly right now, FC submarine items.");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextWrapped("Tracks special items in the inventory across all your cached caracters, mainly right now, FC submarine items.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
         PushButton();
+        SectionRow();
         if (ImGui.Button("Refresh##invrefresh")) LoadInventory();
         PopButton();
 
@@ -102,9 +94,7 @@ public partial class ConfigWindow
                 bool isCurrent = currentKey != null && row.Rec.Key == currentKey;
                 if (isCurrent)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
-                    ImGui.TextUnformatted(row.Rec.Name);
-                    ImGui.PopStyleColor();
+                    Common.GreenText(row.Rec.Name);
                 }
                 else if (lifestreamOn)
                 {
@@ -130,9 +120,7 @@ public partial class ConfigWindow
                         ImGui.TextUnformatted(qty.ToString("N0", CultureInfo.InvariantCulture));
                     else
                     {
-                        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-                        ImGui.TextUnformatted("-");
-                        ImGui.PopStyleColor();
+                        Common.DimmedText("-");
                     }
                 }
             }

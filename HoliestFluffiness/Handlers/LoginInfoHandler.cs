@@ -69,8 +69,10 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                     if (xwExisting != null)
                     {
                         var xwGil   = await CollectGilAsync(token);
+                        var xwMgp   = await CollectMgpAsync(token);
                         var xwPlate = await CollectPlateAsync(token, retry: true);
                         if (xwGil >= 0)                     xwExisting.Gil        = xwGil;
+                        if (xwMgp >= 0)                     xwExisting.Mgp        = xwMgp;
                         if (xwPlate?.TextValue != null)     xwExisting.SearchInfo = xwPlate.TextValue;
                         xwExisting.LastSeen = DateTime.UtcNow;
                         await Task.Run(() => characterDb.Upsert(xwExisting), token);
@@ -93,6 +95,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         string?   privateHouse = needPrivateHouse ? await CollectPrivateHouseAsync(token) : null;
         string?   fcHouse      = needFcHouse      ? await CollectFcHouseAsync(token)      : null;
         long      gil          = dbEnabled         ? await CollectGilAsync(token)          : 0;
+        long      mgp          = dbEnabled         ? await CollectMgpAsync(token)          : -1;
         string?   inventory    = dbEnabled         ? await CollectInventoryAsync(token)    : null;
         FcData?   fc    = null;
         SeString? plate = null;
@@ -178,8 +181,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 SearchInfo   = plate?.TextValue      ?? existing?.SearchInfo,
                 PrivateHouse = privateHouse          ?? existing?.PrivateHouse,
                 FcHouse      = fc == null ? null     : (fcHouse ?? existing?.FcHouse),
-                Gil          = gil >= 0 ? gil                    : existing?.Gil ?? 0,
-                Inventory    = inventory                         ?? existing?.Inventory,
+                Gil          = gil >= 0 ? gil        : existing?.Gil ?? 0,
+                Mgp          = mgp >= 0 ? mgp        : existing?.Mgp ?? -1,
+                Inventory    = inventory               ?? existing?.Inventory,
                 LastSeen     = DateTime.UtcNow,
             };
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
@@ -214,6 +218,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var newPrivateHouse = await CollectPrivateHouseAsync(CancellationToken.None);
         var newFcHouse      = await CollectFcHouseAsync(CancellationToken.None);
         var newGil          = await CollectGilAsync(CancellationToken.None);
+        var newMgp          = await CollectMgpAsync(CancellationToken.None);
         var newPlate        = await CollectPlateAsync(CancellationToken.None);
         var newInventory    = await CollectInventoryAsync(CancellationToken.None);
 
@@ -221,6 +226,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         existing.FcHouse     = newFc == null ? null : (newFcHouse ?? existing.FcHouse);
         if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
         if (newGil            >= 0)    existing.Gil          = newGil;
+        if (newMgp            >= 0)    existing.Mgp          = newMgp;
         if (newPlate?.TextValue != null) existing.SearchInfo = newPlate.TextValue;
         if (newInventory      != null) existing.Inventory    = newInventory;
         existing.LastSeen = DateTime.UtcNow;
@@ -250,6 +256,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var newPrivateHouse = await CollectPrivateHouseAsync(token);
                 var newFcHouse      = await CollectFcHouseAsync(token);
                 var newGil          = await CollectGilAsync(token);
+                var newMgp          = await CollectMgpAsync(token);
                 var newPlate        = await CollectPlateAsync(token);
                 var newInventory    = await CollectInventoryAsync(token);
 
@@ -259,6 +266,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 // Only accept confident values; fall back to existing for anything that didn't load
                 var newFcDisplay  = newFc?.Display;
                 var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
+                var newMgpValue   = newMgp >= 0 ? newMgp    : existing.Mgp;
                 var newPlateText  = newPlate?.TextValue      ?? existing.SearchInfo;
                 var newPH         = newPrivateHouse          ?? existing.PrivateHouse;
                 var newFcH        = newFc == null ? null     : (newFcHouse ?? existing.FcHouse);
@@ -268,6 +276,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                     existing.PrivateHouse == newPH         &&
                     existing.FcHouse      == newFcH        &&
                     existing.Gil          == newGilValue   &&
+                    existing.Mgp          == newMgpValue   &&
                     existing.SearchInfo   == newPlateText  &&
                     existing.Inventory    == newInv)
                     continue;
@@ -276,6 +285,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 existing.PrivateHouse = newPH;
                 existing.FcHouse      = newFcH;
                 existing.Gil          = newGilValue;
+                existing.Mgp          = newMgpValue;
                 existing.SearchInfo   = newPlateText;
                 existing.Inventory    = newInv;
                 existing.LastSeen     = DateTime.UtcNow;
@@ -488,6 +498,33 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var slot = container->GetInventorySlot(0);
                 if (slot == null || slot->ItemId != 1) return; // slot 0 is Gil (item ID 1)
                 result = slot->Quantity;
+            }
+        });
+
+        return result;
+    }
+
+    private async Task<long> CollectMgpAsync(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+
+        long result = -1;
+
+        await framework.RunOnFrameworkThread(() =>
+        {
+            unsafe
+            {
+                var inv = InventoryManager.Instance();
+                if (inv == null) return;
+                var container = inv->GetInventoryContainer(InventoryType.Currency);
+                if (container == null) return;
+                for (int i = 0; i < (int)container->Size; i++)
+                {
+                    var slot = container->GetInventorySlot(i);
+                    if (slot == null || slot->ItemId != 29) continue; // 29 = Manderville Gold Saucer Points
+                    result = slot->Quantity;
+                    break;
+                }
             }
         });
 

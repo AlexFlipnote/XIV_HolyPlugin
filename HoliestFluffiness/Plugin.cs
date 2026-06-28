@@ -25,6 +25,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using HoliestFluffiness.Windows;
 using System.Reflection;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace HoliestFluffiness;
 
@@ -57,6 +58,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IPartyList PartyList { get; init; } = null!;
     [PluginService] private ITargetManager TargetManager { get; init; } = null!;
     [PluginService] private IFlyTextGui    FlyTextGui    { get; init; } = null!;
+    [PluginService] private INamePlateGui NamePlateGui  { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -82,6 +84,12 @@ public sealed class Plugin : IDalamudPlugin
     private readonly CommendationHandler commendationHandler;
     private readonly DoorbellHandler doorbellHandler;
     private readonly CombatHitHandler combatHitHandler;
+    private readonly DynamicTravelerHandler  dynamicTravelerHandler;
+    private readonly EchoPartyFinderHandler  echoPartyFinderHandler;
+    private readonly ClientTweaksHandler     clientTweaksHandler;
+    private readonly DutyTimerHandler dutyTimerHandler;
+    private readonly CastBarHandler castBarHandler;
+    private readonly LoginEnhancementHandler loginEnhancementHandler;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -108,6 +116,10 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe delegate void InitiateReadyCheckDelegate(AgentReadyCheck* self);
     private Hook<InitiateReadyCheckDelegate>? readyCheckHook;
+
+    private const string NormalCraftSig = "48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC ?? 49 8B F0 48 8B FA 4C 8B F1 45 85 C9";
+    private unsafe delegate AtkValue* NormalCraftCallbackDelegate(AtkModuleInterface.AtkEventInterface* thisPtr, AtkValue* returnValue, AtkValue* values, uint valueCount, ulong eventKind);
+    private Hook<NormalCraftCallbackDelegate>? normalCraftHook;
 
     private readonly IntPtr windowHandle;
     private readonly string originalTitle;
@@ -152,7 +164,7 @@ public sealed class Plugin : IDalamudPlugin
         charPickerWindow       = new CharacterPickerWindow(SwitchToCharacter);
         noKillHandler.OnLobbyError += (isAuth) =>
         {
-            if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld);
+            if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld, noKillHandler.InterceptLog);
             if (!isAuth && !string.IsNullOrEmpty(lastKnownName) && !string.IsNullOrEmpty(lastKnownWorld))
                 noKillHandler.SetAutoLoginTarget(lastKnownName, lastKnownWorld);
         };
@@ -167,16 +179,25 @@ public sealed class Plugin : IDalamudPlugin
         commendationHandler.OnCommendation += OnCommendationReceived;
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
         combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop);
+        dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
+        echoPartyFinderHandler  = new EchoPartyFinderHandler(configuration, GameInterop, AddonLifecycle, DataManager, ClientState, ChatGui, Log);
+        clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework);
+dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager, Log);
+        castBarHandler         = new CastBarHandler(configuration, SigScanner, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
+        loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
         doorbellHandler.OnEntered     += OnDoorbellEntered;
         doorbellHandler.OnLeft        += OnDoorbellLeft;
         doorbellHandler.OnAlreadyHere += OnDoorbellAlreadyHere;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
-        pingChartWindow        = new PingChartWindow(serverInfoHandler);
+        pingChartWindow        = new PingChartWindow(serverInfoHandler, configuration);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetNearbyHandler(nearbyHandler);
         configWindow.SetCombatHitHandler(combatHitHandler);
+        configWindow.SetClientTweaksHandler(clientTweaksHandler);
+        configWindow.SetLoginEnhancementHandler(loginEnhancementHandler);
+
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
         windowSystem.AddWindow(noKillWindow);
@@ -229,6 +250,17 @@ public sealed class Plugin : IDalamudPlugin
                 OnReadyCheckInitiated);
         }
         readyCheckHook.Enable();
+
+        Condition.ConditionChange += OnConditionChange;
+        ChatGui.LogMessage += OnLogMessageFlash;
+
+        unsafe
+        {
+            normalCraftHook = GameInterop.HookFromSignature<NormalCraftCallbackDelegate>(NormalCraftSig, OnNormalCraftCallback);
+        }
+        normalCraftHook.Enable();
+
+        AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "SynthesisSimple", OnSynthesisSimpleRefresh);
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
@@ -477,11 +509,18 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private bool IsLifestreamBusy()
+    {
+        try { return PluginInterface.GetIpcSubscriber<bool>("Lifestream.IsBusy").InvokeFunc(); }
+        catch { return false; }
+    }
+
     private void OnCharaSelectForPicker(AddonEvent type, AddonArgs args)
     {
         if (!configuration.CharacterPickerOnMainMenu) return;
         if (switchingCharacter) return;
         if (noKillHandler.PendingAutoLogin || noKillHandler.IsReconnecting) return;
+        if (IsLifestreamBusy()) return;
         var chars = characterDb.GetAll();
         if (chars.Count == 0) return;
         charPickerWindow.Show(chars);
@@ -613,6 +652,35 @@ public sealed class Plugin : IDalamudPlugin
             FlashTaskbar();
     }
 
+    private void OnLogMessageFlash(ILogMessage message)
+    {
+        if (configuration.ClientFlashOnAlarm && message.LogMessageId == 3906)
+            FlashTaskbar();
+    }
+
+    private void OnConditionChange(ConditionFlag flag, bool value)
+    {
+        if (configuration.ClientFlashOnCombat && flag == ConditionFlag.InCombat && value)
+            FlashTaskbar();
+    }
+
+    private unsafe AtkValue* OnNormalCraftCallback(AtkModuleInterface.AtkEventInterface* thisPtr, AtkValue* returnValue, AtkValue* values, uint valueCount, ulong eventKind)
+    {
+        if (configuration.ClientFlashOnSynthesis && valueCount > 0 && values[0].Int == -2)
+            FlashTaskbar();
+        return normalCraftHook!.Original(thisPtr, returnValue, values, valueCount, eventKind);
+    }
+
+    private unsafe void OnSynthesisSimpleRefresh(AddonEvent type, AddonArgs args)
+    {
+        if (!configuration.ClientFlashOnSynthesis) return;
+        if (args is not AddonRefreshArgs refreshArgs) return;
+        if (refreshArgs.AtkValueCount < 5) return;
+        var values = (AtkValue*)refreshArgs.AtkValues;
+        if (values[3].UInt == 0 || values[3].UInt != values[4].UInt) return;
+        FlashTaskbar();
+    }
+
     private unsafe void OnReadyCheckInitiated(AgentReadyCheck* self)
     {
         readyCheckHook!.Original(self);
@@ -659,7 +727,11 @@ public sealed class Plugin : IDalamudPlugin
         AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, "_CharaSelectListMenu", OnCharaSelectListOpened);
         ChatGui.ChatMessage -= OnChatMessageFlash;
         ChatGui.ChatMessage -= OnChatMessageZone;
+        ChatGui.LogMessage -= OnLogMessageFlash;
+        Condition.ConditionChange -= OnConditionChange;
         readyCheckHook?.Dispose();
+        normalCraftHook?.Dispose();
+        AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "SynthesisSimple", OnSynthesisSimpleRefresh);
         lock (ctsLock)
         {
             loginCts?.Cancel();
@@ -694,6 +766,12 @@ public sealed class Plugin : IDalamudPlugin
         doorbellHandler.OnAlreadyHere -= OnDoorbellAlreadyHere;
         doorbellHandler.Dispose();
         combatHitHandler.Dispose();
+        dynamicTravelerHandler.Dispose();
+        echoPartyFinderHandler.Dispose();
+        clientTweaksHandler.Dispose();
+        dutyTimerHandler.Dispose();
+        castBarHandler.Dispose();
+        loginEnhancementHandler.Dispose();
         characterDb.Dispose();
     }
 }

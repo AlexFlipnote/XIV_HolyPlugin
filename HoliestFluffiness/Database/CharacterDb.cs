@@ -24,6 +24,7 @@ public sealed class CharacterDb : IDisposable
         db.CreateTable<HousingBidRecord>();
         AddColumnIfMissing("slot", "INTEGER");
         AddColumnIfMissing("inventory", "TEXT");
+        AddColumnIfMissing("mgp", "INTEGER");
     }
 
     private void AddColumnIfMissing(string column, string type)
@@ -47,6 +48,8 @@ public sealed class CharacterDb : IDisposable
     public int Count() => db.Table<CharacterRecord>().Count();
 
     public long TotalGil() => db.Table<CharacterRecord>().ToList().Where(r => r.Gil >= 0).Sum(r => r.Gil);
+
+    public long TotalMgp() => db.Table<CharacterRecord>().ToList().Where(r => r.Mgp >= 0).Sum(r => r.Mgp);
 
     public int CountWithFc() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.FreeCompany));
 
@@ -143,6 +146,7 @@ public sealed class CharacterDb : IDisposable
         rec.PrivateHouse = null;
         rec.FcHouse      = null;
         rec.Gil          = -1;
+        rec.Mgp          = -1;
         rec.Inventory    = null;
         db.Update(rec);
         Changed?.Invoke();

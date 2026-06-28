@@ -26,31 +26,19 @@ public partial class ConfigWindow
 
     private void DrawDatabaseSection()
     {
-        BeginSection("Database");
+        BeginSection("Database", "Stores character info to a local SQLite database on every login.");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Stores character info to a local SQLite database on every login.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 6));
-        SectionRow();
-
-        PushCheckbox();
-        var dbEnabled = configuration.CharactersDbEnabled;
-        if (ImGui.Checkbox("Enable character database", ref dbEnabled))
-        {
-            configuration.CharactersDbEnabled = dbEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Enable character database",
+            configuration.CharactersDbEnabled,
+            v => configuration.CharactersDbEnabled = v);
 
         ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
 
         if (bulkUpdateTotal > 0)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-            ImGui.TextUnformatted($"Processing {bulkUpdateProgress}/{bulkUpdateTotal}...");
-            ImGui.PopStyleColor();
+            Common.DimmedText($"Processing {bulkUpdateProgress}/{bulkUpdateTotal}...");
             ImGui.SameLine();
             PushButton();
             if (ImGui.Button("Cancel##bulkupdate")) bulkUpdateCts?.Cancel();
@@ -70,12 +58,13 @@ public partial class ConfigWindow
             if (ImGui.Button("Export CSV##dbexport"))
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("Key,Name,World,DataCenter,Slot,FreeCompany,SearchInfo,PrivateHouse,FcHouse,Gil,LastSeen");
+                sb.AppendLine("Key,Name,World,DataCenter,Slot,FreeCompany,SearchInfo,PrivateHouse,FcHouse,Gil,Mgp,LastSeen");
                 foreach (var r in characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))
                     sb.AppendLine(string.Join(",", CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
                         r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany), CsvEscape(r.SearchInfo),
                         CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
                         r.Gil < 0 ? "" : r.Gil.ToString(),
+                        r.Mgp < 0 ? "" : r.Mgp.ToString(),
                         r.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")));
                 var csv = sb.ToString();
                 fileDialogManager.SaveFileDialog("Export characters", "CSV{.csv}", "characters_export.csv", ".csv",
@@ -89,21 +78,18 @@ public partial class ConfigWindow
         {
             ImGui.Dummy(new Vector2(0, 2));
             SectionRow();
-            ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-            ImGui.TextUnformatted(csvExportMessage);
-            ImGui.PopStyleColor();
+            Common.DimmedText(csvExportMessage);
         }
 
         ImGui.Dummy(new Vector2(0, 8));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-        ImGui.TextUnformatted("Did you know?");
-        ImGui.PopStyleColor();
+        Common.GoldText("Did you know?");
         ImGui.Dummy(new Vector2(0, 2));
         SectionRow();
 
         var count         = characterDb.Count();
         var totalGil      = characterDb.TotalGil();
+        var totalMgp      = characterDb.TotalMgp();
         var withFc        = characterDb.CountWithFc();
         var uniqueFc      = characterDb.CountUniqueFc();
         var uniqueFcHouse = characterDb.CountUniqueFcHouse();
@@ -157,7 +143,7 @@ public partial class ConfigWindow
                 ImGui.TextUnformatted($"is the highest gil amount, owned by {richest.Name} @ {richest.World}");
             }
 
-            foreach (var (num, label) in new[] { ($"{totalCeruleum:N0}", "Ceruleum Tanks across all your characters"), ($"{totalMagitek:N0}", "Magitek Repair Materials across all your characters") })
+            foreach (var (num, label) in new[] { ($"{totalMgp:N0}", "MGP across all your characters"), ($"{totalCeruleum:N0}", "Ceruleum Tanks across all your characters"), ($"{totalMagitek:N0}", "Magitek Repair Materials across all your characters") })
             {
                 ImGui.TableNextRow();
                 ImGui.TableSetColumnIndex(0);

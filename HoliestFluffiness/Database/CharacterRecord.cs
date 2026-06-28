@@ -33,6 +33,9 @@ public class CharacterRecord
     [Column("gil")]
     public long Gil { get; set; } = -1;
 
+    [Column("mgp")]
+    public long Mgp { get; set; } = -1;
+
     [Column("last_seen")]
     public DateTime LastSeen { get; set; }
 

@@ -52,27 +52,15 @@ public class CharacterPickerWindow : Window
         // forceCenter=true on first Show() so re-opens always land on center even within the same session
         ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), forceCenter ? ImGuiCond.Always : ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
         forceCenter = false;
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,             Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.Text,                 Theme.ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,              Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.FrameBg,              Theme.ColPrimary);
-        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     Theme.ColGold);
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding,  4f);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,  Vector2.Zero);
-        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,    new Vector2(8, 5));
+        Common.PushWindowTheme();
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,   new Vector2(8, 5));
     }
 
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(13);
+        Common.PopWindowTheme();
         ImGui.PopStyleVar(3);
     }
 
@@ -109,15 +97,14 @@ public class CharacterPickerWindow : Window
             ImGui.TableSetupColumn("Name",       ImGuiTableColumnFlags.None,                                                     col1Width, 1);
             ImGui.TableSetupColumn("World/Slot", ImGuiTableColumnFlags.None,                                                     col2Width, 2);
 
-            ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, Theme.ColPrimary);
-            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+            Common.PushTableHeader();
             ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
             ImGui.TableSetColumnIndex(0);
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             ImGui.TableHeader("Last login");
             ImGui.TableSetColumnIndex(1); ImGui.TableHeader("Name");
             ImGui.TableSetColumnIndex(2); ImGui.TableHeader("World/Slot");
-            ImGui.PopStyleColor(2);
+            Common.PopTableHeader();
 
             // Sort, must happen after TableHeadersRow so specs are populated
             var sortSpecs = ImGui.TableGetSortSpecs();
@@ -165,14 +152,10 @@ public class CharacterPickerWindow : Window
                 if (clicked) { nextName = rec.Name; nextWorld = rec.World; }
 
                 ImGui.TableSetColumnIndex(1);
-                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-                ImGui.TextUnformatted(rec.Name);
-                ImGui.PopStyleColor();
+                Common.GoldText(rec.Name);
 
                 ImGui.TableSetColumnIndex(2);
-                ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-                ImGui.TextUnformatted(rec.Slot > 0 ? $"{rec.World}/{rec.Slot}" : rec.World);
-                ImGui.PopStyleColor();
+                Common.DimmedText(rec.Slot > 0 ? $"{rec.World}/{rec.Slot}" : rec.World);
             }
 
             ImGui.EndTable();
@@ -181,11 +164,9 @@ public class CharacterPickerWindow : Window
         const float margin = 30f;
         ImGui.SetCursorPosX(margin);
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - margin);
-        ImGui.PushStyleColor(ImGuiCol.Border, Theme.ColGoldMid);
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
+        Common.PushSearchInput();
         ImGui.InputTextWithHint("##pickersearch", "Search...", ref search, 128);
-        ImGui.PopStyleVar();
-        ImGui.PopStyleColor();
+        Common.PopSearchInput();
 
         if (nextName != null && nextWorld != null)
         {

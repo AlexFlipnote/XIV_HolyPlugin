@@ -244,18 +244,21 @@ public partial class ConfigWindow : Window
 
     // ── Section helpers ───────────────────────────────────────────────────────
 
-    private void BeginSection(string title, Action? afterTitle = null)
+    private void BeginSection(string title, string? desc = null, Action? afterTitle = null)
     {
         ImGui.BeginChild(title + "##sec", new Vector2(0, 0), false);
 
         ImGui.Dummy(new Vector2(0, 6));
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 10f);
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         ImGui.TextUnformatted(title);
         if (afterTitle != null) { ImGui.SameLine(); afterTitle(); }
         ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 6));
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        if (desc != null)
+        {
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+            Common.DimmedTextWrapped(desc);
+        }
     }
 
     private void EndSection(float bottomPadding = 0)
@@ -268,12 +271,54 @@ public partial class ConfigWindow : Window
     private static void SectionRow() =>
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
 
-    private void SubsectionLabel(string label)
+    private static void RowGap(float gap = 4)
     {
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.Dummy(new Vector2(0, gap));
+        SectionRow();
+    }
+
+    private void ConfigSliderInt(string label, int current, int min, int max, Action<int> setter,
+        float width = 220, string? hint = null, Action? onChange = null)
+    {
+        SectionRow();
+        ImGui.SetNextItemWidth(width);
+        PushInput();
+        if (ImGui.SliderInt(label, ref current, min, max))
+        {
+            setter(current);
+            configuration.Save();
+            onChange?.Invoke();
+        }
+        PopInput();
+        if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+    }
+
+    private void ConfigSliderFloat(string label, float current, float min, float max, Action<float> setter,
+        float width = 220, string? format = null, string? hint = null)
+    {
+        ImGui.SetNextItemWidth(width);
+        PushInput();
+        bool changed = format != null
+            ? ImGui.SliderFloat(label, ref current, min, max, format)
+            : ImGui.SliderFloat(label, ref current, min, max);
+        if (changed) { setter(current); configuration.Save(); }
+        PopInput();
+        if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+    }
+
+    private void SubsectionLabel(string label, string? desc = null)
+    {
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted(label);
         ImGui.PopStyleColor();
+        if (desc != null)
+        {
+            SectionRow();
+            Common.DimmedTextWrapped(desc);
+        }
+        ImGui.Dummy(new Vector2(0, 1));
     }
 
     // ── Style helpers ─────────────────────────────────────────────────────────
@@ -343,5 +388,46 @@ public partial class ConfigWindow : Window
     {
         ImGui.PopStyleColor(4);
         ImGui.PopStyleVar();
+    }
+
+    private void ConfigCheckbox(string label, bool current, Action<bool> setter, string? desc = null)
+    {
+        SectionRow();
+
+        if (desc == null)
+        {
+            PushCheckbox();
+            if (ImGui.Checkbox(label, ref current))
+            {
+                setter(current);
+                configuration.Save();
+            }
+            PopCheckbox();
+            return;
+        }
+
+        // Separate display text from ImGui ID so we can position them independently
+        var sep  = label.IndexOf("##", StringComparison.Ordinal);
+        var text = sep >= 0 ? label[..sep] : label;
+        var id   = sep >= 0 ? label[sep..] : "##" + label;
+
+        // Draw the checkbox box only (no visible label)
+        PushCheckbox();
+        if (ImGui.Checkbox(id, ref current))
+        {
+            setter(current);
+            configuration.Save();
+        }
+        PopCheckbox();
+
+        var boxMin = ImGui.GetItemRectMin();
+        var boxMax = ImGui.GetItemRectMax();
+        var textX  = boxMax.X + ImGui.GetStyle().ItemInnerSpacing.X + 2f;
+
+        ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y - 5f));
+        ImGui.TextUnformatted(text);
+
+        ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y + 10f));
+        Common.DimmedTextWrapped(desc);
     }
 }

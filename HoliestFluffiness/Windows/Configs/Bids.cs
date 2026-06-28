@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace HoliestFluffiness.Windows;
 
@@ -24,20 +23,12 @@ public partial class ConfigWindow
     {
         if (cachedBids == null) LoadBids();
 
-        bool lifestreamOn  = pluginInterface.InstalledPlugins.Any(p => p.InternalName == "Lifestream" && p.IsLoaded);
-        var  localPlayer   = objectTable[0] as IPlayerCharacter;
-        string? currentKey = localPlayer != null
-            ? $"{localPlayer.Name.TextValue}@{localPlayer.HomeWorld.ValueNullable?.Name.ExtractText()}"
-            : null;
+        bool lifestreamOn  = Common.IsPluginLoaded(pluginInterface, "Lifestream");
+        string? currentKey = Common.GetCurrentPlayerKey(objectTable);
 
-        BeginSection("Bids");
+        BeginSection("Bids", "Housing lottery bids are tracked automatically when you place or confirm a bid.");
 
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Housing lottery bids are tracked automatically when you place or confirm a bid.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 4));
         SectionRow();
-
         PushButton();
         if (ImGui.Button("Refresh##bidrefresh")) LoadBids();
         PopButton();
@@ -70,9 +61,7 @@ public partial class ConfigWindow
                     bool isCurrent = currentKey != null && rec.Key == currentKey;
                     if (isCurrent)
                     {
-                        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
-                        ImGui.TextUnformatted($"{rec.Name} @ {rec.World}");
-                        ImGui.PopStyleColor();
+                        Common.GreenText($"{rec.Name} @ {rec.World}");
                     }
                     else if (lifestreamOn)
                     {
@@ -89,9 +78,7 @@ public partial class ConfigWindow
                 }
                 else
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-                    ImGui.TextUnformatted(bid.CharacterKey);
-                    ImGui.PopStyleColor();
+                    Common.DimmedText(bid.CharacterKey);
                 }
 
                 ImGui.TableSetColumnIndex(1);

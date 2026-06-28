@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
@@ -14,6 +15,8 @@ public sealed class NoKillHandler : IDisposable
 
     public event Action<bool>? OnLobbyError; // bool = isAuthError
     public int    InterceptCount   { get; private set; }
+    public IReadOnlyList<DateTime> InterceptLog => interceptLog;
+    private readonly List<DateTime> interceptLog = [];
     public bool   PendingAutoLogin { get; set; }
     public bool   IsReconnecting   { get; private set; }
     public string? AutoLoginName   { get; private set; }
@@ -71,6 +74,7 @@ public sealed class NoKillHandler : IDisposable
         if (v4 > 0)
         {
             InterceptCount++;
+            interceptLog.Add(DateTime.Now);
             OnLobbyError?.Invoke(v4_16 == 0x332C);
             if (v4_16 != 0x332C) // skip auth errors,  they require re-login anyway
                 Marshal.WriteInt64(p3 + 8, 0x3E80); // server connection lost

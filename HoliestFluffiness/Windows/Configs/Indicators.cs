@@ -8,33 +8,27 @@ public partial class ConfigWindow
 {
     private void DrawIndicatorsSection()
     {
-        BeginSection("Indicators");
-
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Settings for in-game indicators and HUD additions.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 8));
+        BeginSection("Indicators", "Settings for in-game indicators and HUD additions.");
 
         // ── Server info ───────────────────────────────────────────────────────
-        SubsectionLabel("Server info");
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Adds entries to the server info bar (the row of icons at the top right).");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
+        SubsectionLabel("Server info", "Adds entries to the server info bar (the row of icons at the top right).");
 
-        PushCheckbox();
-        var pingEnabled = configuration.ServerInfoPingEnabled;
-        if (ImGui.Checkbox("Show ping##serverinfoping", ref pingEnabled))
-        {
-            configuration.ServerInfoPingEnabled = pingEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "Show FPS##serverinfofps",
+            configuration.ServerInfoFpsEnabled,
+            v => configuration.ServerInfoFpsEnabled = v);
+
+        ConfigCheckbox(
+            "Show nearby player count##nearbydtr",
+            configuration.NearbyDtrEnabled,
+            v => configuration.NearbyDtrEnabled = v);
+
+        ConfigCheckbox(
+            "Show ping##serverinfoping",
+            configuration.ServerInfoPingEnabled,
+            v => configuration.ServerInfoPingEnabled = v);
         ImGui.SameLine();
-        ImGui.BeginDisabled(!pingEnabled);
+        ImGui.BeginDisabled(!configuration.ServerInfoPingEnabled);
         ImGui.SetNextItemWidth(150);
         var displayModes = new[] { "Last ping", "Average ping", "Both" };
         var displayIndex = (int)configuration.ServerInfoPingDisplay;
@@ -47,96 +41,47 @@ public partial class ConfigWindow
         PopInput();
         ImGui.EndDisabled();
 
-        ImGui.Dummy(new Vector2(0, 8));
+        ImGui.SetNextItemWidth(150);
+        var pingScaleMax = configuration.PingChartScaleMax;
         SectionRow();
-
-        PushCheckbox();
-        var fpsEnabled = configuration.ServerInfoFpsEnabled;
-        if (ImGui.Checkbox("Show FPS##serverinfofps", ref fpsEnabled))
+        PushInput();
+        if (ImGui.InputInt("Ping chart Y-axis max (ms, 0 = auto)##pingscale", ref pingScaleMax, 10, 50))
         {
-            configuration.ServerInfoFpsEnabled = fpsEnabled;
+            configuration.PingChartScaleMax = Math.Max(0, pingScaleMax);
             configuration.Save();
         }
-        PopCheckbox();
-
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-
-        PushCheckbox();
-        var dtrEnabled = configuration.NearbyDtrEnabled;
-        if (ImGui.Checkbox("Show nearby player count##nearbydtr", ref dtrEnabled))
-        {
-            configuration.NearbyDtrEnabled = dtrEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
-
-        ImGui.Dummy(new Vector2(0, 12));
+        PopInput();
 
         // ── Repair ────────────────────────────────────────────────────────────
-        SubsectionLabel("Repair");
-        ImGui.Dummy(new Vector2(0, 2));
-        SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextWrapped("Adds a debuff icon to Status (Other) when your gear durability drops below a threshold. " +
-                          "Critical takes priority over Low, only one icon appears at a time. " +
-                          "The main difference between them is the icon displayed and the message shown on hover.");
-        ImGui.PopStyleColor();
-        ImGui.Dummy(new Vector2(0, 8));
+        SubsectionLabel("Repair",
+            "Adds a debuff icon to Status (Other) when your gear durability drops below a threshold. " +
+            "Critical takes priority over Low, only one icon appears at a time.");
 
-        SectionRow();
-        PushCheckbox();
-        var lowEnabled = configuration.RepairLowEnabled;
-        if (ImGui.Checkbox("##repairlowcheck", ref lowEnabled))
-        {
-            configuration.RepairLowEnabled = lowEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "##repairlowcheck",
+            configuration.RepairLowEnabled,
+            v => configuration.RepairLowEnabled = v);
 
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        var lowThreshold = configuration.RepairLowThreshold;
-        PushInput();
-        if (ImGui.SliderFloat("Low threshold##repairlowthr", ref lowThreshold, 1f, 100f, "%.0f%%"))
-        {
-            configuration.RepairLowThreshold = lowThreshold;
-            configuration.Save();
-        }
-        PopInput();
+        ConfigSliderFloat("Low threshold##repairlowthr", configuration.RepairLowThreshold, 1f, 100f,
+            v => configuration.RepairLowThreshold = v, width: 200, format: "%.0f%%");
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Shows: \"Gear at X%, consider repairing\"");
-        ImGui.PopStyleColor();
+        Common.DimmedText("Shows: \"Gear at X%, consider repairing\"");
 
-        ImGui.Dummy(new Vector2(0, 8));
+        ImGui.Dummy(new Vector2(0, 4));
 
-        SectionRow();
-        PushCheckbox();
-        var critEnabled = configuration.RepairCriticalEnabled;
-        if (ImGui.Checkbox("##repaircritcheck", ref critEnabled))
-        {
-            configuration.RepairCriticalEnabled = critEnabled;
-            configuration.Save();
-        }
-        PopCheckbox();
+        ConfigCheckbox(
+            "##repaircritcheck",
+            configuration.RepairCriticalEnabled,
+            v => configuration.RepairCriticalEnabled = v);
 
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        var critThreshold = configuration.RepairCriticalThreshold;
-        PushInput();
-        if (ImGui.SliderFloat("Critical threshold##repaircritthr", ref critThreshold, 1f, 100f, "%.0f%%"))
-        {
-            configuration.RepairCriticalThreshold = critThreshold;
-            configuration.Save();
-        }
-        PopInput();
+        ConfigSliderFloat("Critical threshold##repaircritthr", configuration.RepairCriticalThreshold, 1f, 100f,
+            v => configuration.RepairCriticalThreshold = v, width: 200, format: "%.0f%%");
 
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Shows: \"Gear really damaged (X%), repair now!!\"");
-        ImGui.PopStyleColor();
+        Common.DimmedText("Shows: \"Gear really damaged (X%), repair now!!\"");
 
         ImGui.Dummy(new Vector2(0, 8));
 
@@ -147,75 +92,56 @@ public partial class ConfigWindow
             repairHandler.TestPct = testing ? null : 69f;
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Simulates 69% gear condition to preview the debuff icon.");
-        ImGui.PopStyleColor();
-
-        ImGui.Dummy(new Vector2(0, 12));
+        Common.DimmedText("Simulates 69% gear condition to preview the debuff icon.");
 
         // ── Ready check ───────────────────────────────────────────────────────
         SubsectionLabel("Ready Check Helper");
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
 
-        PushCheckbox();
-        var showNames = configuration.ReadyCheckShowNames;
-        if (ImGui.Checkbox("Show names in chat##rcnames", ref showNames))
-        {
-            configuration.ReadyCheckShowNames = showNames;
-            configuration.Save();
-        }
-        PopCheckbox();
-        ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Prints who is not ready after a ready check");
-        ImGui.PopStyleColor();
+        ConfigCheckbox(
+            "Show names in chat##rcnames",
+            configuration.ReadyCheckShowNames,
+            v => configuration.ReadyCheckShowNames = v,
+            "Prints who is not ready after a ready check");
 
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
-
-        PushCheckbox();
-        var drawOverlay = configuration.ReadyCheckDrawOverlay;
-        if (ImGui.Checkbox("Draw ready check overlay##rcoverlay", ref drawOverlay))
-        {
-            configuration.ReadyCheckDrawOverlay = drawOverlay;
-            configuration.Save();
-        }
-        PopCheckbox();
-        ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Shows ready/not-ready icons on the party list");
-        ImGui.PopStyleColor();
+        ConfigCheckbox(
+            "Draw ready check overlay##rcoverlay",
+            configuration.ReadyCheckDrawOverlay,
+            v => configuration.ReadyCheckDrawOverlay = v,
+            "Shows ready/not-ready icons on the party list");
 
         ImGui.Dummy(new Vector2(0, 4));
         ImGui.BeginDisabled(!configuration.ReadyCheckDrawOverlay);
-        SectionRow();
 
-        var seconds = configuration.ReadyCheckClearAfterSeconds;
-        ImGui.SetNextItemWidth(220);
-        PushInput();
-        if (ImGui.SliderInt("Clear after (s)##rcclear", ref seconds, 1, 60))
-        {
-            configuration.ReadyCheckClearAfterSeconds = Math.Clamp(seconds, 1, 60);
-            configuration.Save();
-        }
-        PopInput();
-        ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("(default 10)");
-        ImGui.PopStyleColor();
+        ConfigSliderInt("Clear after (s)##rcclear", configuration.ReadyCheckClearAfterSeconds, 1, 60,
+            v => configuration.ReadyCheckClearAfterSeconds = v,
+            hint: "(default 10)");
 
-        ImGui.Dummy(new Vector2(0, 4));
-        SectionRow();
+        RowGap();
         PushButton();
         if (ImGui.Button("Test overlay##rctest"))
             readyCheckHandler.Simulate();
         PopButton();
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
-        ImGui.TextUnformatted("Simulates a ready check for 1 second (requires a party)");
-        ImGui.PopStyleColor();
+        Common.DimmedText("Simulates a ready check for 1 second (requires a party)");
         ImGui.EndDisabled();
+
+        // ── Cast bar aetheryte names ──────────────────────────────────────────
+        SubsectionLabel("Cast bar");
+
+        ConfigCheckbox(
+            "Enable cast bar aetheryte names##castbaraetheryte",
+            configuration.CastBarAetheryteEnabled,
+            v => configuration.CastBarAetheryteEnabled = v,
+            "Replaces the generic cast bar text with the actual aetheryte name when using Teleport.");
+
+        // ── Duty timer ────────────────────────────────────────────────────────
+        SubsectionLabel("Duty queue timer");
+
+        ConfigCheckbox(
+            "Show duty queue timer##dutytimer",
+            configuration.DutyTimerEnabled,
+            v => configuration.DutyTimerEnabled = v,
+            "Shows estimated remaining queue time in the duty ready check dialog, based on the wait time shown when your duty was found.");
 
         EndSection(10);
     }
