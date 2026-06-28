@@ -16,23 +16,11 @@ public partial class ConfigWindow
     {
         BeginSection("Social", "Nearby players, targeting tracker, house doorbell, commendation sounds, and nameplate tweaks.");
 
-        // ── Dynamic Traveler ──────────────────────────────────────────────────
-        SubsectionLabel("Dynamic Traveler");
-
         ConfigCheckbox(
             "Replace Wanderer / Traveller with home world##dynamictraveler",
             configuration.DynamicTravelerEnabled,
             v => configuration.DynamicTravelerEnabled = v,
             "Replaces the Wanderer / Traveller FC tags on cross-world nameplates with the player's home world.");
-
-        // ── Echo Party Finder ─────────────────────────────────────────────────
-        SubsectionLabel("Echo Party Finder");
-
-        ConfigCheckbox(
-            "Echo party finder description##echopartyfinder",
-            configuration.EchoPartyFinderEnabled,
-            v => configuration.EchoPartyFinderEnabled = v,
-            "Prints the party finder listing description to chat when you join, and again when you enter the duty.");
 
         // ── Nearby players ────────────────────────────────────────────────────
         SubsectionLabel("Nearby players");
@@ -131,9 +119,6 @@ public partial class ConfigWindow
             "Debug: Track yourself##nearbytracksself",
             configuration.NearbyTargeterTrackSelf,
             v => configuration.NearbyTargeterTrackSelf = v);
-        ImGui.EndDisabled();
-
-        ImGui.BeginDisabled(!configuration.NearbyShowTargeters);
 
         ConfigCheckbox(
             "Mark targeting you in-world##nearbymarktargeting",
@@ -143,14 +128,14 @@ public partial class ConfigWindow
         ImGui.BeginDisabled(!configuration.NearbyMarkTargeting);
         SectionRow();
         var markCol = configuration.NearbyMarkTargetingColour;
-        if (ImGui.ColorEdit4("Mark colour##nearbymarkcol", ref markCol, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
+        if (ImGui.ColorEdit4("##nearbymarkcol", ref markCol, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
         {
             configuration.NearbyMarkTargetingColour = markCol;
             configuration.Save();
         }
-        ImGui.SameLine(0, 20);
+        ImGui.SameLine();
         ConfigSliderInt("Mark size##nearbymarksize", configuration.NearbyMarkTargetingSize, 1, 20,
-            v => configuration.NearbyMarkTargetingSize = v, width: 200);
+            v => configuration.NearbyMarkTargetingSize = v, width: 200, padding: false);
         ImGui.EndDisabled();
 
         // ── Sound ─────────────────────────────────────────────────────────────

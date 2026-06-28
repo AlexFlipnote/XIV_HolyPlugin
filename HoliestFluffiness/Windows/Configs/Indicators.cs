@@ -10,6 +10,28 @@ public partial class ConfigWindow
     {
         BeginSection("Indicators", "Settings for in-game indicators and HUD additions.");
 
+        ConfigCheckbox(
+            "Enable cast bar aetheryte names##castbaraetheryte",
+            configuration.CastBarAetheryteEnabled,
+            v => configuration.CastBarAetheryteEnabled = v,
+            "Replaces the generic cast bar text with the actual aetheryte name when using Teleport.");
+
+        ConfigCheckbox(
+            "Show duty queue timer##dutytimer",
+            configuration.DutyTimerEnabled,
+            v => configuration.DutyTimerEnabled = v,
+            "Shows estimated remaining queue time in the duty ready check dialog.");
+
+        ConfigCheckbox(
+            "Hide hotbar lock##hotbarlock",
+            configuration.HotbarLockHidden,
+            v =>
+            {
+                configuration.HotbarLockHidden = v;
+                if (!v) clientTweaksHandler?.RestoreHotbarLock();
+            },
+            "Hides the padlock icon on the action bar");
+
         // ── Server info ───────────────────────────────────────────────────────
         SubsectionLabel("Server info", "Adds entries to the server info bar (the row of icons at the top right).");
 
@@ -124,24 +146,6 @@ public partial class ConfigWindow
         ImGui.SameLine();
         Common.DimmedText("Simulates a ready check for 1 second (requires a party)");
         ImGui.EndDisabled();
-
-        // ── Cast bar aetheryte names ──────────────────────────────────────────
-        SubsectionLabel("Cast bar");
-
-        ConfigCheckbox(
-            "Enable cast bar aetheryte names##castbaraetheryte",
-            configuration.CastBarAetheryteEnabled,
-            v => configuration.CastBarAetheryteEnabled = v,
-            "Replaces the generic cast bar text with the actual aetheryte name when using Teleport.");
-
-        // ── Duty timer ────────────────────────────────────────────────────────
-        SubsectionLabel("Duty queue timer");
-
-        ConfigCheckbox(
-            "Show duty queue timer##dutytimer",
-            configuration.DutyTimerEnabled,
-            v => configuration.DutyTimerEnabled = v,
-            "Shows estimated remaining queue time in the duty ready check dialog, based on the wait time shown when your duty was found.");
 
         EndSection(10);
     }

@@ -114,8 +114,8 @@ public partial class ConfigWindow : Window
     {
         ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.ColPrimary);
         ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(6, 6));
         ImGui.BeginChild("##sidebar", new Vector2(width, height), false);
@@ -195,8 +195,8 @@ public partial class ConfigWindow : Window
     {
         ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.ColSecondary);
         ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8, 0));
         ImGui.BeginChild("##main", new Vector2(0, height), false);
@@ -259,6 +259,7 @@ public partial class ConfigWindow : Window
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             Common.DimmedTextWrapped(desc);
         }
+        ImGui.Dummy(new Vector2(0, 2));
     }
 
     private void EndSection(float bottomPadding = 0)
@@ -278,9 +279,9 @@ public partial class ConfigWindow : Window
     }
 
     private void ConfigSliderInt(string label, int current, int min, int max, Action<int> setter,
-        float width = 220, string? hint = null, Action? onChange = null)
+        float width = 220, string? hint = null, Action? onChange = null, bool padding = true)
     {
-        SectionRow();
+        if (padding) SectionRow();
         ImGui.SetNextItemWidth(width);
         PushInput();
         if (ImGui.SliderInt(label, ref current, min, max))

@@ -19,8 +19,12 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
         this.addonLifecycle = addonLifecycle;
         this.framework      = framework;
 
+        addonLifecycle.RegisterListener(AddonEvent.PostSetup,           "_ActionBar", OnActionBarUpdate);
         addonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "_ActionBar", OnActionBarUpdate);
         framework.Update += OnFrameworkUpdate;
+
+        if (config.HotbarLockHidden)
+            ApplyHotbarLockHide();
     }
 
     private void OnFrameworkUpdate(IFramework fw)
@@ -39,6 +43,14 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
         if (node != null) node->ToggleVisibility(false);
     }
 
+    private void ApplyHotbarLockHide()
+    {
+        var addon = (AtkUnitBase*)AtkStage.Instance()->RaptureAtkUnitManager->GetAddonByName("_ActionBar");
+        if (addon == null || !addon->IsReady) return;
+        var node = addon->GetNodeById(21);
+        if (node != null) node->ToggleVisibility(false);
+    }
+
     public void RestoreHotbarLock()
     {
         var addon = (AtkUnitBase*)AtkStage.Instance()->RaptureAtkUnitManager->GetAddonByName("_ActionBar");
@@ -50,6 +62,7 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
     public void Dispose()
     {
         framework.Update -= OnFrameworkUpdate;
+        addonLifecycle.UnregisterListener(AddonEvent.PostSetup,           "_ActionBar", OnActionBarUpdate);
         addonLifecycle.UnregisterListener(AddonEvent.PostRequestedUpdate, "_ActionBar", OnActionBarUpdate);
 
         if (config.HotbarLockHidden)

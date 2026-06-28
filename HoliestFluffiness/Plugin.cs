@@ -50,7 +50,6 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IDataManager DataManager { get; init; } = null!;
     [PluginService] private ITitleScreenMenu TitleScreenMenu { get; init; } = null!;
     [PluginService] private ITextureProvider TextureProvider { get; init; } = null!;
-    [PluginService] private INotificationManager NotificationManager { get; init; } = null!;
     [PluginService] private IGameInteropProvider GameInterop { get; init; } = null!;
     [PluginService] private IDtrBar DtrBar { get; init; } = null!;
     [PluginService] private ISigScanner SigScanner { get; init; } = null!;
@@ -85,7 +84,6 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DoorbellHandler doorbellHandler;
     private readonly CombatHitHandler combatHitHandler;
     private readonly DynamicTravelerHandler  dynamicTravelerHandler;
-    private readonly EchoPartyFinderHandler  echoPartyFinderHandler;
     private readonly ClientTweaksHandler     clientTweaksHandler;
     private readonly DutyTimerHandler dutyTimerHandler;
     private readonly CastBarHandler castBarHandler;
@@ -154,7 +152,7 @@ public sealed class Plugin : IDalamudPlugin
 
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(5); });
-        loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log, NotificationManager);
+        loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
         antiAfkHandler         = new AntiAfkHandler(configuration, Framework, Log, windowHandle);
@@ -169,7 +167,7 @@ public sealed class Plugin : IDalamudPlugin
                 noKillHandler.SetAutoLoginTarget(lastKnownName, lastKnownWorld);
         };
         charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, noKillHandler, SwitchToCharacter);
-        housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, NotificationManager, Log);
+        housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
@@ -180,9 +178,8 @@ public sealed class Plugin : IDalamudPlugin
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
         combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
-        echoPartyFinderHandler  = new EchoPartyFinderHandler(configuration, GameInterop, AddonLifecycle, DataManager, ClientState, ChatGui, Log);
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework);
-dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager, Log);
+        dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
         castBarHandler         = new CastBarHandler(configuration, SigScanner, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
         loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
         doorbellHandler.OnEntered     += OnDoorbellEntered;
@@ -229,6 +226,7 @@ dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, Dat
 
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.Draw += nearbyWindow.DrawMarkers;
+        PluginInterface.UiBuilder.Draw += () => Common.DrawToasts(configuration);
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
@@ -254,11 +252,15 @@ dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, Dat
         Condition.ConditionChange += OnConditionChange;
         ChatGui.LogMessage += OnLogMessageFlash;
 
-        unsafe
+        try
         {
-            normalCraftHook = GameInterop.HookFromSignature<NormalCraftCallbackDelegate>(NormalCraftSig, OnNormalCraftCallback);
+            unsafe
+            {
+                normalCraftHook = GameInterop.HookFromSignature<NormalCraftCallbackDelegate>(NormalCraftSig, OnNormalCraftCallback);
+            }
+            normalCraftHook.Enable();
         }
-        normalCraftHook.Enable();
+        catch (Exception ex) { Log.Warning(ex, "[HF] Plugin: NormalCraft hook failed."); }
 
         AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "SynthesisSimple", OnSynthesisSimpleRefresh);
     }
@@ -488,12 +490,10 @@ dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, Dat
             // IPC must be called on the framework thread; after the async save we may be on a pool thread
             await Framework.RunOnFrameworkThread(() =>
             {
-                NotificationManager.AddNotification(new Dalamud.Interface.ImGuiNotification.Notification
-                {
-                    Content   = $"Switching to {name} ({world})",
-                    Type      = Dalamud.Interface.ImGuiNotification.NotificationType.Info,
-                    Minimized = false,
-                });
+                Common.ShowToast(
+                    "Swap character",
+                    $"Switching to {name} ({world})"
+                );
                 // Return type is ErrorCode enum, use object to avoid InvalidCastException
                 PluginInterface.GetIpcSubscriber<string, string, object>("Lifestream.ChangeCharacter")
                                .InvokeFunc(name, world);
@@ -767,7 +767,6 @@ dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, Dat
         doorbellHandler.Dispose();
         combatHitHandler.Dispose();
         dynamicTravelerHandler.Dispose();
-        echoPartyFinderHandler.Dispose();
         clientTweaksHandler.Dispose();
         dutyTimerHandler.Dispose();
         castBarHandler.Dispose();

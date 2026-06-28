@@ -130,7 +130,9 @@ public class Configuration : IPluginConfiguration
 
     // Dynamic traveler (Social)
     public bool DynamicTravelerEnabled    { get; set; } = false;
-    public bool EchoPartyFinderEnabled    { get; set; } = false;
+
+    // Toast notifications
+    public bool ToastAdaptiveWidth { get; set; } = false;
 
     // Login enhancements (Login)
     public bool LoginSkipLogo    { get; set; } = false;

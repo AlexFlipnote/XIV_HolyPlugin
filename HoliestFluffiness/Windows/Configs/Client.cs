@@ -15,6 +15,12 @@ public partial class ConfigWindow
     {
         BeginSection("Client", "Settings that change client/application behaviour.");
 
+        ConfigCheckbox(
+            "Disable idle movie##titlemovie",
+            configuration.TitleMovieDisabled,
+            v => configuration.TitleMovieDisabled = v,
+            "Prevents the intro video from playing on the title screen");
+
         SubsectionLabel(
             "Window title",
             "When the game launches, change the window title to something else.");
@@ -74,7 +80,7 @@ public partial class ConfigWindow
 
         SubsectionLabel("No-kill",
             "Intercepts lobby errors and converts them to a reconnect attempt instead of closing the game.");
-            
+
         ConfigCheckbox(
             "Enable no-kill##nokill",
             configuration.NoKillEnabled,
@@ -116,24 +122,6 @@ public partial class ConfigWindow
         ConfigSliderInt("AFK timer threshold (s)##antiafklimit", configuration.AntiAfkTimerLimit, 5, 60,
             v => configuration.AntiAfkTimerLimit = v,
             hint: "(default 30)");
-
-        SubsectionLabel("Title screen");
-        ConfigCheckbox(
-            "Disable idle movie##titlemovie",
-            configuration.TitleMovieDisabled,
-            v => configuration.TitleMovieDisabled = v,
-            "Prevents the intro video from playing on the title screen");
-
-        SubsectionLabel("Hotbar");
-        ConfigCheckbox(
-            "Hide hotbar lock##hotbarlock",
-            configuration.HotbarLockHidden,
-            v =>
-            {
-                configuration.HotbarLockHidden = v;
-                if (!v) clientTweaksHandler?.RestoreHotbarLock();
-            },
-            "Hides the padlock icon on the action bar");
 
         EndSection(10);
     }

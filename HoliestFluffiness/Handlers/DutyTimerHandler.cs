@@ -10,20 +10,20 @@ namespace HoliestFluffiness.Handlers;
 
 public sealed unsafe class DutyTimerHandler : IDisposable
 {
-    private readonly Configuration  config;
+    private readonly Configuration   config;
     private readonly IAddonLifecycle addonLifecycle;
-    private readonly IDataManager   dataManager;
-    private readonly IPluginLog     log;
 
     private int      capturedSeconds;
     private readonly Stopwatch stopwatch = new();
+    private readonly string    timeRemainingLabel;
 
-    public DutyTimerHandler(Configuration config, IAddonLifecycle addonLifecycle, IDataManager dataManager, IPluginLog log)
+    public DutyTimerHandler(Configuration config, IAddonLifecycle addonLifecycle, IDataManager dataManager)
     {
         this.config         = config;
         this.addonLifecycle = addonLifecycle;
-        this.dataManager    = dataManager;
-        this.log            = log;
+
+        timeRemainingLabel = dataManager.GetExcelSheet<Lumina.Excel.Sheets.Addon>()
+            ?.GetRowOrDefault(2780)?.Text.ExtractText() ?? "Time remaining";
 
         addonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "ContentsFinderConfirm", OnConfirmUpdate);
         addonLifecycle.RegisterListener(AddonEvent.PostUpdate,          "ContentsFinderReady",   OnReadyUpdate);
@@ -61,9 +61,7 @@ public sealed unsafe class DutyTimerHandler : IDisposable
 
         if (remaining > 0)
         {
-            // "Time remaining" label from Addon sheet row 2780
-            var label = dataManager.GetExcelSheet<Lumina.Excel.Sheets.Addon>()?.GetRowOrDefault(2780)?.Text.ExtractText() ?? "Time remaining";
-            var text  = $"{label}: {remaining}s";
+            var text = $"{timeRemainingLabel}: {remaining}s";
             Span<byte> buf = stackalloc byte[Encoding.UTF8.GetMaxByteCount(text.Length) + 1];
             var len = Encoding.UTF8.GetBytes(text, buf);
             buf[len] = 0;

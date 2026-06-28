@@ -47,9 +47,9 @@ public sealed class CharacterDb : IDisposable
 
     public int Count() => db.Table<CharacterRecord>().Count();
 
-    public long TotalGil() => db.Table<CharacterRecord>().ToList().Where(r => r.Gil >= 0).Sum(r => r.Gil);
+    public long TotalGil() => db.ExecuteScalar<long>("SELECT COALESCE(SUM(gil), 0) FROM characters WHERE gil >= 0");
 
-    public long TotalMgp() => db.Table<CharacterRecord>().ToList().Where(r => r.Mgp >= 0).Sum(r => r.Mgp);
+    public long TotalMgp() => db.ExecuteScalar<long>("SELECT COALESCE(SUM(mgp), 0) FROM characters WHERE mgp >= 0");
 
     public int CountWithFc() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.FreeCompany));
 

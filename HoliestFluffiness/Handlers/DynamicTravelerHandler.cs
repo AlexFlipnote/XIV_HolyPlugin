@@ -4,29 +4,28 @@ using Dalamud.Game.Gui.NamePlate;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using Lumina.Excel;
 using Lumina.Excel.Sheets;
 
 namespace HoliestFluffiness.Handlers;
 
 public sealed unsafe class DynamicTravelerHandler : IDisposable
 {
-    private readonly Configuration config;
-    private readonly INamePlateGui  namePlateGui;
-    private readonly IDataManager   dataManager;
+    private readonly Configuration       config;
+    private readonly INamePlateGui       namePlateGui;
+    private readonly ExcelSheet<World>?  worldSheet;
 
     public DynamicTravelerHandler(Configuration config, INamePlateGui namePlateGui, IDataManager dataManager)
     {
         this.config       = config;
         this.namePlateGui = namePlateGui;
-        this.dataManager  = dataManager;
+        worldSheet        = dataManager.GetExcelSheet<World>();
         namePlateGui.OnDataUpdate += OnNamePlateDataUpdate;
     }
 
     private void OnNamePlateDataUpdate(INamePlateUpdateContext context, IReadOnlyList<INamePlateUpdateHandler> handlers)
     {
         if (!config.DynamicTravelerEnabled) return;
-
-        var worldSheet = dataManager.GetExcelSheet<World>();
 
         foreach (var handler in handlers)
         {

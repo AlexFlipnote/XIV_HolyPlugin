@@ -8,7 +8,6 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
@@ -16,7 +15,7 @@ using HoliestFluffiness.Windows;
 
 namespace HoliestFluffiness;
 
-public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log, INotificationManager notificationManager)
+public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log)
 {
     public static readonly Dictionary<uint, string> TrackedItems = new()
     {
@@ -313,49 +312,50 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var toastMsg = BuildChatMessage(character, fc, plate, privateHouse, fcHouse);
                 if (toastMsg != null)
                     await framework.RunOnFrameworkThread(() =>
-                        notificationManager.AddNotification(new Notification
-                        {
-                            Content         = toastMsg.ToString(),
-                            Type            = NotificationType.Info,
-                            InitialDuration = TimeSpan.FromSeconds(10),
-                            Minimized       = false,
-                        }));
+                        Common.ShowToast(
+                            "Character Info", toastMsg.ToString(),
+                            durationSec: 10f));
                 break;
 
             default: // Echo
-                var message = BuildChatMessage(character, fc, plate, privateHouse, fcHouse);
+                var message = BuildChatMessage(character, fc, plate, privateHouse, fcHouse, includeHeader: true);
                 if (message != null)
                     await framework.RunOnFrameworkThread(() => chatGui.Print(message));
                 break;
         }
     }
 
-    private SeString? BuildChatMessage(string? character, FcData? fc, SeString? plate, string? privateHouse, string? fcHouse)
+    private SeString? BuildChatMessage(string? character, FcData? fc, SeString? plate, string? privateHouse, string? fcHouse, bool includeHeader = false)
     {
         if (character == null && fc == null && plate == null && privateHouse == null && fcHouse == null) return null;
 
-        var builder = new SeStringBuilder().AddText("Character info loaded.");
+        var builder = new SeStringBuilder();
+        var spacer = "";
+        if (includeHeader) {
+            builder.AddText("Character info loaded.\n");
+            spacer = "    ";
+        }
 
         foreach (var slot in configuration.LoginInfoOrder)
         {
             switch (slot)
             {
                 case 0 when character != null:
-                    builder.AddText($"\n    》 {character}");
+                    builder.AddText($"{spacer}》 {character}");
                     break;
                 case 1 when plate != null:
-                    builder.AddText("\n    》 Search info: ");
+                    builder.AddText($"\n{spacer}》 Search info: ");
                     foreach (var payload in plate.Payloads)
                         builder.Add(payload);
                     break;
                 case 2 when privateHouse != null:
-                    builder.AddText($"\n    》 Private house: {privateHouse}");
+                    builder.AddText($"\n{spacer}》 Private house: {privateHouse}");
                     break;
                 case 3 when fc != null:
-                    builder.AddText($"\n    》 Free Company: {fc.Display}");
+                    builder.AddText($"\n{spacer}》 Free Company: {fc.Display}");
                     break;
                 case 4 when fcHouse != null:
-                    builder.AddText($"\n    》 FC house: {fcHouse}");
+                    builder.AddText($"\n{spacer}》 FC house: {fcHouse}");
                     break;
             }
         }
@@ -481,30 +481,10 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    private async Task<long> CollectGilAsync(CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
+    private Task<long> CollectGilAsync(CancellationToken token) => CollectCurrencyAsync(token, 1);
+    private Task<long> CollectMgpAsync(CancellationToken token) => CollectCurrencyAsync(token, 29);
 
-        long result = -1; // -1 = not yet cached
-
-        await framework.RunOnFrameworkThread(() =>
-        {
-            unsafe
-            {
-                var inv = InventoryManager.Instance();
-                if (inv == null) return;
-                var container = inv->GetInventoryContainer(InventoryType.Currency);
-                if (container == null) return;
-                var slot = container->GetInventorySlot(0);
-                if (slot == null || slot->ItemId != 1) return; // slot 0 is Gil (item ID 1)
-                result = slot->Quantity;
-            }
-        });
-
-        return result;
-    }
-
-    private async Task<long> CollectMgpAsync(CancellationToken token)
+    private async Task<long> CollectCurrencyAsync(CancellationToken token, uint itemId)
     {
         token.ThrowIfCancellationRequested();
 
@@ -521,7 +501,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 for (int i = 0; i < (int)container->Size; i++)
                 {
                     var slot = container->GetInventorySlot(i);
-                    if (slot == null || slot->ItemId != 29) continue; // 29 = Manderville Gold Saucer Points
+                    if (slot == null || slot->ItemId != itemId) continue;
                     result = slot->Quantity;
                     break;
                 }

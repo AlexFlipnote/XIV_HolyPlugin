@@ -6,7 +6,6 @@ using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Chat;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -21,7 +20,6 @@ public sealed class HousingLotteryHandler : IDisposable
     private readonly IAddonEventManager addonEventManager;
     private readonly IObjectTable objectTable;
     private readonly IChatGui chatGui;
-    private readonly INotificationManager notificationManager;
     private readonly IPluginLog log;
 
     private IAddonEventHandle? _resultYesHandle;
@@ -49,16 +47,14 @@ public sealed class HousingLotteryHandler : IDisposable
 
     public HousingLotteryHandler(
         CharacterDb characterDb, IAddonLifecycle addonLifecycle, IAddonEventManager addonEventManager,
-        IObjectTable objectTable, IChatGui chatGui,
-        INotificationManager notificationManager, IPluginLog log)
+        IObjectTable objectTable, IChatGui chatGui, IPluginLog log)
     {
-        this.characterDb         = characterDb;
-        this.addonLifecycle      = addonLifecycle;
-        this.addonEventManager   = addonEventManager;
-        this.objectTable         = objectTable;
-        this.chatGui             = chatGui;
-        this.notificationManager = notificationManager;
-        this.log                 = log;
+        this.characterDb       = characterDb;
+        this.addonLifecycle    = addonLifecycle;
+        this.addonEventManager = addonEventManager;
+        this.objectTable       = objectTable;
+        this.chatGui           = chatGui;
+        this.log               = log;
 
         addonLifecycle.RegisterListener(AddonEvent.PostSetup,    AddonName, OnAddon);
         addonLifecycle.RegisterListener(AddonEvent.PostRefresh,  AddonName, OnAddon);
@@ -341,14 +337,7 @@ public sealed class HousingLotteryHandler : IDisposable
         }
     }
 
-    private void Notify(string msg) =>
-        notificationManager.AddNotification(new Notification
-        {
-            Content         = $"[HF] {msg}",
-            Type            = NotificationType.Info,
-            InitialDuration = TimeSpan.FromSeconds(6),
-            Minimized       = false,
-        });
+    private static void Notify(string msg) => Common.ShowToast("Lottery tracker", msg);
 
     public void Dispose()
     {

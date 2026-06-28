@@ -22,31 +22,28 @@ public partial class ConfigWindow
     {
         BeginSection("Login", "Settings for what happens when you log in with a character.");
 
+        ConfigCheckbox(
+            "Show on character select##charPicker",
+            configuration.CharacterPickerOnMainMenu,
+            v => configuration.CharacterPickerOnMainMenu = v,
+            "Shows a character picker popup when you enter the main menu");
+
         // ── Login info ────────────────────────────────────────────────────────
-        SubsectionLabel("Login info");
+        SubsectionLabel(
+            "Login info",
+            "Information that will be shown when you login to a character.");
+
+        DrawInfoOrderList();
 
         bool anyEnabled = configuration.ShowCharacterInfo
             || configuration.InfoEnabled
             || configuration.AdventurePlateEnabled
             || configuration.ShowPrivateHouseLocation
             || configuration.ShowFcHouseLocation;
-        SectionRow();
-        Common.DimmedText("Simulate login:");
-        ImGui.SameLine();
+
         ImGui.BeginDisabled(!anyEnabled);
-        PushButton();
-        if (ImGui.Button("Test##loginall"))
-        {
-            testAllCts?.Cancel();
-            testAllCts?.Dispose();
-            testAllCts = new CancellationTokenSource();
-            Task.Run(() => loginInfoHandler.RunAsync(testAllCts.Token, instant: true));
-        }
-        PopButton();
-        ImGui.EndDisabled();
 
-        RowGap();
-
+        SectionRow();
         Common.DimmedText("Show as:");
         ImGui.SameLine();
         foreach (var (label, val) in new (string, LoginInfoDisplay)[]
@@ -65,10 +62,7 @@ public partial class ConfigWindow
         }
         ImGui.NewLine();
 
-        ImGui.Dummy(new Vector2(0, 8));
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-        Common.GoldText("What to show");
-        ImGui.SameLine();
+        SectionRow();
         PushButton();
         if (ImGui.Button("Reset order##loginorder"))
         {
@@ -77,55 +71,17 @@ public partial class ConfigWindow
         }
         PopButton();
 
-        DrawInfoOrderList();
-
-        // ── Fashion accessory ─────────────────────────────────────────────────
-        SubsectionLabel("Fashion accessory");
-
-        SectionRow();
-        Common.DimmedText("Simulate login:");
         ImGui.SameLine();
-        ImGui.BeginDisabled(!configuration.AccessoryEnabled);
         PushButton();
-        if (ImGui.Button("Test##accessory"))
+        if (ImGui.Button("Test##loginall"))
         {
-            accessoryCts?.Cancel();
-            accessoryCts?.Dispose();
-            accessoryCts = new CancellationTokenSource();
-            Task.Run(() => accessoryHandler.RunAsync(accessoryCts.Token));
+            testAllCts?.Cancel();
+            testAllCts?.Dispose();
+            testAllCts = new CancellationTokenSource();
+            Task.Run(() => loginInfoHandler.RunAsync(testAllCts.Token, instant: true));
         }
         PopButton();
         ImGui.EndDisabled();
-
-        RowGap(6);
-
-        PushCheckbox();
-        var accessoryEnabled = configuration.AccessoryEnabled;
-        bool accessoryChanged = ImGui.Checkbox("Equip accessory on login", ref accessoryEnabled);
-        PopCheckbox();
-        if (accessoryChanged)
-        {
-            configuration.AccessoryEnabled = accessoryEnabled;
-            configuration.Save();
-        }
-
-        ImGui.Dummy(new Vector2(0, 4));
-        ImGui.BeginDisabled(!accessoryEnabled);
-
-        SectionRow();
-        var accessoryName = configuration.AccessoryName;
-        ImGui.SetNextItemWidth(200);
-        PushInput();
-        if (ImGui.InputText("Accessory name", ref accessoryName, 128))
-        {
-            configuration.AccessoryName = accessoryName;
-            configuration.Save();
-        }
-        PopInput();
-
-        ImGui.EndDisabled();
-
-        DrawRestrictionsSubsection(accessoryEnabled);
 
         // ── Login enhancements ────────────────────────────────────────────────
         SubsectionLabel("Login enhancements");
@@ -142,14 +98,48 @@ public partial class ConfigWindow
             v => configuration.PreloadTerritory = v,
             "Starts loading the destination zone in the background while in the login queue");
 
-        // ── Character picker ──────────────────────────────────────────────────
-        SubsectionLabel("Character picker");
+        // ── Fashion accessory ─────────────────────────────────────────────────
+        SubsectionLabel("Fashion accessory");
 
-        ConfigCheckbox(
-            "Show on character select##charPicker",
-            configuration.CharacterPickerOnMainMenu,
-            v => configuration.CharacterPickerOnMainMenu = v,
-            "Shows a character picker popup when you enter the main menu");
+        SectionRow();
+        PushCheckbox();
+        var accessoryEnabled = configuration.AccessoryEnabled;
+        bool accessoryChanged = ImGui.Checkbox("Equip accessory on login", ref accessoryEnabled);
+        PopCheckbox();
+
+        if (accessoryChanged)
+        {
+            configuration.AccessoryEnabled = accessoryEnabled;
+            configuration.Save();
+        }
+
+        ImGui.BeginDisabled(!accessoryEnabled);
+
+        ImGui.SameLine();
+        PushButton();
+        if (ImGui.Button("Test##accessory"))
+        {
+            accessoryCts?.Cancel();
+            accessoryCts?.Dispose();
+            accessoryCts = new CancellationTokenSource();
+            Task.Run(() => accessoryHandler.RunAsync(accessoryCts.Token));
+        }
+        PopButton();
+
+        SectionRow();
+        var accessoryName = configuration.AccessoryName;
+        ImGui.SetNextItemWidth(200);
+        PushInput();
+        if (ImGui.InputText("Accessory name", ref accessoryName, 128))
+        {
+            configuration.AccessoryName = accessoryName;
+            configuration.Save();
+        }
+        PopInput();
+
+        ImGui.EndDisabled();
+
+        DrawRestrictionsSubsection(accessoryEnabled);
 
         EndSection(10);
     }
@@ -216,10 +206,8 @@ public partial class ConfigWindow
 
     private void DrawRestrictionsSubsection(bool enabled)
     {
-        SubsectionLabel("Restrictions");
-
         ImGui.BeginDisabled(!enabled);
-        SectionRow();
+        RowGap(8);
         var maxFreeSlots = configuration.AccessoryInventory;
         ImGui.SetNextItemWidth(90);
         PushInput();
@@ -245,11 +233,8 @@ public partial class ConfigWindow
         ImGui.SameLine();
         Common.DimmedText("(0 = skip check)");
 
-        ImGui.EndDisabled();
-
-        SubsectionLabel("Whitelist", "Characters listed here will bypass all restrictions.");
-        ImGui.BeginDisabled(!enabled);
-
+        RowGap(4);
+        Common.DimmedText("Characters listed here will bypass all restrictions.");
         int removeIdx = -1;
         for (int i = 0; i < configuration.AccessoryWhitelist.Count; i++)
         {

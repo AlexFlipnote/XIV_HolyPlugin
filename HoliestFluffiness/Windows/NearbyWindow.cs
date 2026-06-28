@@ -247,7 +247,7 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.ColSecondary);
         ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
         ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, Theme.ColGoldSub);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 10));
 
         const ImGuiWindowFlags flags =
