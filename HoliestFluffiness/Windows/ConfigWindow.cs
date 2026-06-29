@@ -3,6 +3,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -20,6 +21,7 @@ public partial class ConfigWindow : Window
     private readonly PhysicsHandler physicsHandler;
     private readonly AntiAfkHandler antiAfkHandler;
     private readonly ReadyCheckHandler readyCheckHandler;
+    private FoodCheckHandler? foodCheckHandler;
     private readonly IObjectTable objectTable;
     private readonly CharacterDb characterDb;
     private readonly IDalamudPluginInterface pluginInterface;
@@ -28,6 +30,9 @@ public partial class ConfigWindow : Window
     private readonly Action<CharacterRecord, HousingBidRecord> onGoToBid;
     private readonly Action onClientSettingsChanged;
     private readonly FileDialogManager fileDialogManager = new() { AddedWindowFlags = ImGuiWindowFlags.NoCollapse };
+
+    private IFontHandle? titleFont;
+    internal void SetTitleFont(IFontHandle font) => titleFont = font;
 
     private int selectedSection;
 
@@ -60,6 +65,8 @@ public partial class ConfigWindow : Window
         Size          = new Vector2(600, 420);
         SizeCondition = ImGuiCond.FirstUseEver;
     }
+
+    public void SetFoodCheckHandler(FoodCheckHandler h) => foodCheckHandler = h;
 
     public void NavigateTo(int section)
     {
@@ -106,6 +113,7 @@ public partial class ConfigWindow : Window
         accessoryCts?.Cancel();
         bulkUpdateCts?.Cancel();
         repairHandler.TestPct = null;
+        foodCheckHandler?.Invalidate();
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────────
@@ -124,7 +132,6 @@ public partial class ConfigWindow : Window
         SidebarItem("Client", 0);
         SidebarItem("Login", 1);
         SidebarItem("Indicators", 2);
-        SidebarItem("Combat", 10);
         SidebarItem("Social", 8);
 
         ImGui.Dummy(new Vector2(0, 4));
@@ -206,7 +213,6 @@ public partial class ConfigWindow : Window
             case 0: DrawClientSection();      break;
             case 1: DrawLoginSection();       break;
             case 2:  DrawIndicatorsSection();  break;
-            case 10: DrawCombatSection();      break;
             case 4: DrawDatabaseSection();    break;
             case 5: DrawCharactersSection();  break;
             case 6: DrawBidsSection();        break;
@@ -251,7 +257,8 @@ public partial class ConfigWindow : Window
         ImGui.Dummy(new Vector2(0, 6));
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-        ImGui.TextUnformatted(title);
+        using (titleFont?.Push())
+            ImGui.TextUnformatted(title);
         if (afterTitle != null) { ImGui.SameLine(); afterTitle(); }
         ImGui.PopStyleColor();
         if (desc != null)

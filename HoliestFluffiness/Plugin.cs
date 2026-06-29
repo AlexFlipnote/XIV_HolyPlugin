@@ -16,6 +16,8 @@ using Dalamud.Game.Command;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Interface.GameFonts;
+using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -88,6 +90,9 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DutyTimerHandler dutyTimerHandler;
     private readonly CastBarHandler castBarHandler;
     private readonly LoginEnhancementHandler loginEnhancementHandler;
+    private readonly FoodCheckHandler foodCheckHandler;
+    private readonly FoodCheckOverlay foodCheckOverlay;
+    private readonly IFontHandle titleFont;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -182,14 +187,20 @@ public sealed class Plugin : IDalamudPlugin
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
         castBarHandler         = new CastBarHandler(configuration, SigScanner, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
         loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
+        foodCheckHandler       = new FoodCheckHandler(configuration, PartyList, ObjectTable, ClientState, ChatGui, DataManager, Framework, GameInterop, Log, PluginInterface.AssemblyLocation.DirectoryName!);
+        foodCheckOverlay       = new FoodCheckOverlay(configuration, foodCheckHandler, GameGui);
+        titleFont              = PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamily.Axis, 32f));
         doorbellHandler.OnEntered     += OnDoorbellEntered;
         doorbellHandler.OnLeft        += OnDoorbellLeft;
         doorbellHandler.OnAlreadyHere += OnDoorbellAlreadyHere;
+        readyCheckHandler.ReadyCheckEnded += foodCheckHandler.Invalidate;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
         pingChartWindow        = new PingChartWindow(serverInfoHandler, configuration);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
+        configWindow.SetTitleFont(titleFont);
+        configWindow.SetFoodCheckHandler(foodCheckHandler);
         configWindow.SetNearbyHandler(nearbyHandler);
         configWindow.SetCombatHitHandler(combatHitHandler);
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
@@ -202,6 +213,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(readyCheckOverlay);
         windowSystem.AddWindow(nearbyWindow);
         windowSystem.AddWindow(pingChartWindow);
+        windowSystem.AddWindow(foodCheckOverlay);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -687,6 +699,7 @@ public sealed class Plugin : IDalamudPlugin
         if (configuration.ClientFlashOnReadyCheck)
             FlashTaskbar();
         readyCheckHandler.OnBegin();
+        foodCheckHandler.OnReadyCheck();
     }
 
     private void ApplyClientTitle()
@@ -771,6 +784,9 @@ public sealed class Plugin : IDalamudPlugin
         dutyTimerHandler.Dispose();
         castBarHandler.Dispose();
         loginEnhancementHandler.Dispose();
+        foodCheckHandler.Dispose();
+        foodCheckOverlay.Dispose();
+        titleFont.Dispose();
         characterDb.Dispose();
     }
 }

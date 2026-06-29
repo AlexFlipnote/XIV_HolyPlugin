@@ -2,8 +2,6 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Textures.TextureWraps;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -13,7 +11,7 @@ using Lumina.Data.Files;
 
 namespace HoliestFluffiness.Windows;
 
-public class ReadyCheckOverlay : Window, IDisposable
+public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
 {
     private readonly Configuration config;
     private readonly ReadyCheckHandler handler;
@@ -27,12 +25,6 @@ public class ReadyCheckOverlay : Window, IDisposable
         this.config = config; this.handler = handler; this.gameGui = gameGui;
         readyCheckTex = textureProvider.CreateFromTexFile(dataManager.GetFile<TexFile>("ui/uld/ReadyCheck_hr1.tex")!);
         notPresentTex = textureProvider.GetFromGameIcon(61504).RentAsync().Result;
-
-        ForceMainWindow = true;
-        RespectCloseHotkey = false;
-        DisableWindowSounds = true;
-        Flags = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoMove |
-                ImGuiWindowFlags.NoMouseInputs | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoNav;
     }
 
     public void Dispose()
@@ -44,12 +36,6 @@ public class ReadyCheckOverlay : Window, IDisposable
     public override void PreOpenCheck()
     {
         IsOpen = config.ReadyCheckDrawOverlay && handler.IsValid;
-    }
-
-    public override void PreDraw()
-    {
-        Size = ImGuiHelpers.MainViewport.Size;
-        Position = ImGuiHelpers.MainViewport.Pos;
     }
 
     public override unsafe void Draw()
@@ -85,7 +71,7 @@ public class ReadyCheckOverlay : Window, IDisposable
 
     private unsafe void DrawPartyList(int idx, ReadyCheckStatus state, AddonPartyList* pList, ImDrawListPtr drawList)
     {
-        if (idx is < 0 or > 7 || (nint)pList == nint.Zero || !IsVisible(pList->AtkUnitBase)) return;
+        if (idx is < 0 or > 7 || (nint)pList == nint.Zero || !Common.IsAddonVisible(&pList->AtkUnitBase)) return;
         var m    = pList->PartyMembers[idx];
         var node = m.PartyMemberComponent->OwnerNode;
         var icon = m.ClassJobIcon;
@@ -99,7 +85,7 @@ public class ReadyCheckOverlay : Window, IDisposable
 
     private unsafe void DrawAlliance(int idx, ReadyCheckStatus state, AddonAllianceListX* pList, ImDrawListPtr drawList)
     {
-        if (idx is < 0 or > 7 || (nint)pList == nint.Zero || !IsVisible(pList->AtkUnitBase)) return;
+        if (idx is < 0 or > 7 || (nint)pList == nint.Zero || !Common.IsAddonVisible(&pList->AtkUnitBase)) return;
         var m    = pList->AllianceMembers[idx];
         var node = m.ComponentBase->OwnerNode;
         var icon = m.ComponentBase->GetImageNodeById(9)->GetAsAtkImageNode();
@@ -112,7 +98,7 @@ public class ReadyCheckOverlay : Window, IDisposable
 
     private unsafe void DrawCrossWorld(int groupIdx, int memberIdx, ReadyCheckStatus state, AddonAlliance48* pList, ImDrawListPtr drawList)
     {
-        if (groupIdx is < 1 or > 5 || memberIdx is < 0 or > 7 || (nint)pList == nint.Zero || !IsVisible(pList->AtkUnitBase)) return;
+        if (groupIdx is < 1 or > 5 || memberIdx is < 0 or > 7 || (nint)pList == nint.Zero || !Common.IsAddonVisible(&pList->AtkUnitBase)) return;
         var alliance = pList->Alliances[groupIdx - 1];
         var aNode    = alliance.ComponentBase->OwnerNode;
         var member   = alliance.Members[memberIdx];
@@ -135,10 +121,4 @@ public class ReadyCheckOverlay : Window, IDisposable
             drawList.AddImage(notPresentTex.Handle, pos, pos + size);
     }
 
-    private static unsafe bool IsVisible(AtkUnitBase addon)
-    {
-        if (!addon.IsVisible || addon.RootNode is null || !addon.RootNode->IsVisible()) return false;
-        if ((addon.VisibilityFlags & 5) is not 0) return false;
-        return true;
-    }
 }

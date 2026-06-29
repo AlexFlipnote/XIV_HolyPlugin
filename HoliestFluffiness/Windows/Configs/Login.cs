@@ -46,21 +46,16 @@ public partial class ConfigWindow
         SectionRow();
         Common.DimmedText("Show as:");
         ImGui.SameLine();
-        foreach (var (label, val) in new (string, LoginInfoDisplay)[]
+        var loginDisplayModes = new[] { "Echo text", "Popup", "Toast" };
+        var displayIndex = (int)configuration.LoginInfoDisplay;
+        ImGui.SetNextItemWidth(120);
+        PushInput();
+        if (ImGui.Combo("##logininfodisplay", ref displayIndex, loginDisplayModes, loginDisplayModes.Length))
         {
-            ("Echo text", LoginInfoDisplay.Echo),
-            ("Popup",     LoginInfoDisplay.Popup),
-            ("Toast",     LoginInfoDisplay.Toast),
-        })
-        {
-            if (ImGui.RadioButton(label, configuration.LoginInfoDisplay == val))
-            {
-                configuration.LoginInfoDisplay = val;
-                configuration.Save();
-            }
-            ImGui.SameLine();
+            configuration.LoginInfoDisplay = (LoginInfoDisplay)displayIndex;
+            configuration.Save();
         }
-        ImGui.NewLine();
+        PopInput();
 
         SectionRow();
         PushButton();

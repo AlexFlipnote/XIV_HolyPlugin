@@ -212,24 +212,33 @@ public sealed class NearbyWindow : Window, IDisposable
     {
         const string historyLabel = "Target History";
         const float  margin       = 24f;
-        var buttonW   = ImGui.CalcTextSize(historyLabel).X + ImGui.GetStyle().FramePadding.X * 2;
+        var showHistory = config.NearbyShowTargeters;
+
+        if (!showHistory) historyOpen = false;
+
+        var buttonW   = showHistory ? ImGui.CalcTextSize(historyLabel).X + ImGui.GetStyle().FramePadding.X * 2 : 0f;
         var hasActive = handler.CurrentTargeters.Count > 0;
 
         ImGui.SetCursorPosX(margin);
         Common.PushSearchInput();
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - margin - buttonW - ImGui.GetStyle().ItemSpacing.X);
+        var searchW = ImGui.GetContentRegionAvail().X - margin
+                      - (showHistory ? buttonW + ImGui.GetStyle().ItemSpacing.X : 0f);
+        ImGui.SetNextItemWidth(searchW);
         ImGui.InputTextWithHint("##nearbysearch", $"Search... ({handler.NearbyPlayers.Count} nearby)", ref searchText, 64);
         Common.PopSearchInput();
 
-        ImGui.SameLine();
+        if (showHistory)
+        {
+            ImGui.SameLine();
 
-        var isActive = historyOpen || hasActive;
-        if (isActive) Common.PushGoldButton(); else Common.PushGreyButton();
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
-        if (ImGui.Button(historyLabel))
-            ToggleHistory();
-        ImGui.PopStyleVar();
-        ImGui.PopStyleColor(4);
+            var isActive = historyOpen || hasActive;
+            if (isActive) Common.PushGoldButton(); else Common.PushGreyButton();
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+            if (ImGui.Button(historyLabel))
+                ToggleHistory();
+            ImGui.PopStyleVar();
+            ImGui.PopStyleColor(4);
+        }
     }
 
     private void ToggleHistory() => historyOpen = !historyOpen;

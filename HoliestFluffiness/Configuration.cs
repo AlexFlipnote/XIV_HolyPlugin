@@ -20,7 +20,7 @@ public class Configuration : IPluginConfiguration
     public int AccessoryInventoryMin { get; set; } = 0;
     public string AccessoryName { get; set; } = "Angel Wings";
     public List<string> AccessoryWhitelist { get; set; } = [];
-    public bool ShowCharacterInfo { get; set; } = true;
+    public bool ShowCharacterInfo { get; set; } = false;
     public bool InfoEnabled { get; set; } = false;
     public bool AdventurePlateEnabled { get; set; } = false;
     public bool ShowPrivateHouseLocation { get; set; } = false;
@@ -42,7 +42,7 @@ public class Configuration : IPluginConfiguration
     // Repair section
     public bool RepairLowEnabled { get; set; } = false;
     public float RepairLowThreshold { get; set; } = 50f;
-    public bool RepairCriticalEnabled { get; set; } = true;
+    public bool RepairCriticalEnabled { get; set; } = false;
     public float RepairCriticalThreshold { get; set; } = 25f;
 
     // Client section
@@ -59,7 +59,7 @@ public class Configuration : IPluginConfiguration
     public bool CharacterPickerOnMainMenu { get; set; } = false;
 
     // NoKill section
-    public bool NoKillEnabled { get; set; } = true;
+    public bool NoKillEnabled { get; set; } = false;
     public bool NoKillDisablePopup { get; set; } = false;
 
     // Physics section
@@ -82,10 +82,10 @@ public class Configuration : IPluginConfiguration
     // Nearby section
     public bool    NearbyEnabled             { get; set; } = false;
     public bool    NearbyDtrEnabled          { get; set; } = false;
-    public bool    NearbyShowTargeters       { get; set; } = true;
+    public bool    NearbyShowTargeters       { get; set; } = false;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;
     public bool    NearbyHideInCombat        { get; set; } = false;
-    public bool    NearbyHideInDuty          { get; set; } = true;
+    public bool    NearbyHideInDuty          { get; set; } = false;
     public bool    NearbyFilterAfk           { get; set; } = false;
     public bool    NearbyFilterLowLevel      { get; set; } = false;
     public bool    NearbyDebugSelf           { get; set; } = false;
@@ -137,6 +137,18 @@ public class Configuration : IPluginConfiguration
     // Login enhancements (Login)
     public bool LoginSkipLogo    { get; set; } = false;
     public bool PreloadTerritory { get; set; } = false;
+
+    // Food check section
+    public bool   FoodCheckEcho         { get; set; } = false;
+    public bool   FoodCheckHighlight    { get; set; } = false;
+    public bool   FoodCheckSound        { get; set; } = false;
+    public string FoodCheckSoundPath    { get; set; } = "";
+    public float  FoodCheckSoundVolume  { get; set; } = 0.5f;
+    public int    FoodCheckThreshold    { get; set; } = 10;
+    public bool FoodCheckScopeHighEnd  { get; set; } = false;
+    public bool FoodCheckScopeSavage   { get; set; } = false;
+    public bool FoodCheckScopeExtreme  { get; set; } = false;
+    public bool FoodCheckScopeAny      { get; set; } = false;
 
     // Combat section
     // DC – Direct Critical Damage

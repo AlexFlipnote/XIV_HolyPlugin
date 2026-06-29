@@ -28,6 +28,7 @@ public class ReadyCheckHandler : IDisposable
     private HashSet<ulong> savedPartyIds = [];
 
     public bool IsValid { get; private set; }
+    public event Action? ReadyCheckEnded;
 
     public ReadyCheckHandler(Configuration config, IGameInteropProvider gameInterop, IClientState clientState, IChatGui chatGui, IFramework framework, IObjectTable objectTable, IPluginLog log)
     {
@@ -99,6 +100,7 @@ public class ReadyCheckHandler : IDisposable
         ProcessData();
         CapturePartyIds();
         AfterReadyCheck();
+        ReadyCheckEnded?.Invoke();
     }
 
     private void AfterReadyCheck()

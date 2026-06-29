@@ -7,6 +7,8 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace HoliestFluffiness;
 
@@ -382,4 +384,82 @@ internal static class Common
 
     private static uint ToastU32(Vector4 c, float a) =>
         ImGui.ColorConvertFloat4ToU32(c with { W = Math.Clamp(a, 0f, 1f) });
+
+    // ── Overlay draw helpers ──────────────────────────────────────────────────
+
+    internal static (float expand, float alpha) CalcPulse(
+        float maxPx = 15f, float period = 2f, float active = 0.7f, float maxAlpha = 0.75f)
+    {
+        var phase = (float)(ImGui.GetTime() % period) / period;
+        if (phase >= active) return (0f, 0f);
+        var t = phase / active;
+        return (t * maxPx, maxAlpha * (1f - t));
+    }
+
+    internal static void DrawHighlightRect(ImDrawListPtr dl, Vector2 min, Vector2 max,
+        float rounding, Vector4 color, string? text = null, bool pulse = true, float scale = 1f)
+    {
+        dl.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32(color with { W = 0.25f }), rounding);
+        dl.AddRect(min, max, ImGui.ColorConvertFloat4ToU32(color), rounding);
+
+        if (pulse)
+        {
+            var (expand, baseAlpha) = CalcPulse();
+            if (baseAlpha > 0.005f)
+            {
+                for (var i = 0; i <= 8; i++)
+                {
+                    var frac  = (float)i / 8;
+                    var size  = expand * frac * scale;
+                    var alpha = baseAlpha * (1f - frac);
+                    if (alpha < 0.005f) continue;
+                    dl.AddRect(
+                        min - new Vector2(size),
+                        max + new Vector2(size),
+                        ImGui.ColorConvertFloat4ToU32(color with { W = alpha }),
+                        rounding + size);
+                }
+            }
+        }
+
+        if (text != null)
+        {
+            var textSize = ImGui.CalcTextSize(text);
+            var textPos  = new Vector2(
+                max.X - 5f - textSize.X,
+                min.Y + ((max.Y - min.Y) - textSize.Y) / 2f);
+            DrawTextShadowed(dl, text, textPos);
+        }
+    }
+
+    internal static void DrawTextShadowed(ImDrawListPtr dl, string text, Vector2 pos)
+    {
+        var shadow = ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 0f, 0f, 1f));
+        var white  = ImGui.ColorConvertFloat4ToU32(Theme.ColWhite);
+        for (var dx = -1; dx <= 1; dx++)
+        for (var dy = -1; dy <= 1; dy++)
+            if (dx != 0 || dy != 0)
+                dl.AddText(pos + new Vector2(dx, dy), shadow, text);
+        dl.AddText(pos, white, text);
+    }
+
+    internal static unsafe Vector2 GetNodePosition(AtkResNode* node)
+    {
+        var pos = new Vector2(node->X, node->Y);
+        var par = node->ParentNode;
+        while (par != null)
+        {
+            pos *= new Vector2(par->ScaleX, par->ScaleY);
+            pos += new Vector2(par->X,      par->Y);
+            par  = par->ParentNode;
+        }
+        return pos;
+    }
+
+    internal static unsafe bool IsAddonVisible(AtkUnitBase* addon)
+    {
+        if (!addon->IsVisible || addon->RootNode is null || !addon->RootNode->IsVisible()) return false;
+        if ((addon->VisibilityFlags & 5) is not 0) return false;
+        return true;
+    }
 }
