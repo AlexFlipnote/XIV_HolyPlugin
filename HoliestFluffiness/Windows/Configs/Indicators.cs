@@ -124,7 +124,8 @@ public partial class ConfigWindow
 
         // ── Food check ────────────────────────────────────────────────────────
         SubsectionLabel("Food Check Helper",
-            "Warns when party members are missing or running low on food. Triggers automatically on ready check and countdown start.");
+            "Warns when party members are missing or running low on food. Triggers automatically on ready check and countdown start. " +
+            "You can also use '/hf foodcheck' or '/foodcheck' to check on demand.");
 
         SectionRow();
         PushButton();
@@ -174,7 +175,7 @@ public partial class ConfigWindow
             "High-end duty##foodscopehighend",
             configuration.FoodCheckScopeHighEnd,
             v => configuration.FoodCheckScopeHighEnd = v,
-            "Ultimate, current Savage/Unreal");
+            "Ultimate, current savage/unreal");
 
         ConfigCheckbox(
             "Any savage##foodscopesavage",

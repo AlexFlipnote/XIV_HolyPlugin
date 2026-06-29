@@ -33,11 +33,12 @@ namespace HoliestFluffiness;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private const string CommandName    = "/hf";
-    private const string HwCommand     = "/hw";
-    private const string HwPlusCommand = "/hw+";
-    private const string HwMinCommand  = "/hw-";
-    private const string NearbyCommand = "/nearby";
+    private const string CommandName       = "/hf";
+    private const string HwCommand        = "/hw";
+    private const string HwPlusCommand    = "/hw+";
+    private const string HwMinCommand     = "/hw-";
+    private const string NearbyCommand    = "/nearby";
+    private const string FoodCheckCommand = "/foodcheck";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -217,7 +218,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' for the about page, '/hf ping' for the ping chart."
+            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' for the about page, '/hf ping' for the ping chart, '/hf foodcheck' to run a food check."
         });
         CommandManager.AddHandler(HwCommand, new CommandInfo(OnHwCommand)
         {
@@ -234,6 +235,10 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(NearbyCommand, new CommandInfo(OnNearbyCommand)
         {
             HelpMessage = "Toggle the Nearby Players window."
+        });
+        CommandManager.AddHandler(FoodCheckCommand, new CommandInfo(OnFoodCheckCommand)
+        {
+            HelpMessage = "Run a food check on the current party (alias for /hf foodcheck)."
         });
 
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -291,6 +296,9 @@ public sealed class Plugin : IDalamudPlugin
             case "ping":
                 pingChartWindow.IsOpen = !pingChartWindow.IsOpen;
                 break;
+            case "foodcheck":
+                foodCheckHandler.ForceCheck();
+                break;
             default:
                 configWindow.IsOpen = !configWindow.IsOpen;
                 break;
@@ -339,6 +347,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnHwPlusCommand(string command, string args)  => CycleCharacter(+1);
     private void OnHwMinusCommand(string command, string args) => CycleCharacter(-1);
+
+    private void OnFoodCheckCommand(string command, string args) => foodCheckHandler.ForceCheck();
 
     private void OnNearbyCommand(string command, string args)
     {
@@ -756,6 +766,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(HwPlusCommand);
         CommandManager.RemoveHandler(HwMinCommand);
         CommandManager.RemoveHandler(NearbyCommand);
+        CommandManager.RemoveHandler(FoodCheckCommand);
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
