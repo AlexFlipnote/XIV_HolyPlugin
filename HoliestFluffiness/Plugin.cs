@@ -352,6 +352,11 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnNearbyCommand(string command, string args)
     {
+        if (ClientState.IsPvP)
+        {
+            ChatGui.Print("Nope, you cannot check nearby people while batteling in PvP, no cheating~");
+            return;
+        }
         if (!configuration.NearbyEnabled)
         {
             configuration.NearbyEnabled = true;
@@ -363,6 +368,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OnNewTargeter(Handlers.Targeter t)
     {
         if (!configuration.NearbyTargeterSound) return;
+        if (ClientState.IsPvP) return;
         SoundEngine.Play(ResolveSound(configuration.NearbyTargeterSoundPath, "Sounds/Targeting/looking.mp3"), configuration.NearbyTargeterSoundVolume);
     }
 

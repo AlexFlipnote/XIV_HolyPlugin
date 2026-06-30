@@ -88,6 +88,7 @@ public sealed class NearbyWindow : Window, IDisposable
     public void DrawMarkers()
     {
         if (!config.NearbyMarkTargeting || !config.NearbyShowTargeters) return;
+        if (condition[ConditionFlag.PvPDisplayActive]) return;
 
         var dl   = ImGui.GetBackgroundDrawList();
         var col  = ImGui.GetColorU32(config.NearbyMarkTargetingColour);
