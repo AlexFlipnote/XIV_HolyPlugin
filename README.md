@@ -1,8 +1,6 @@
 # The Holiest Fluffiness
 A tweak plugin born for the free company 'The Holiest Fluffiness', now open for all to enjoy.
 
-Originally created as a custom tweak plugin for the free company 'The Holiest Fluffiness', this project is now open-source and available for everyone to enjoy.
-
 >[!NOTE]
 > This project leans on AI to speed up development while I learn C#. It provided a solid foundation to get things running quickly, and I now manually maintain and expand upon that base layer using my background in programming. It works smoothly, and it's been a great way to learn in the process.
 
