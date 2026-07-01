@@ -17,6 +17,7 @@ public sealed unsafe class CombatHitHandler : IDisposable
     private readonly IFlyTextGui             flyTextGui;
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly IObjectTable            objectTable;
+    private readonly IPluginLog              log;
 
     private static readonly ImmutableHashSet<FlyTextKind> DcKinds = ImmutableHashSet.Create(
         FlyTextKind.AutoAttackOrDotCritDh, FlyTextKind.DamageCritDh);
@@ -43,12 +44,13 @@ public sealed unsafe class CombatHitHandler : IDisposable
 
     public CombatHitHandler(Configuration config, IFlyTextGui flyTextGui,
                             IDalamudPluginInterface pluginInterface, IObjectTable objectTable,
-                            ISigScanner sigScanner, IGameInteropProvider gameInterop)
+                            ISigScanner sigScanner, IGameInteropProvider gameInterop, IPluginLog log)
     {
         this.config          = config;
         this.flyTextGui      = flyTextGui;
         this.pluginInterface = pluginInterface;
         this.objectTable     = objectTable;
+        this.log             = log;
 
         flyTextGui.FlyTextCreated += OnFlyText;
 
@@ -58,13 +60,16 @@ public sealed unsafe class CombatHitHandler : IDisposable
             screenLogHook = gameInterop.HookFromAddress<AddToScreenLogDelegate>(address, OnScreenLog);
             screenLogHook.Enable();
         }
-        catch { /* sig may change with patches; damage crits still work without this hook */ }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[HF] CombatHit: screen-log sig scan failed, damage crits still work but heal-crit ownership will not");
+        }
     }
 
     private void OnScreenLog(Character* target, Character* source, FlyTextKind kind,
                              byte option, byte actionKind, int actionId, int val1, int val2, byte damageType)
     {
-        if (HealKinds.Contains(kind))
+        if (HealKinds.Contains(kind) && source != null && target != null)
         {
             var localId       = objectTable.LocalPlayer?.EntityId ?? 0;
             lastHealWasOwn    = source->GameObject.GetGameObjectId() == localId ||

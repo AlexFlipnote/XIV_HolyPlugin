@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -29,6 +30,13 @@ public sealed class NearbyWindow : Window, IDisposable
     private bool   hoveredTargeterRow;
     private bool   hoveredNearbyRow;
     private bool   historyOpen;
+
+    // Recomputed only when the underlying data or search text changes, not every frame
+    private List<NearbyPlayer>? cachedNearbySource;
+    private List<Targeter>?     cachedTargetersSource;
+    private string              cachedSearchText  = string.Empty;
+    private HashSet<ulong>      cachedTargeterIds = [];
+    private List<NearbyPlayer>  cachedSorted      = [];
 
     private static readonly Vector4 ColTargeter  = new(235/255f, 130/255f,  80/255f, 1f);
     private static readonly Vector4 ColHistory   = new(235/255f, 130/255f,  80/255f, 0.4f);
@@ -138,18 +146,31 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.TableSetColumnIndex(4); ImGui.TableHeader("FC");
         Common.PopTableHeader();
 
-        var targeterIds = handler.CurrentTargeters.Select(t => t.GameObjectId).ToHashSet();
+        // NearbyHandler replaces these list references on update (~2x/sec), so reference
+        // equality tells us whether the underlying data actually changed since last frame.
+        if (!ReferenceEquals(cachedNearbySource, handler.NearbyPlayers) ||
+            !ReferenceEquals(cachedTargetersSource, handler.CurrentTargeters) ||
+            cachedSearchText != searchText)
+        {
+            cachedNearbySource    = handler.NearbyPlayers;
+            cachedTargetersSource = handler.CurrentTargeters;
+            cachedSearchText      = searchText;
+            cachedTargeterIds     = handler.CurrentTargeters.Select(t => t.GameObjectId).ToHashSet();
 
-        var source = string.IsNullOrEmpty(searchText)
-            ? handler.NearbyPlayers
-            : handler.NearbyPlayers.Where(p =>
-                p.Name.Contains(searchText,       StringComparison.OrdinalIgnoreCase) ||
-                p.HomeWorld.Contains(searchText,  StringComparison.OrdinalIgnoreCase) ||
-                p.CompanyTag.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                p.JobAbbr.Contains(searchText,    StringComparison.OrdinalIgnoreCase));
+            var source = string.IsNullOrEmpty(searchText)
+                ? handler.NearbyPlayers
+                : handler.NearbyPlayers.Where(p =>
+                    p.Name.Contains(searchText,       StringComparison.OrdinalIgnoreCase) ||
+                    p.HomeWorld.Contains(searchText,  StringComparison.OrdinalIgnoreCase) ||
+                    p.CompanyTag.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                    p.JobAbbr.Contains(searchText,    StringComparison.OrdinalIgnoreCase));
 
-        // Targeters float to top; stable so existing sort order is preserved within each group
-        var sorted = source.OrderByDescending(p => targeterIds.Contains(p.GameObjectId)).ToList();
+            // Targeters float to top; stable so existing sort order is preserved within each group
+            cachedSorted = source.OrderByDescending(p => cachedTargeterIds.Contains(p.GameObjectId)).ToList();
+        }
+
+        var targeterIds = cachedTargeterIds;
+        var sorted      = cachedSorted;
 
         var prevHoveredNearby = hoveredNearbyRow;
         hoveredNearbyRow = false;

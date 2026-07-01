@@ -8,6 +8,20 @@ using SQLite;
 
 namespace HoliestFluffiness;
 
+public readonly record struct CharacterDbStats(
+    int Count,
+    long TotalGil,
+    long TotalMgp,
+    int WithFc,
+    int UniqueFc,
+    int WithPrivateHouse,
+    int UniqueFcHouse,
+    int WithSearchInfo,
+    CharacterRecord? Richest,
+    long AverageGil,
+    Dictionary<uint, long> InventoryTotals
+);
+
 public sealed class CharacterDb : IDisposable
 {
     private readonly SQLiteConnection db;
@@ -45,45 +59,48 @@ public sealed class CharacterDb : IDisposable
         catch { /* reflection may fail on trimmed/obfuscated builds */ }
     }
 
-    public int Count() => db.Table<CharacterRecord>().Count();
-
-    public long TotalGil() => db.ExecuteScalar<long>("SELECT COALESCE(SUM(gil), 0) FROM characters WHERE gil >= 0");
-
-    public long TotalMgp() => db.ExecuteScalar<long>("SELECT COALESCE(SUM(mgp), 0) FROM characters WHERE mgp >= 0");
-
-    public int CountWithFc() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.FreeCompany));
-
-    public int CountUniqueFc() => db.Table<CharacterRecord>().ToList()
-        .Where(r => !string.IsNullOrEmpty(r.FreeCompany)).Select(r => r.FreeCompany).Distinct().Count();
-
-    public int CountWithPrivateHouse() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.PrivateHouse));
-
-    public int CountUniqueFcHouse() => db.Table<CharacterRecord>().ToList()
-        .Where(r => !string.IsNullOrEmpty(r.FcHouse)).Select(r => r.FcHouse).Distinct().Count();
-
-    public int CountWithSearchInfo() => db.Table<CharacterRecord>().ToList().Count(r => !string.IsNullOrEmpty(r.SearchInfo));
-
-    public CharacterRecord? RichestCharacter() => db.Table<CharacterRecord>().ToList()
-        .Where(r => r.Gil >= 0).OrderByDescending(r => r.Gil).FirstOrDefault();
-
-    public long AverageGil()
+    // Single pass over the table instead of the ~9 separate full-table reads the individual
+    // Count*/Total*/Richest/Average queries used to do (this is called from Draw() every
+    // frame the Database config tab is open, so 9 reads became 1).
+    public CharacterDbStats GetStats()
     {
-        var list = db.Table<CharacterRecord>().ToList().Where(r => r.Gil >= 0).ToList();
-        return list.Count == 0 ? 0 : (long)list.Average(r => r.Gil);
-    }
+        var all = db.Table<CharacterRecord>().ToList();
 
-    public Dictionary<uint, long> TotalInventoryItems()
-    {
-        var totals = new Dictionary<uint, long>();
-        foreach (var rec in db.Table<CharacterRecord>())
+        var uniqueFc      = new HashSet<string>();
+        var uniqueFcHouse = new HashSet<string>();
+        var invTotals     = new Dictionary<uint, long>();
+
+        int withFc = 0, withHouse = 0, withSearch = 0, gilCount = 0;
+        long gilSum = 0, mgpSum = 0;
+        CharacterRecord? richest = null;
+
+        foreach (var r in all)
         {
-            if (rec.Inventory == null) continue;
-            var items = JsonSerializer.Deserialize<Dictionary<uint, int>>(rec.Inventory);
-            if (items == null) continue;
-            foreach (var (id, qty) in items)
-                totals[id] = totals.GetValueOrDefault(id) + qty;
+            if (!string.IsNullOrEmpty(r.FreeCompany))  { withFc++; uniqueFc.Add(r.FreeCompany); }
+            if (!string.IsNullOrEmpty(r.PrivateHouse)) withHouse++;
+            if (!string.IsNullOrEmpty(r.FcHouse))      uniqueFcHouse.Add(r.FcHouse);
+            if (!string.IsNullOrEmpty(r.SearchInfo))   withSearch++;
+
+            if (r.Gil >= 0)
+            {
+                gilSum += r.Gil;
+                gilCount++;
+                if (richest == null || r.Gil > richest.Gil) richest = r;
+            }
+            if (r.Mgp >= 0) mgpSum += r.Mgp;
+
+            if (r.Inventory != null &&
+                JsonSerializer.Deserialize<Dictionary<uint, int>>(r.Inventory) is { } items)
+            {
+                foreach (var (id, qty) in items)
+                    invTotals[id] = invTotals.GetValueOrDefault(id) + qty;
+            }
         }
-        return totals;
+
+        return new CharacterDbStats(
+            all.Count, gilSum, mgpSum,
+            withFc, uniqueFc.Count, withHouse, uniqueFcHouse.Count, withSearch,
+            richest, gilCount == 0 ? 0 : gilSum / gilCount, invTotals);
     }
 
     public event Action? Changed;

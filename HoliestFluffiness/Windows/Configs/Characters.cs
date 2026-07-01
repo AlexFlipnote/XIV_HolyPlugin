@@ -53,7 +53,6 @@ public partial class ConfigWindow
 
     private List<TableColumn<CharacterRow>> BuildCharacterColumns(bool lifestreamOn, string? currentKey, Action<string> onReset, Action<string> onDelete)
     {
-        var itemCols = LoginInfoHandler.TrackedItems.ToList();
         uint uid = 0;
 
         var columns = new List<TableColumn<CharacterRow>>
@@ -95,7 +94,7 @@ public partial class ConfigWindow
                 r => ImGui.TextUnformatted(r.Rec.Mgp < 0 ? "" : r.Rec.Mgp.ToString("N0", CultureInfo.InvariantCulture))),
         };
 
-        foreach (var (itemId, itemName) in itemCols)
+        foreach (var (itemId, itemName) in LoginInfoHandler.TrackedItems)
         {
             columns.Add(new TableColumn<CharacterRow>(itemName, uid++, ImGuiTableColumnFlags.None, 0,
                 r => r.Items.GetValueOrDefault(itemId),

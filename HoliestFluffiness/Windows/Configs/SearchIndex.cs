@@ -15,7 +15,14 @@ public partial class ConfigWindow
 
         public static IEnumerable<SettingEntry> Entries => Registry.Values;
 
-        public static void Register(ConfigSection section, string key, string title, string? desc) =>
+        // Bumped on every registration so callers can cheaply detect whether the (lazily
+        // growing) registry changed since they last computed something derived from it.
+        public static int Version { get; private set; }
+
+        public static void Register(ConfigSection section, string key, string title, string? desc)
+        {
             Registry[(section, key)] = new SettingEntry(title, desc, section, key);
+            Version++;
+        }
     }
 }

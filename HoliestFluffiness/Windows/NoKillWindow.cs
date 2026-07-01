@@ -61,15 +61,14 @@ public class NoKillWindow : Window
 
         if (interceptLog.Count > 0)
         {
-            ImGui.Dummy(new Vector2(0, 2));
             var start = Math.Max(0, interceptLog.Count - 5);
             for (int i = interceptLog.Count - 1; i >= start; i--)
-                Common.DimmedText($"  {interceptLog[i]:HH:mm:ss}");
+                Common.DimmedText($"- {interceptLog[i]:HH:mm:ss}");
         }
 
         var charLabel = (autoLoginName != null && autoLoginWorld != null)
             ? $"{autoLoginName} @ {autoLoginWorld}"
-            : "none (log in first)";
+            : "none";
         Common.DimmedText($"Reconnect target: {charLabel}");
 
         ImGui.Dummy(new Vector2(0, 4));

@@ -79,9 +79,9 @@ public partial class ConfigWindow
         PushButton();
         if (ImGui.Button("Set to default##nearbycoldefault"))
         {
-            configuration.NearbyColParty   = new Vector4(100/255f, 180/255f, 255/255f, 1f);
-            configuration.NearbyColFriend  = new Vector4(1f, 127/255f, 0f, 1f);
-            configuration.NearbyColLocalFc = new Vector4(220/255f, 200/255f, 80/255f, 1f);
+            configuration.NearbyColParty   = Configuration.DefaultNearbyColParty;
+            configuration.NearbyColFriend  = Configuration.DefaultNearbyColFriend;
+            configuration.NearbyColLocalFc = Configuration.DefaultNearbyColLocalFc;
             configuration.Save();
         }
         PopButton();

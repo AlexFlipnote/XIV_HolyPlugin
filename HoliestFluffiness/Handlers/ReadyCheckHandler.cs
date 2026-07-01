@@ -237,7 +237,7 @@ public class ReadyCheckHandler : IDisposable
         {
             try { await Task.Delay(delayMs, cts.Token); }
             catch (OperationCanceledException) { return; }
-            Invalidate();
+            await framework.RunOnFrameworkThread(Invalidate);
         });
     }
 

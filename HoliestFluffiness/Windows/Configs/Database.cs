@@ -90,20 +90,20 @@ public partial class ConfigWindow
             ImGui.Dummy(new Vector2(0, 2));
             SectionRow();
 
-            var count         = characterDb.Count();
-            var totalGil      = characterDb.TotalGil();
-            var totalMgp      = characterDb.TotalMgp();
-            var withFc        = characterDb.CountWithFc();
-            var uniqueFc      = characterDb.CountUniqueFc();
-            var uniqueFcHouse = characterDb.CountUniqueFcHouse();
-            var withHouse     = characterDb.CountWithPrivateHouse();
+            var stats         = characterDb.GetStats();
+            var count         = stats.Count;
+            var totalGil      = stats.TotalGil;
+            var totalMgp      = stats.TotalMgp;
+            var withFc        = stats.WithFc;
+            var uniqueFc      = stats.UniqueFc;
+            var uniqueFcHouse = stats.UniqueFcHouse;
+            var withHouse     = stats.WithPrivateHouse;
             var loneWolves    = count - withFc;
-            var withStory     = characterDb.CountWithSearchInfo();
-            var richest       = characterDb.RichestCharacter();
-            var avgGil        = characterDb.AverageGil();
-            var invTotals     = characterDb.TotalInventoryItems();
-            var totalCeruleum = invTotals.GetValueOrDefault(10155u);
-            var totalMagitek  = invTotals.GetValueOrDefault(10373u);
+            var withStory     = stats.WithSearchInfo;
+            var richest       = stats.Richest;
+            var avgGil        = stats.AverageGil;
+            var totalCeruleum = stats.InventoryTotals.GetValueOrDefault(10155u);
+            var totalMagitek  = stats.InventoryTotals.GetValueOrDefault(10373u);
 
             var statNums   = new[] { $"{count:N0}", $"{withFc:N0}", $"{loneWolves:N0}", $"{uniqueFcHouse:N0}", $"{withHouse:N0}", $"{withStory:N0}", $"{totalGil:N0}", $"{avgGil:N0}" };
             var statLabels = new[]

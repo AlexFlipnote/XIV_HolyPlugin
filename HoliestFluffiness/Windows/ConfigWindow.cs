@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -39,6 +40,9 @@ public partial class ConfigWindow : Window
     private ConfigSection currentDrawSection;
     private string searchQuery = "";
     private bool searchModeActive;
+    private string cachedSearchQuery = "\0"; // sentinel, never a real trimmed query, forces first compute
+    private int cachedSearchVersion = -1;
+    private List<SettingEntry> cachedSearchMatches = [];
     private int searchBoxGeneration;
     private string? pendingJumpKey;
     private int pendingJumpFramesLeft;
@@ -350,14 +354,22 @@ public partial class ConfigWindow : Window
 
     private void DrawSearchResults()
     {
-        var query    = searchQuery.Trim();
-        var showAll  = query.Length == 0;
-        var filtered = showAll
-            ? SearchIndex.Entries
-            : SearchIndex.Entries.Where(e =>
-                e.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (e.Desc?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
-        var matches = filtered.OrderBy(e => e.Section).ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase).ToList();
+        var query   = searchQuery.Trim();
+        var showAll = query.Length == 0;
+
+        if (query != cachedSearchQuery || SearchIndex.Version != cachedSearchVersion)
+        {
+            cachedSearchQuery   = query;
+            cachedSearchVersion = SearchIndex.Version;
+
+            var filtered = showAll
+                ? SearchIndex.Entries
+                : SearchIndex.Entries.Where(e =>
+                    e.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    (e.Desc?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
+            cachedSearchMatches = filtered.OrderBy(e => e.Section).ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        var matches = cachedSearchMatches;
 
         ImGui.Dummy(new Vector2(0, 6));
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
@@ -547,9 +559,9 @@ public partial class ConfigWindow : Window
         if (ImGui.SliderInt(label, ref current, min, max))
         {
             setter(current);
-            configuration.Save();
             onChange?.Invoke();
         }
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
         if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
         ImGui.EndGroup();
@@ -565,7 +577,8 @@ public partial class ConfigWindow : Window
         bool changed = format != null
             ? ImGui.SliderFloat(label, ref current, min, max, format)
             : ImGui.SliderFloat(label, ref current, min, max);
-        if (changed) { setter(current); configuration.Save(); }
+        if (changed) setter(current);
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
         if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
         ImGui.EndGroup();
@@ -732,8 +745,8 @@ public partial class ConfigWindow : Window
         if (ImGui.ColorEdit4(label, ref current, flags))
         {
             setter(current);
-            configuration.Save();
         }
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         ImGui.EndGroup();
         Anchor(ExtractKey(label), title ?? ExtractTitle(label), desc);
     }

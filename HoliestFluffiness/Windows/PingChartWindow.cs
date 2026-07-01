@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
@@ -11,6 +10,12 @@ public sealed class PingChartWindow : Window, IDisposable
 {
     private readonly ServerInfoHandler handler;
     private readonly Configuration configuration;
+
+    // ServerInfoHandler replaces PingChartData's reference whenever new data lands, so
+    // reference equality tells us whether these stats need recomputing this frame.
+    private float[]? cachedData;
+    private int      cachedTimeouts;
+    private int      cachedAvg, cachedMin, cachedMax;
 
     public PingChartWindow(ServerInfoHandler handler, Configuration configuration) : base("Ping History##HFPingChart")
     {
@@ -49,11 +54,30 @@ public sealed class PingChartWindow : Window, IDisposable
             return;
         }
 
-        var successes = data.Where(v => v > 0).ToArray();
-        var timeouts  = data.Length - successes.Length;
-        var avg       = successes.Length > 0 ? (int)successes.Average() : 0;
-        var min       = successes.Length > 0 ? (int)successes.Min()     : 0;
-        var max       = successes.Length > 0 ? (int)successes.Max()     : 0;
+        if (!ReferenceEquals(cachedData, data))
+        {
+            cachedData = data;
+            var successCount = 0;
+            var sum = 0f;
+            var sampleMin = float.MaxValue;
+            var sampleMax = float.MinValue;
+            foreach (var v in data)
+            {
+                if (v <= 0) continue;
+                successCount++;
+                sum += v;
+                if (v < sampleMin) sampleMin = v;
+                if (v > sampleMax) sampleMax = v;
+            }
+            cachedTimeouts = data.Length - successCount;
+            cachedAvg      = successCount > 0 ? (int)(sum / successCount) : 0;
+            cachedMin      = successCount > 0 ? (int)sampleMin : 0;
+            cachedMax      = successCount > 0 ? (int)sampleMax : 0;
+        }
+        var avg      = cachedAvg;
+        var min      = cachedMin;
+        var max      = cachedMax;
+        var timeouts = cachedTimeouts;
 
         Common.GoldText($"avg {avg}ms");
 

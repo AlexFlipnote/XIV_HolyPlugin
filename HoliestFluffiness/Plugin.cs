@@ -146,6 +146,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         configuration.Initialize(PluginInterface);
+        SoundEngine.Initialize(Log);
 
         using var proc = Process.GetCurrentProcess();
         windowHandle  = proc.MainWindowHandle;
@@ -166,12 +167,7 @@ public sealed class Plugin : IDalamudPlugin
         readyCheckOverlay      = new ReadyCheckOverlay(configuration, readyCheckHandler, GameGui, TextureProvider, DataManager);
         noKillWindow           = new NoKillWindow();
         charPickerWindow       = new CharacterPickerWindow(SwitchToCharacter);
-        noKillHandler.OnLobbyError += (isAuth) =>
-        {
-            if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld, noKillHandler.InterceptLog);
-            if (!isAuth && !string.IsNullOrEmpty(lastKnownName) && !string.IsNullOrEmpty(lastKnownWorld))
-                noKillHandler.SetAutoLoginTarget(lastKnownName, lastKnownWorld);
-        };
+        noKillHandler.OnLobbyError += OnNoKillLobbyError;
         charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, noKillHandler, SwitchToCharacter);
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
@@ -182,7 +178,7 @@ public sealed class Plugin : IDalamudPlugin
         commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
         commendationHandler.OnCommendation += OnCommendationReceived;
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
-        combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop);
+        combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop, Log);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
@@ -363,6 +359,13 @@ public sealed class Plugin : IDalamudPlugin
             configuration.Save();
         }
         nearbyWindow.IsOpen = !nearbyWindow.IsOpen;
+    }
+
+    private void OnNoKillLobbyError(bool isAuth)
+    {
+        if (!configuration.NoKillDisablePopup) noKillWindow.Show(noKillHandler.InterceptCount, lastKnownName, lastKnownWorld, noKillHandler.InterceptLog);
+        if (!isAuth && !string.IsNullOrEmpty(lastKnownName) && !string.IsNullOrEmpty(lastKnownWorld))
+            noKillHandler.SetAutoLoginTarget(lastKnownName, lastKnownWorld);
     }
 
     private void OnNewTargeter(Handlers.Targeter t)
@@ -782,6 +785,7 @@ public sealed class Plugin : IDalamudPlugin
         housingLotteryHandler.Dispose();
         serverInfoHandler.Dispose();
         repairHandler.Dispose();
+        noKillHandler.OnLobbyError -= OnNoKillLobbyError;
         noKillHandler.Dispose();
         physicsHandler.Dispose();
         antiAfkHandler.Dispose();

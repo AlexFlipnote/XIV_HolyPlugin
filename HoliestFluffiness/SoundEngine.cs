@@ -1,12 +1,17 @@
 using System;
 using System.IO;
 using System.Threading;
+using Dalamud.Plugin.Services;
 using NAudio.Wave;
 
 namespace HoliestFluffiness;
 
 internal static class SoundEngine
 {
+    private static IPluginLog? log;
+
+    internal static void Initialize(IPluginLog pluginLog) => log = pluginLog;
+
     internal static string Resolve(string configPath, string defaultRelative, string baseDir) =>
         string.IsNullOrEmpty(configPath) ? Path.Combine(baseDir, defaultRelative) : configPath;
 
@@ -25,7 +30,7 @@ internal static class SoundEngine
                 while (output.PlaybackState == PlaybackState.Playing)
                     Thread.Sleep(50);
             }
-            catch { }
+            catch (Exception ex) { log?.Warning(ex, $"[HF] SoundEngine: failed to play '{path}'"); }
         }) { IsBackground = true }.Start();
     }
 }

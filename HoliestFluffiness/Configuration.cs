@@ -13,6 +13,12 @@ public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
+    // Named so the "Set to default" button in Social.cs can reference the same values
+    // instead of re-typing the literals (which previously drifted out of sync risk-free).
+    public static readonly Vector4 DefaultNearbyColParty   = new(100/255f, 180/255f, 255/255f, 1f);
+    public static readonly Vector4 DefaultNearbyColFriend  = new(1f, 127/255f, 0f, 1f);
+    public static readonly Vector4 DefaultNearbyColLocalFc = new(220/255f, 200/255f, 80/255f, 1f);
+
     public int Version { get; set; } = 1;
 
     public bool AccessoryEnabled { get; set; } = false;
@@ -88,9 +94,9 @@ public class Configuration : IPluginConfiguration
     public bool    NearbyFilterLowLevel      { get; set; } = false;
     public bool    NearbyDebugSelf           { get; set; } = false;
     public int     NearbyDebugSelfAs         { get; set; } = 0; // 0=Friend 1=FC 2=Party 3=TargetingYou
-    public Vector4 NearbyColParty            { get; set; } = new(100/255f, 180/255f, 255/255f, 1f);
-    public Vector4 NearbyColFriend           { get; set; } = new(1f, 127/255f, 0f, 1f);
-    public Vector4 NearbyColLocalFc          { get; set; } = new(220/255f, 200/255f,  80/255f, 1f);
+    public Vector4 NearbyColParty            { get; set; } = DefaultNearbyColParty;
+    public Vector4 NearbyColFriend           { get; set; } = DefaultNearbyColFriend;
+    public Vector4 NearbyColLocalFc          { get; set; } = DefaultNearbyColLocalFc;
     public bool    NearbyMarkTargeting        { get; set; } = false;
     public Vector4 NearbyMarkTargetingColour { get; set; } = new(235/255f, 130/255f, 80/255f, 1f);
     public int     NearbyMarkTargetingSize   { get; set; } = 5;

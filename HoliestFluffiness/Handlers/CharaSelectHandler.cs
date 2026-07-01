@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
@@ -18,6 +19,7 @@ public sealed class CharaSelectHandler : IDisposable
     private readonly IFramework framework;
     private readonly NoKillHandler? noKillHandler;
     private readonly Action<string, string>? onAutoLogin;
+    private CancellationTokenSource? autoLoginCts;
 
     public CharaSelectHandler(Configuration configuration, CharacterDb characterDb, IAddonLifecycle addonLifecycle, IDataManager dataManager, IFramework framework, NoKillHandler? noKillHandler = null, Action<string, string>? onAutoLogin = null)
     {
@@ -88,11 +90,20 @@ public sealed class CharaSelectHandler : IDisposable
         // retry dialogues (lobby 2002 etc) need a longer backoff before re-invoking Lifestream
         var delay = isRetry ? 5000 : 3000;
 
+        autoLoginCts?.Cancel();
+        autoLoginCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        autoLoginCts = cts;
+
         Task.Run(async () =>
         {
-            await Task.Delay(500);
-            await framework.RunOnFrameworkThread(() => DismissDialogueUnsafe(addr));
-            await Task.Delay(delay);
+            try
+            {
+                await Task.Delay(500, cts.Token);
+                await framework.RunOnFrameworkThread(() => DismissDialogueUnsafe(addr));
+                await Task.Delay(delay, cts.Token);
+            }
+            catch (OperationCanceledException) { return; }
             onAutoLogin?.Invoke(name, world);
         });
     }
@@ -115,5 +126,7 @@ public sealed class CharaSelectHandler : IDisposable
         addonLifecycle.UnregisterListener(AddonEvent.PostSetup,   "_CharaSelectListMenu", OnCharaSelectList);
         addonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "_CharaSelectListMenu", OnCharaSelectList);
         addonLifecycle.UnregisterListener(AddonEvent.PostSetup,   "Dialogue",             OnDialogueSetup);
+        autoLoginCts?.Cancel();
+        autoLoginCts?.Dispose();
     }
 }

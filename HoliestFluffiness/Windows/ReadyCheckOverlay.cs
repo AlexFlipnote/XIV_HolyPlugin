@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -17,20 +18,21 @@ public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
     private readonly ReadyCheckHandler handler;
     private readonly IGameGui gameGui;
     private readonly IDalamudTextureWrap readyCheckTex;
-    private readonly IDalamudTextureWrap notPresentTex;
+    private readonly ISharedImmediateTexture notPresentTex;
 
     public ReadyCheckOverlay(Configuration config, ReadyCheckHandler handler, IGameGui gameGui, ITextureProvider textureProvider, IDataManager dataManager)
         : base("##HFReadyCheckOverlay")
     {
         this.config = config; this.handler = handler; this.gameGui = gameGui;
         readyCheckTex = textureProvider.CreateFromTexFile(dataManager.GetFile<TexFile>("ui/uld/ReadyCheck_hr1.tex")!);
-        notPresentTex = textureProvider.GetFromGameIcon(61504).RentAsync().Result;
+        // Shared textures are cache-owned; GetWrapOrEmpty() is cheap to call every draw and
+        // avoids blocking construction on RentAsync().Result (sync-over-async deadlock risk).
+        notPresentTex = textureProvider.GetFromGameIcon(61504);
     }
 
     public void Dispose()
     {
         readyCheckTex.Dispose();
-        notPresentTex.Dispose(); // rented via RentAsync, must be returned
     }
 
     public override void PreOpenCheck()
@@ -118,7 +120,7 @@ public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
         else if (state == ReadyCheckStatus.Ready)
             drawList.AddImage(readyCheckTex.Handle, pos, pos + size, Vector2.Zero, new Vector2(0.5f, 1f));
         else if (state == ReadyCheckStatus.MemberNotPresent)
-            drawList.AddImage(notPresentTex.Handle, pos, pos + size);
+            drawList.AddImage(notPresentTex.GetWrapOrEmpty().Handle, pos, pos + size);
     }
 
 }

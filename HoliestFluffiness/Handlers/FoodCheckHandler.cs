@@ -113,7 +113,7 @@ public class FoodCheckHandler : IDisposable
                 Invalidate();
             }
         }
-        catch { }
+        catch (Exception ex) { log.Debug($"FoodCheck OnFrameworkUpdate: {ex}"); }
     }
 
     private void RunCheck(bool ignoreDutyFilter, int clearDelayMs = 30_000)
@@ -228,7 +228,7 @@ public class FoodCheckHandler : IDisposable
         {
             try { await Task.Delay(delayMs, cts.Token); }
             catch (OperationCanceledException) { return; }
-            Invalidate();
+            await framework.RunOnFrameworkThread(Invalidate);
         });
     }
 }
