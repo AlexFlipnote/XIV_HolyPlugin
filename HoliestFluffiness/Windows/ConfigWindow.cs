@@ -22,6 +22,7 @@ public partial class ConfigWindow : Window
     private readonly NoKillHandler noKillHandler;
     private readonly PhysicsHandler physicsHandler;
     private readonly AntiAfkHandler antiAfkHandler;
+    private readonly FastMouseClickFixHandler fastMouseClickFixHandler;
     private readonly ReadyCheckHandler readyCheckHandler;
     private FoodCheckHandler? foodCheckHandler;
     private readonly IObjectTable objectTable;
@@ -49,7 +50,7 @@ public partial class ConfigWindow : Window
     private string? flashKey;
     private double flashEndTime;
 
-    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, RepairHandler repairHandler, NoKillHandler noKillHandler, PhysicsHandler physicsHandler, AntiAfkHandler antiAfkHandler, ReadyCheckHandler readyCheckHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, Action<CharacterRecord, HousingBidRecord> onGoToBid, Action onClientSettingsChanged)
+    public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, RepairHandler repairHandler, NoKillHandler noKillHandler, PhysicsHandler physicsHandler, AntiAfkHandler antiAfkHandler, FastMouseClickFixHandler fastMouseClickFixHandler, ReadyCheckHandler readyCheckHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, Action<CharacterRecord, HousingBidRecord> onGoToBid, Action onClientSettingsChanged)
         : base($"The Holiest Fluffiness##Config")
     {
         this.configuration = configuration;
@@ -59,6 +60,7 @@ public partial class ConfigWindow : Window
         this.noKillHandler = noKillHandler;
         this.physicsHandler = physicsHandler;
         this.antiAfkHandler = antiAfkHandler;
+        this.fastMouseClickFixHandler = fastMouseClickFixHandler;
         this.readyCheckHandler = readyCheckHandler;
         this.objectTable = objectTable;
         this.characterDb = characterDb;

@@ -17,21 +17,42 @@ https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/release/repo.json
 Once added, simply search for **The Holiest Fluffiness** in the plugin installer.
 
 ## Features
-## Features
-A comprehensive suite of quality-of-life tools, including:
+A comprehensive suite of quality-of-life tools, grouped the same way as the in-plugin settings:
 
-- **Login Info:** Displays your character name, world, data center, FC tag, adventure plate, and housing locations upon login. Output is highly customizable: choose between a chat message, toast notification, or a dedicated popup window.
-- **Accessory Auto-Equip:** Automatically equips a fashion accessory (via `/fashion`) on login. Includes customizable delays, skips if an accessory is already equipped, and features inventory slot threshold checks.
-- **Anti-AFK:** Prevents idle kicks by sending a silent keypress to the game window when your AFK timer runs high, perfect for when you're just vibing.
-- **Auto-Reconnect (No-Kill):** Intercepts lobby disconnects and automatically reconnects you instead of booting you back to the title screen. Integrates seamlessly with [Lifestream](https://github.com/NightmareXIV/Lifestream) to ensure you log back into the correct character.
-- **Gear Repair Indicator:** Adds a handy durability icon to your server info bar. Features configurable warning and critical thresholds so you never get caught with broken gear mid-duty.
-- **Doorbell:** Alerts you when players enter or leave your current house. Great for tracking visitors while AFK inside your FC estate.
-- **Ready Check Overlay:** Highlights party frames with ready/not-ready indicators during a check. Optionally sends a chat message calling out who hasn't readied up yet.
-- **Commendation Tracker:** Celebrates every commendation you receive after a duty, because you earned it.
-- **Nearby Player List:** Displays a live radar of nearby players, sorted by Party > Friends > FC > Others. Includes filters for AFK or low-level characters, and shows exactly who is currently targeting you.
-- **Server Info Bar:** Shows your live ping (or a 30-ping rolling average) and FPS directly in the server info bar.
-- **Housing Lottery Tracker:** Automatically logs your active housing bids in a local database, clearing them out once the lottery concludes or you interact with the result dialog.
-- **Character Database:** Maintains a local, periodically updated record of all your characters across logins, storing their FC, search info, housing locations, gil, and specific inventory items.
-- **Physics Cap:** Throttles the game's physics simulation to a set frame rate. Saves your GPU from overworking itself on physics rendering while you're AFK.
+### Login
+- **Character Picker:** Optional popup on the main menu for quickly picking which character to log into.
+- **Login Info:** Shows your name, world, data center, FC tag, adventure plate, and housing locations as a chat message, popup, or toast on login.
+- **Skip Intro Logo:** Jumps straight to the title screen instead of playing the intro movie on launch.
+- **Preload Territory:** Starts loading your destination zone in the background while you're still in the login queue.
+- **Accessory Auto-Equip:** Automatically equips a fashion accessory via `/fashion` on login, with configurable delays and inventory slot thresholds.
+
+### Client
+- **Disable Idle Movie:** Skips the looping intro video on the title screen.
+- **Fast Mouse Click Fix:** Removes an artificial delay the client imposes between mouse clicks.
+- **Window Title:** Customizes the game window's title, optionally appending your logged-in character's name.
+- **Taskbar Flash:** Flashes the FFXIV taskbar icon on tells, ready checks, alarms, combat, or synthesis completion.
+- **Auto-Reconnect (No-Kill):** Intercepts lobby disconnects and reconnects you automatically instead of booting you to the title screen, integrating with [Lifestream](https://github.com/NightmareXIV/Lifestream) to log back into the correct character.
+- **Physics Cap:** Throttles the game's physics simulation to a target FPS so hair/cloth physics behave correctly and your GPU isn't overworked while AFK.
+- **Anti-AFK:** Sends a silent keypress when your AFK timer runs high so you never get idle-kicked.
+
+### Indicators
+- **Cast Bar Aetheryte Names:** Shows the actual aetheryte name instead of generic text when teleporting.
+- **Duty Queue Timer:** Displays the estimated remaining queue time in the duty ready check dialog.
+- **Hide Hotbar Lock:** Removes the padlock icon from the action bar.
+- **Server Info Bar:** Adds live FPS, nearby player count, and ping (with a rolling average) to the server info bar.
+- **Gear Repair Indicator:** Adds a durability warning icon with configurable low and critical thresholds so you never get caught with broken gear mid-duty.
+- **Food Check Helper:** Warns when party members are missing or low on food during ready checks and countdowns.
+- **Ready Check Overlay:** Highlights party frames with ready/not-ready icons and can call out stragglers in chat.
+- **Combat Hits:** Adds customizable sounds and text for critical hits, direct hits, and heals.
+
+### Social
+- **Nameplate Tweaks:** Replaces cross-world "Wanderer/Traveller" FC tags with the player's actual home world.
+- **Nearby Player List:** A live radar of nearby players sorted by Party > Friends > FC > Others, with AFK/low-level filters and alerts for who's targeting you.
+- **Doorbell:** Alerts you when players enter, leave, or are already inside your current house.
+- **Commendation Tracker:** Plays a sound based on how many commendations you received after a duty.
+
+### Database
+- **Character Database:** Keeps a local, periodically updated record of every character you've logged into, including FC, gil, MGP, housing, and tracked inventory items.
+- **Housing Lottery Tracker:** Automatically logs your active housing bids and clears them once the lottery concludes.
 
 > All features are completely optional (opt-in by default) and can be toggled at any time via the settings menu (`/hf` command shortcut).

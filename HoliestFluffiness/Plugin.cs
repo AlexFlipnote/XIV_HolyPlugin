@@ -78,6 +78,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly NoKillHandler noKillHandler;
     private readonly PhysicsHandler physicsHandler;
     private readonly AntiAfkHandler antiAfkHandler;
+    private readonly FastMouseClickFixHandler fastMouseClickFixHandler;
     private readonly ReadyCheckHandler readyCheckHandler;
     private readonly ReadyCheckOverlay readyCheckOverlay;
     private readonly NearbyHandler nearbyHandler;
@@ -163,6 +164,7 @@ public sealed class Plugin : IDalamudPlugin
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
         antiAfkHandler         = new AntiAfkHandler(configuration, Framework, Log, windowHandle);
+        fastMouseClickFixHandler = new FastMouseClickFixHandler(configuration, SigScanner, Log);
         readyCheckHandler      = new ReadyCheckHandler(configuration, GameInterop, ClientState, ChatGui, Framework, ObjectTable, Log);
         readyCheckOverlay      = new ReadyCheckOverlay(configuration, readyCheckHandler, GameGui, TextureProvider, DataManager);
         noKillWindow           = new NoKillWindow();
@@ -195,7 +197,7 @@ public sealed class Plugin : IDalamudPlugin
         pingChartWindow        = new PingChartWindow(serverInfoHandler, configuration);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
-        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
+        configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, fastMouseClickFixHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetTitleFont(titleFont);
         configWindow.SetFoodCheckHandler(foodCheckHandler);
         configWindow.SetNearbyHandler(nearbyHandler);
@@ -789,6 +791,7 @@ public sealed class Plugin : IDalamudPlugin
         noKillHandler.Dispose();
         physicsHandler.Dispose();
         antiAfkHandler.Dispose();
+        fastMouseClickFixHandler.Dispose();
         readyCheckHandler.Dispose();
         readyCheckOverlay.Dispose();
         nearbyHandler.NewTargeter -= OnNewTargeter;

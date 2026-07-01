@@ -59,6 +59,7 @@ public class Configuration : IPluginConfiguration
     public bool ClientFlashOnSynthesis { get; set; } = false;
     public bool TitleMovieDisabled { get; set; } = false;
     public bool HotbarLockHidden { get; set; } = false;
+    public bool FastMouseClickFixEnabled { get; set; } = false;
     // Character picker section
     public bool CharacterPickerOnMainMenu { get; set; } = false;
 

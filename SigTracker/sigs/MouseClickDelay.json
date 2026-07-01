@@ -1,0 +1,19 @@
+{
+  "name": "MouseClickDelay",
+  "history": [
+    {
+      "pattern": "EB 3F B8 ?? ?? ?? ?? 48 8B D7",
+      "rva": null,
+      "bytes_at_rva": null,
+      "exe_hash": null,
+      "date": null
+    },
+    {
+      "pattern": "EB 3F B8 ?? ?? ?? ?? 48 8B D7",
+      "rva": "0x6869bc",
+      "bytes_at_rva": "EB 3F B8 09 00 00 00 48 8B D7 49 8B CE 66 89 07 E8 DF 8F FD FF 0B F0 B9 01 00 00 00 0F B6 47 02",
+      "exe_hash": "c2c3f05c",
+      "date": "2026-07-01"
+    }
+  ]
+}

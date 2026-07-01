@@ -15,6 +15,12 @@ public partial class ConfigWindow
             "The gold-and-dark palette is pulled straight from our FC colours, because the plugin is part of the " +
             "experience and should look the part. As for why it exists: we have too many alts and other plugins " +
             "couldn't keep up with how we play, so we took matters into our own hands.");
+        SectionRow();
+        Common.DimmedTextWrapped(
+            "A lot of what's bundled here resembles other standalone plugins you may already know. Rather than " +
+            "installing a dozen small plugins that each do one simple job, we folded them into one, cutting down " +
+            "on boilerplate, reducing RAM and CPU usage, and keeping the overall code quality higher for better " +
+            "performance across the board.");
 
         SubsectionLabel("Optional 3rd party plugins");
         bool lifestreamOn = Common.IsPluginLoaded(pluginInterface, "Lifestream");

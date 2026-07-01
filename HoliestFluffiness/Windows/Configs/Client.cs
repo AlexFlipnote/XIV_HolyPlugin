@@ -21,6 +21,16 @@ public partial class ConfigWindow
             v => configuration.TitleMovieDisabled = v,
             "Prevents the intro video from playing on the title screen");
 
+        ImGui.BeginDisabled(!fastMouseClickFixHandler.IsAvailable);
+        ConfigCheckbox(
+            "Fast mouse click fix##fastmouseclickfix",
+            fastMouseClickFixHandler.IsEnabled,
+            v => { if (v) fastMouseClickFixHandler.Enable(); else fastMouseClickFixHandler.Disable(); },
+            fastMouseClickFixHandler.IsAvailable
+                ? "Removes an artificial delay the client imposes between mouse clicks."
+                : "Unavailable: the memory signature for this fix could not be found on your current game version.");
+        ImGui.EndDisabled();
+
         SubsectionLabel(
             "Window title",
             "When the game launches, change the window title to something else.");
