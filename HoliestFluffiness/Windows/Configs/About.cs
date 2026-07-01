@@ -8,7 +8,6 @@ public partial class ConfigWindow
     private void DrawAboutSection()
     {
         BeginSection("About", "A custom plugin made mostly for our FC, but shared to others too.");
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
         SectionRow();
         Common.DimmedTextWrapped(
             "The plugin is named after our Free Company, when no existing plugin did exactly what we needed, " +

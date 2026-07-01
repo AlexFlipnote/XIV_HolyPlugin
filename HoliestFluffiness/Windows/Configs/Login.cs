@@ -47,15 +47,9 @@ public partial class ConfigWindow
         Common.DimmedText("Show as:");
         ImGui.SameLine();
         var loginDisplayModes = new[] { "Echo text", "Popup", "Toast" };
-        var displayIndex = (int)configuration.LoginInfoDisplay;
-        ImGui.SetNextItemWidth(120);
-        PushInput();
-        if (ImGui.Combo("##logininfodisplay", ref displayIndex, loginDisplayModes, loginDisplayModes.Length))
-        {
-            configuration.LoginInfoDisplay = (LoginInfoDisplay)displayIndex;
-            configuration.Save();
-        }
-        PopInput();
+        ConfigCombo("##logininfodisplay", (int)configuration.LoginInfoDisplay, loginDisplayModes,
+            v => configuration.LoginInfoDisplay = (LoginInfoDisplay)v, width: 120, padding: false,
+            title: "Login info display mode", desc: "Echo text, popup, or toast");
 
         SectionRow();
         PushButton();
@@ -96,17 +90,9 @@ public partial class ConfigWindow
         // ── Fashion accessory ─────────────────────────────────────────────────
         SubsectionLabel("Fashion accessory");
 
-        SectionRow();
-        PushCheckbox();
+        ConfigCheckbox("Equip accessory on login##accessoryenabled", configuration.AccessoryEnabled,
+            v => configuration.AccessoryEnabled = v);
         var accessoryEnabled = configuration.AccessoryEnabled;
-        bool accessoryChanged = ImGui.Checkbox("Equip accessory on login", ref accessoryEnabled);
-        PopCheckbox();
-
-        if (accessoryChanged)
-        {
-            configuration.AccessoryEnabled = accessoryEnabled;
-            configuration.Save();
-        }
 
         ImGui.BeginDisabled(!accessoryEnabled);
 
@@ -121,16 +107,8 @@ public partial class ConfigWindow
         }
         PopButton();
 
-        SectionRow();
-        var accessoryName = configuration.AccessoryName;
-        ImGui.SetNextItemWidth(200);
-        PushInput();
-        if (ImGui.InputText("Accessory name", ref accessoryName, 128))
-        {
-            configuration.AccessoryName = accessoryName;
-            configuration.Save();
-        }
-        PopInput();
+        ConfigInputText("Accessory name##accessoryname", configuration.AccessoryName,
+            v => configuration.AccessoryName = v, width: 200);
 
         ImGui.EndDisabled();
 
@@ -149,6 +127,7 @@ public partial class ConfigWindow
             int slot = order[i];
 
             SectionRow();
+            ImGui.BeginGroup();
 
             PushButton();
             ImGui.BeginDisabled(i == 0);
@@ -194,6 +173,9 @@ public partial class ConfigWindow
                 configuration.Save();ImGui.Dummy(new Vector2(0, 6));
             }
             PopCheckbox();
+
+            ImGui.EndGroup();
+            Anchor($"logininfo{slot}", $"Login info: {InfoItemLabels[slot]}", "Shown when logging in with a character");
         }
 
         ImGui.Dummy(new Vector2(0, 4));
@@ -203,30 +185,13 @@ public partial class ConfigWindow
     {
         ImGui.BeginDisabled(!enabled);
         RowGap(8);
-        var maxFreeSlots = configuration.AccessoryInventory;
-        ImGui.SetNextItemWidth(90);
-        PushInput();
-        if (ImGui.InputInt("Stop if N or fewer free inventory slots (0–140)##max", ref maxFreeSlots, 1, 10))
-        {
-            configuration.AccessoryInventory = Math.Clamp(maxFreeSlots, 0, 140);
-            configuration.Save();
-        }
-        PopInput();
-        ImGui.SameLine();
-        Common.DimmedText("(0 = skip check)");
+        ConfigInputInt("Stop if N or fewer free inventory slots (0–140)##max", configuration.AccessoryInventory, 0, 140,
+            v => configuration.AccessoryInventory = v, hint: "(0 = skip check)", padding: false,
+            desc: "Accessory equip is skipped if you have this many free inventory slots or fewer");
 
-        SectionRow();
-        var minFreeSlots = configuration.AccessoryInventoryMin;
-        ImGui.SetNextItemWidth(90);
-        PushInput();
-        if (ImGui.InputInt("Stop if N or more free inventory slots (0–140)##min", ref minFreeSlots, 1, 10))
-        {
-            configuration.AccessoryInventoryMin = Math.Clamp(minFreeSlots, 0, 140);
-            configuration.Save();
-        }
-        PopInput();
-        ImGui.SameLine();
-        Common.DimmedText("(0 = skip check)");
+        ConfigInputInt("Stop if N or more free inventory slots (0–140)##min", configuration.AccessoryInventoryMin, 0, 140,
+            v => configuration.AccessoryInventoryMin = v, hint: "(0 = skip check)",
+            desc: "Accessory equip is skipped if you have this many free inventory slots or more");
 
         RowGap(4);
         Common.DimmedText("Characters listed here will bypass all restrictions.");

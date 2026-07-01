@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -34,7 +35,15 @@ public partial class ConfigWindow : Window
     private IFontHandle? titleFont;
     internal void SetTitleFont(IFontHandle font) => titleFont = font;
 
-    private int selectedSection;
+    private ConfigSection selectedSection;
+    private ConfigSection currentDrawSection;
+    private string searchQuery = "";
+    private bool searchModeActive;
+    private int searchBoxGeneration;
+    private string? pendingJumpKey;
+    private int pendingJumpFramesLeft;
+    private string? flashKey;
+    private double flashEndTime;
 
     public ConfigWindow(Configuration configuration, LoginInfoHandler loginInfoHandler, AccessoryHandler accessoryHandler, RepairHandler repairHandler, NoKillHandler noKillHandler, PhysicsHandler physicsHandler, AntiAfkHandler antiAfkHandler, ReadyCheckHandler readyCheckHandler, IObjectTable objectTable, IDalamudPluginInterface pluginInterface, CharacterDb characterDb, IClientState clientState, Action<string, string> onSwitchCharacter, Action<CharacterRecord, HousingBidRecord> onGoToBid, Action onClientSettingsChanged)
         : base($"The Holiest Fluffiness##Config")
@@ -54,7 +63,9 @@ public partial class ConfigWindow : Window
         this.onSwitchCharacter = onSwitchCharacter;
         this.onGoToBid = onGoToBid;
         this.onClientSettingsChanged = onClientSettingsChanged;
-        selectedSection = configuration.LastSelectedSection;
+        selectedSection = (ConfigSection)configuration.LastSelectedSection;
+        if (!configuration.CharactersDbEnabled && (selectedSection == ConfigSection.Characters || selectedSection == ConfigSection.Bids))
+            selectedSection = ConfigSection.Database;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -68,19 +79,45 @@ public partial class ConfigWindow : Window
 
     public void SetFoodCheckHandler(FoodCheckHandler h) => foodCheckHandler = h;
 
-    public void NavigateTo(int section)
+    public void NavigateTo(ConfigSection section)
     {
+        if (!configuration.CharactersDbEnabled && (section == ConfigSection.Characters || section == ConfigSection.Bids))
+            section = ConfigSection.Database;
+
         selectedSection = section;
-        configuration.LastSelectedSection = section;
+        configuration.LastSelectedSection = (int)section;
         configuration.Save();
-        if (section == 5) LoadCharacters();
-        if (section == 6) LoadBids();
-        if (section == 9) LoadInventory();
+        if (section == ConfigSection.Characters) LoadCharacters();
+        if (section == ConfigSection.Bids) LoadBids();
+    }
+
+    private void JumpTo(ConfigSection section, string key)
+    {
+        NavigateTo(section);
+        pendingJumpKey = key;
+        pendingJumpFramesLeft = 3;
+        flashKey = key;
+        flashEndTime = ImGui.GetTime() + 1.2;
+        ExitSearchMode();
+    }
+
+    // searchModeActive is deliberately sticky (only cleared here, never by focus loss alone).
+    // A click on a result row can cause the search InputText to lose ImGui focus on that very
+    // same frame, before the row itself is even processed, if entering/staying in search mode
+    // depended on re-reading IsItemFocused() every frame, that same click would collapse the
+    // results list back to the previous section before the row's own click got a chance to fire.
+    // Changing the widget's ID (searchBoxGeneration) additionally forces ImGui to drop any
+    // lingering keyboard focus so the box visually deactivates too.
+    private void ExitSearchMode()
+    {
+        searchQuery = "";
+        searchModeActive = false;
+        searchBoxGeneration++;
     }
 
     public override void PreDraw()
     {
-        SizeConstraints = (selectedSection == 5 || selectedSection == 6 || selectedSection == 9)
+        SizeConstraints = (selectedSection == ConfigSection.Characters || selectedSection == ConfigSection.Bids)
             ? new WindowSizeConstraints { MinimumSize = new Vector2(700, 380), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) }
             : new WindowSizeConstraints { MinimumSize = new Vector2(480, 250), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
 
@@ -96,6 +133,12 @@ public partial class ConfigWindow : Window
 
     public override void Draw()
     {
+        if (!searchIndexWarmed)
+        {
+            WarmSearchIndex();
+            searchIndexWarmed = true;
+        }
+
         var avail = ImGui.GetContentRegionAvail();
         const float sidebarWidth = 180f;
 
@@ -107,6 +150,47 @@ public partial class ConfigWindow : Window
         fileDialogManager.Draw();
     }
 
+    // Silently draws every settings-bearing section once, into a clipped 1x1 child with all
+    // input blocked, purely so every Config*/Anchor call registers into SearchIndex before the
+    // user ever opens a tab. Runs once per game session on the first time this window draws.
+    private static bool searchIndexWarmed;
+
+    private void WarmSearchIndex()
+    {
+        var savedSection = currentDrawSection;
+
+        ImGui.SetCursorPos(Vector2.Zero);
+        ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 0f);
+        // Deliberately NOT sized down to near-zero: a fully clipped/zero-area child gets marked
+        // SkipItems by ImGui, which makes every widget inside it (Checkbox, SliderInt, ...) bail
+        // out immediately without registering, exactly the bug this warmup exists to avoid. Alpha
+        // 0 + NoInputs already make it invisible and unclickable, so a real, unclipped size is safe.
+        ImGui.BeginChild("##searchwarmup", ImGui.GetContentRegionAvail(), false,
+            ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoNav);
+
+        foreach (var section in new[]
+                 {
+                     ConfigSection.Client, ConfigSection.Login, ConfigSection.Indicators,
+                     ConfigSection.Social, ConfigSection.Database,
+                 })
+        {
+            currentDrawSection = section;
+            switch (section)
+            {
+                case ConfigSection.Client:     DrawClientSection();     break;
+                case ConfigSection.Login:      DrawLoginSection();      break;
+                case ConfigSection.Indicators: DrawIndicatorsSection(); break;
+                case ConfigSection.Social:     DrawSocialSection();     break;
+                case ConfigSection.Database:   DrawDatabaseSection();   break;
+            }
+        }
+
+        ImGui.EndChild();
+        ImGui.PopStyleVar();
+
+        currentDrawSection = savedSection;
+    }
+
     public override void OnClose()
     {
         testAllCts?.Cancel();
@@ -114,6 +198,15 @@ public partial class ConfigWindow : Window
         bulkUpdateCts?.Cancel();
         repairHandler.TestPct = null;
         foodCheckHandler?.Invalidate();
+    }
+
+    // Reopening the window while a data-table section was already selected (persisted from a
+    // previous session) skips NavigateTo/SidebarItem entirely, so without this the data would
+    // go stale until the user manually clicked Refresh or switched tabs and back.
+    public override void OnOpen()
+    {
+        if (selectedSection == ConfigSection.Characters) LoadCharacters();
+        if (selectedSection == ConfigSection.Bids) LoadBids();
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────────
@@ -129,24 +222,31 @@ public partial class ConfigWindow : Window
         ImGui.BeginChild("##sidebar", new Vector2(width, height), false);
 
         ImGui.Dummy(new Vector2(0, 4));
-        SidebarItem("Client", 0);
-        SidebarItem("Login", 1);
-        SidebarItem("Indicators", 2);
-        SidebarItem("Social", 8);
+        DrawSearchBox();
+
+        SidebarItem("Client", ConfigSection.Client);
+        SidebarItem("Login", ConfigSection.Login);
+        SidebarItem("Indicators", ConfigSection.Indicators);
+        SidebarItem("Social", ConfigSection.Social);
+
+        if (configuration.CharactersDbEnabled)
+        {
+            ImGui.Dummy(new Vector2(0, 4));
+            SidebarSeparator();
+            SidebarItem("Database", ConfigSection.Database);
+            if (SidebarItem("Characters", ConfigSection.Characters))
+                LoadCharacters();
+            if (SidebarItem("House bids", ConfigSection.Bids))
+                LoadBids();
+        } else
+        {
+            // If the database ain't enabled, don't bother seperating and making bulk
+            SidebarItem("Database", ConfigSection.Database);
+        }
 
         ImGui.Dummy(new Vector2(0, 4));
         SidebarSeparator();
-        SidebarItem("Database", 4);
-        if (SidebarItem("Characters", 5))
-            LoadCharacters();
-        if (SidebarItem("Inventory", 9))
-            LoadInventory();
-        if (SidebarItem("House bids", 6))
-            LoadBids();
-
-        ImGui.Dummy(new Vector2(0, 4));
-        SidebarSeparator();
-        SidebarItem("About", 7);
+        SidebarItem("About", ConfigSection.About);
 
         ImGui.EndChild();
         ImGui.PopStyleVar();
@@ -162,7 +262,19 @@ public partial class ConfigWindow : Window
         ImGui.Dummy(new Vector2(0, 4));
     }
 
-    private bool SidebarItem(string label, int index)
+    private void DrawSearchBox()
+    {
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 6f);
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 6f);
+        PushInput();
+        ImGui.InputTextWithHint($"##settingssearch{searchBoxGeneration}", "Search settings...", ref searchQuery, 64);
+        // Only ever latches search mode ON here; it's turned off exclusively by ExitSearchMode().
+        if (ImGui.IsItemActive() || ImGui.IsItemFocused())
+            searchModeActive = true;
+        PopInput();
+    }
+
+    private bool SidebarItem(string label, ConfigSection index)
     {
         bool active = selectedSection == index;
 
@@ -188,8 +300,9 @@ public partial class ConfigWindow : Window
         if (clicked)
         {
             selectedSection = index;
-            configuration.LastSelectedSection = index;
+            configuration.LastSelectedSection = (int)index;
             configuration.Save();
+            ExitSearchMode();
         }
         ImGui.PopStyleVar(2);
         ImGui.PopStyleColor(4);
@@ -208,22 +321,103 @@ public partial class ConfigWindow : Window
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8, 0));
         ImGui.BeginChild("##main", new Vector2(0, height), false);
 
-        switch (selectedSection)
+        if (searchModeActive)
         {
-            case 0: DrawClientSection();      break;
-            case 1: DrawLoginSection();       break;
-            case 2:  DrawIndicatorsSection();  break;
-            case 4: DrawDatabaseSection();    break;
-            case 5: DrawCharactersSection();  break;
-            case 6: DrawBidsSection();        break;
-            case 7: DrawAboutSection();       break;
-            case 8: DrawSocialSection();      break;
-            case 9: DrawInventorySection();   break;
+            DrawSearchResults();
+        }
+        else
+        {
+            currentDrawSection = selectedSection;
+            switch (selectedSection)
+            {
+                case ConfigSection.Client:     DrawClientSection();     break;
+                case ConfigSection.Login:      DrawLoginSection();      break;
+                case ConfigSection.Indicators: DrawIndicatorsSection(); break;
+                case ConfigSection.Database:   DrawDatabaseSection();   break;
+                case ConfigSection.Characters: DrawCharactersSection(); break;
+                case ConfigSection.Bids:       DrawBidsSection();       break;
+                case ConfigSection.About:      DrawAboutSection();      break;
+                case ConfigSection.Social:     DrawSocialSection();     break;
+            }
         }
 
         ImGui.EndChild();
         ImGui.PopStyleVar();
         ImGui.PopStyleColor(5);
+    }
+
+    // ── Search results ────────────────────────────────────────────────────────
+
+    private void DrawSearchResults()
+    {
+        var query    = searchQuery.Trim();
+        var showAll  = query.Length == 0;
+        var filtered = showAll
+            ? SearchIndex.Entries
+            : SearchIndex.Entries.Where(e =>
+                e.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (e.Desc?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
+        var matches = filtered.OrderBy(e => e.Section).ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase).ToList();
+
+        ImGui.Dummy(new Vector2(0, 6));
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        using (titleFont?.Push())
+            ImGui.TextUnformatted(showAll ? $"All settings ({matches.Count})" : $"Search results ({matches.Count})");
+        ImGui.PopStyleColor();
+        ImGui.Dummy(new Vector2(0, 4));
+
+        if (matches.Count == 0)
+        {
+            SectionRow();
+            Common.DimmedText("No settings match your search.");
+            return;
+        }
+
+        foreach (var entry in matches)
+            DrawSearchResultRow(entry);
+    }
+
+    private void DrawSearchResultRow(SettingEntry entry)
+    {
+        SectionRow();
+        var width = ImGui.GetContentRegionAvail().X - 8f;
+        var height = entry.Desc != null ? 42f : 26f;
+
+        ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGold);
+        bool clicked = ImGui.Selectable($"##searchres_{entry.Section}_{entry.Key}", false,
+            ImGuiSelectableFlags.None, new Vector2(width, height));
+        ImGui.PopStyleColor(3);
+
+        var min   = ImGui.GetItemRectMin();
+        var max   = ImGui.GetItemRectMax();
+        var textX = min.X + 6f;
+
+        ImGui.SetCursorScreenPos(new Vector2(textX, min.Y + 4f));
+        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        ImGui.TextUnformatted(entry.Title);
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        Common.DimmedText($"[ {entry.Section} ]");
+
+        if (entry.Desc != null)
+        {
+            ImGui.SetCursorScreenPos(new Vector2(textX, min.Y + 21f));
+            Common.DimmedTextWrapped(entry.Desc);
+        }
+
+        // The manual SetCursorScreenPos calls above leave the cursor wherever the overlay text
+        // ended, not at the bottom of the row, without pinning it back to the Selectable's own
+        // rect, rows creep upward and overlap after enough of them, and clicks then resolve to
+        // whichever overlapping row's Selectable ends up on top instead of the one you can see.
+        ImGui.SetCursorScreenPos(new Vector2(min.X, max.Y));
+
+        ImGui.Dummy(new Vector2(0, 2));
+
+        if (clicked)
+            JumpTo(entry.Section, entry.Key);
     }
 
     // ── Resize grip ───────────────────────────────────────────────────────────
@@ -285,10 +479,69 @@ public partial class ConfigWindow : Window
         SectionRow();
     }
 
+    // ── Search anchoring ──────────────────────────────────────────────────────
+    // Every searchable control (or BeginGroup'd cluster of controls) calls Anchor(key, title, desc)
+    // right after drawing itself. This both (a) self-registers into SearchIndex for the current
+    // section, so the search box needs no separately-maintained list, and (b) scrolls the key into
+    // view once, right after a search-result click sets pendingJumpKey, and draws a fading
+    // highlight rect while flashKey == key. title/desc are omitted for controls that don't carry
+    // a meaningful standalone label (e.g. a bare checkbox glued to a slider via SameLine).
+
+    private static string? ExtractKey(string label)
+    {
+        var idx = label.IndexOf("##", StringComparison.Ordinal);
+        return idx >= 0 ? label[(idx + 2)..] : null;
+    }
+
+    // Null when the label has no visible text before "##" (e.g. a bare checkbox glued to a
+    // sibling slider) such controls aren't meaningful standalone search results on their own.
+    private static string? ExtractTitle(string label)
+    {
+        var idx = label.IndexOf("##", StringComparison.Ordinal);
+        var title = idx >= 0 ? label[..idx] : label;
+        return title.Length > 0 ? title : null;
+    }
+
+    private void Anchor(string? key, string? title = null, string? desc = null)
+    {
+        if (key == null) return;
+
+        if (title != null)
+            SearchIndex.Register(currentDrawSection, key, title, desc);
+
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+
+        if (pendingJumpKey == key)
+        {
+            // Retried for a few frames rather than consumed on the first hit: the target
+            // section's "##sec" child can be appearing for the first time this session (you
+            // never browsed there normally), and ImGui hasn't got a settled scroll range for a
+            // window on its very first frame, SetScrollHereY silently no-ops until it does.
+            ImGui.SetScrollHereY(0.3f);
+            if (--pendingJumpFramesLeft <= 0)
+                pendingJumpKey = null;
+        }
+
+        if (flashKey != key) return;
+
+        var remaining = flashEndTime - ImGui.GetTime();
+        if (remaining <= 0)
+        {
+            flashKey = null;
+            return;
+        }
+
+        var alpha = (float)Math.Clamp(remaining / 1.2, 0, 1);
+        Common.DrawHighlightRect(ImGui.GetWindowDrawList(), min - new Vector2(4, 4), max + new Vector2(4, 4),
+            4f, Theme.ColGold with { W = alpha }, pulse: false);
+    }
+
     private void ConfigSliderInt(string label, int current, int min, int max, Action<int> setter,
-        float width = 220, string? hint = null, Action? onChange = null, bool padding = true)
+        float width = 220, string? hint = null, Action? onChange = null, bool padding = true, string? desc = null)
     {
         if (padding) SectionRow();
+        ImGui.BeginGroup();
         ImGui.SetNextItemWidth(width);
         PushInput();
         if (ImGui.SliderInt(label, ref current, min, max))
@@ -299,11 +552,14 @@ public partial class ConfigWindow : Window
         }
         PopInput();
         if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), ExtractTitle(label), desc);
     }
 
     private void ConfigSliderFloat(string label, float current, float min, float max, Action<float> setter,
-        float width = 220, string? format = null, string? hint = null)
+        float width = 220, string? format = null, string? hint = null, string? desc = null)
     {
+        ImGui.BeginGroup();
         ImGui.SetNextItemWidth(width);
         PushInput();
         bool changed = format != null
@@ -312,6 +568,8 @@ public partial class ConfigWindow : Window
         if (changed) { setter(current); configuration.Save(); }
         PopInput();
         if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), ExtractTitle(label), desc);
     }
 
     private void SubsectionLabel(string label, string? desc = null)
@@ -401,6 +659,7 @@ public partial class ConfigWindow : Window
     private void ConfigCheckbox(string label, bool current, Action<bool> setter, string? desc = null)
     {
         SectionRow();
+        ImGui.BeginGroup();
 
         if (desc == null)
         {
@@ -411,31 +670,108 @@ public partial class ConfigWindow : Window
                 configuration.Save();
             }
             PopCheckbox();
-            return;
+        }
+        else
+        {
+            // Separate display text from ImGui ID so we can position them independently
+            var sep  = label.IndexOf("##", StringComparison.Ordinal);
+            var text = sep >= 0 ? label[..sep] : label;
+            var id   = sep >= 0 ? label[sep..] : "##" + label;
+
+            // Draw the checkbox box only (no visible label)
+            PushCheckbox();
+            if (ImGui.Checkbox(id, ref current))
+            {
+                setter(current);
+                configuration.Save();
+            }
+            PopCheckbox();
+
+            var boxMin = ImGui.GetItemRectMin();
+            var boxMax = ImGui.GetItemRectMax();
+            var textX  = boxMax.X + ImGui.GetStyle().ItemInnerSpacing.X + 2f;
+
+            ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y - 5f));
+            ImGui.TextUnformatted(text);
+
+            ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y + 10f));
+            Common.DimmedTextWrapped(desc);
         }
 
-        // Separate display text from ImGui ID so we can position them independently
-        var sep  = label.IndexOf("##", StringComparison.Ordinal);
-        var text = sep >= 0 ? label[..sep] : label;
-        var id   = sep >= 0 ? label[sep..] : "##" + label;
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), ExtractTitle(label), desc);
+    }
 
-        // Draw the checkbox box only (no visible label)
-        PushCheckbox();
-        if (ImGui.Checkbox(id, ref current))
+    // ── New Config* helpers (combo/color/text/int) ───────────────────────────
+    // Follow the same convention as ConfigCheckbox/ConfigSliderInt/ConfigSliderFloat above:
+    // label carries a "Display text##anchorkey" suffix used both as the ImGui ID and the
+    // search-anchor key, and the group is auto-registered with Anchor() for search jump/flash.
+
+    private void ConfigCombo(string label, int currentIndex, string[] items, Action<int> setter,
+        float width = 180, string? hint = null, bool padding = true, string? desc = null, string? title = null)
+    {
+        if (padding) SectionRow();
+        ImGui.BeginGroup();
+        ImGui.SetNextItemWidth(width);
+        PushInput();
+        if (ImGui.Combo(label, ref currentIndex, items, items.Length))
+        {
+            setter(currentIndex);
+            configuration.Save();
+        }
+        PopInput();
+        if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), title ?? ExtractTitle(label), desc);
+    }
+
+    private void ConfigColorEdit4(string label, Vector4 current, Action<Vector4> setter,
+        ImGuiColorEditFlags flags = ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar, string? desc = null, string? title = null)
+    {
+        ImGui.BeginGroup();
+        if (ImGui.ColorEdit4(label, ref current, flags))
         {
             setter(current);
             configuration.Save();
         }
-        PopCheckbox();
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), title ?? ExtractTitle(label), desc);
+    }
 
-        var boxMin = ImGui.GetItemRectMin();
-        var boxMax = ImGui.GetItemRectMax();
-        var textX  = boxMax.X + ImGui.GetStyle().ItemInnerSpacing.X + 2f;
+    private void ConfigInputText(string label, string current, Action<string> setter,
+        int maxLength = 128, float width = 220, string? hint = null, Action? onChange = null, string? desc = null)
+    {
+        SectionRow();
+        ImGui.BeginGroup();
+        ImGui.SetNextItemWidth(width);
+        PushInput();
+        if (ImGui.InputText(label, ref current, maxLength))
+        {
+            setter(current);
+            configuration.Save();
+            onChange?.Invoke();
+        }
+        PopInput();
+        if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), ExtractTitle(label), desc);
+    }
 
-        ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y - 5f));
-        ImGui.TextUnformatted(text);
-
-        ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y + 10f));
-        Common.DimmedTextWrapped(desc);
+    private void ConfigInputInt(string label, int current, int min, int max, Action<int> setter,
+        int step = 1, int stepFast = 10, float width = 90, string? hint = null, bool padding = true, string? desc = null)
+    {
+        if (padding) SectionRow();
+        ImGui.BeginGroup();
+        ImGui.SetNextItemWidth(width);
+        PushInput();
+        if (ImGui.InputInt(label, ref current, step, stepFast))
+        {
+            setter(Math.Clamp(current, min, max));
+            configuration.Save();
+        }
+        PopInput();
+        if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
+        ImGui.EndGroup();
+        Anchor(ExtractKey(label), ExtractTitle(label), desc);
     }
 }

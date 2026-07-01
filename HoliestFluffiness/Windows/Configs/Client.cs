@@ -25,19 +25,9 @@ public partial class ConfigWindow
             "Window title",
             "When the game launches, change the window title to something else.");
 
-        var prefix = configuration.ClientTitlePrefix;
-        SectionRow();
-        ImGui.SetNextItemWidth(240);
-        PushInput();
-        if (ImGui.InputText("Title prefix##clientprefix", ref prefix, 128))
-        {
-            configuration.ClientTitlePrefix = prefix;
-            configuration.Save();
-            onClientSettingsChanged();
-        }
-        PopInput();
-        ImGui.SameLine();
-        Common.DimmedText("(empty = FINAL FANTASY XIV)");
+        ConfigInputText("Title prefix##clientprefix", configuration.ClientTitlePrefix,
+            v => configuration.ClientTitlePrefix = v, width: 240,
+            hint: "(empty = FINAL FANTASY XIV)", onChange: onClientSettingsChanged);
 
         ConfigCheckbox(
             "Append name on login##clientappend",

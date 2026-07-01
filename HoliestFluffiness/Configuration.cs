@@ -29,8 +29,6 @@ public class Configuration : IPluginConfiguration
     // Order of the 5 info items: 0=Character, 1=SearchInfo, 2=PrivateHouse, 3=FreeCompany, 4=FcHouse
     public List<int> LoginInfoOrder { get; set; } = [0, 1, 2, 3, 4];
     public bool CharactersDbEnabled { get; set; } = false;
-    // Visibility of the 10 Characters table columns: LastSeen, Name, World, DC, FC, SearchInfo, PrivateHouse, FcHouse, Gil, MGP
-    public bool[] CharactersColumns { get; set; } = [true, true, true, true, true, true, true, true, true, true];
     public int LastSelectedSection { get; set; } = 0;
 
     // Server info section
@@ -192,9 +190,6 @@ public class Configuration : IPluginConfiguration
         var expected = Enumerable.Range(0, 5).ToList();
         if (LoginInfoOrder.Count != 5 || !expected.All(LoginInfoOrder.Contains))
             LoginInfoOrder = expected;
-
-        if (CharactersColumns == null || CharactersColumns.Length != 10)
-            CharactersColumns = [true, true, true, true, true, true, true, true, true, true];
     }
 
     public void Save()

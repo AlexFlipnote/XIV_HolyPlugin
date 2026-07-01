@@ -250,7 +250,7 @@ internal static class Common
             {
                 float w = widths[i];
                 float h = heights[i];
-                // Right-align within overlay — child right edge == screen right edge
+                // Right-align within overlay, child right edge == screen right edge
                 ImGui.SetCursorPos(new Vector2(maxW - w, curY));
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
                 bool ok = ImGui.BeginChild($"##ht{i}", new Vector2(w, h), false,
@@ -267,7 +267,7 @@ internal static class Common
 
     private static float ToastCalcWidth(HfToast t, float s, float padX)
     {
-        // Explicit fixed width — caller knows best (e.g. content with unmeasurable glyphs)
+        // Explicit fixed width, caller knows best (e.g. content with unmeasurable glyphs)
         if (t.Width > 0f) return t.Width * s;
 
         // Auto-size: measure each line independently so ImGui's per-glyph measurement is

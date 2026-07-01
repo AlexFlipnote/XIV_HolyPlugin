@@ -61,7 +61,7 @@ public class FoodCheckHandler : IDisposable
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "[HF] FoodCheck: countdown hook failed — countdown trigger will not work.");
+            log.Warning(ex, "[HF] FoodCheck: countdown hook failed, countdown trigger will not work.");
         }
     }
 
@@ -84,7 +84,7 @@ public class FoodCheckHandler : IDisposable
     // Called from Plugin.cs when a ready check is initiated
     public void OnReadyCheck() => RunCheck(ignoreDutyFilter: false);
 
-    // Called from the test button — skips the duty scope filter, clears after 5 s
+    // Called from the test button, skips the duty scope filter, clears after 5 s
     public void ForceCheck() => RunCheck(ignoreDutyFilter: true, clearDelayMs: 5_000);
 
     private nint OnCountdownTimer(ulong value)
@@ -143,7 +143,7 @@ public class FoodCheckHandler : IDisposable
         var result = new List<FoodCheckEntry>();
         var hud    = AgentHUD.Instance();
 
-        // Party members — read statuses directly from IPartyMember, no object table lookup needed
+        // Party members, read statuses directly from IPartyMember, no object table lookup needed
         for (var i = 0; i < partyList.Length; i++)
         {
             var member = partyList[i];
@@ -166,7 +166,7 @@ public class FoodCheckHandler : IDisposable
                 remaining));
         }
 
-        // Solo or all party lookups empty — check local player directly
+        // Solo or all party lookups empty, check local player directly
         if (result.Count == 0 && objectTable[0] is Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter local)
         {
             var remaining = 0;

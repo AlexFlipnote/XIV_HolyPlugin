@@ -57,34 +57,22 @@ public partial class ConfigWindow
             v => configuration.ServerInfoPingEnabled = v);
         ImGui.SameLine();
         ImGui.BeginDisabled(!configuration.ServerInfoPingEnabled);
-        ImGui.SetNextItemWidth(150);
         var displayModes = new[] { "Last ping", "Average ping", "Both" };
-        var displayIndex = (int)configuration.ServerInfoPingDisplay;
-        PushInput();
-        if (ImGui.Combo("##serverinfopingdisplay", ref displayIndex, displayModes, displayModes.Length))
-        {
-            configuration.ServerInfoPingDisplay = (PingDisplay)displayIndex;
-            configuration.Save();
-        }
-        PopInput();
+        ConfigCombo("##serverinfopingdisplay", (int)configuration.ServerInfoPingDisplay, displayModes,
+            v => configuration.ServerInfoPingDisplay = (PingDisplay)v, width: 150, padding: false,
+            title: "Ping display mode");
         ImGui.EndDisabled();
 
-        ImGui.SetNextItemWidth(150);
-        var pingScaleMax = configuration.PingChartScaleMax;
-        SectionRow();
-        PushInput();
-        if (ImGui.InputInt("Ping chart Y-axis max (ms, 0 = auto)##pingscale", ref pingScaleMax, 10, 50))
-        {
-            configuration.PingChartScaleMax = Math.Max(0, pingScaleMax);
-            configuration.Save();
-        }
-        PopInput();
+        ConfigInputInt("Ping chart Y-axis max (ms, 0 = auto)##pingscale", configuration.PingChartScaleMax, 0, int.MaxValue,
+            v => configuration.PingChartScaleMax = v, step: 10, stepFast: 50, width: 150);
 
         // ── Repair ────────────────────────────────────────────────────────────
         SubsectionLabel("Repair",
             "Adds a debuff icon to Status (Other) when your gear durability drops below a threshold. " +
             "Critical takes priority over Low, only one icon appears at a time.");
 
+        const string repairLowDesc = "Shows: \"Gear at X%, consider repairing\"";
+        ImGui.BeginGroup();
         ConfigCheckbox(
             "##repairlowcheck",
             configuration.RepairLowEnabled,
@@ -95,10 +83,14 @@ public partial class ConfigWindow
             v => configuration.RepairLowThreshold = v, width: 200, format: "%.0f%%");
 
         SectionRow();
-        Common.DimmedText("Shows: \"Gear at X%, consider repairing\"");
+        Common.DimmedText(repairLowDesc);
+        ImGui.EndGroup();
+        Anchor("repairlow", "Low gear repair threshold", repairLowDesc);
 
         ImGui.Dummy(new Vector2(0, 4));
 
+        const string repairCritDesc = "Shows: \"Gear really damaged (X%), repair now!!\"";
+        ImGui.BeginGroup();
         ConfigCheckbox(
             "##repaircritcheck",
             configuration.RepairCriticalEnabled,
@@ -109,7 +101,9 @@ public partial class ConfigWindow
             v => configuration.RepairCriticalThreshold = v, width: 200, format: "%.0f%%");
 
         SectionRow();
-        Common.DimmedText("Shows: \"Gear really damaged (X%), repair now!!\"");
+        Common.DimmedText(repairCritDesc);
+        ImGui.EndGroup();
+        Anchor("repaircrit", "Critical gear repair threshold", repairCritDesc);
 
         ImGui.Dummy(new Vector2(0, 8));
 
@@ -161,7 +155,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.FoodCheckSound);
         DrawSoundPicker(
-            "foodcheck",
+            "foodcheck", "Food check sound",
             Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "FoodCheck", "hungry.mp3"),
             configuration.FoodCheckSoundPath,
             configuration.FoodCheckSoundVolume,
@@ -286,6 +280,8 @@ public partial class ConfigWindow
         float vol,     Action<float>  setVol,
         bool firstSet = false)
     {
+        ImGui.BeginGroup();
+
         if (firstSet) SectionRow();
         else RowGap(6);
 
@@ -346,5 +342,8 @@ public partial class ConfigWindow
         Common.DimmedText("Test the sound + text");
 
         ImGui.EndDisabled();
+
+        ImGui.EndGroup();
+        Anchor(id, $"Combat hit: {label}", "Audio/visual feedback settings for this hit type");
     }
 }

@@ -64,6 +64,38 @@ public class CharacterPickerWindow : Window
         ImGui.PopStyleVar(3);
     }
 
+    private List<TableColumn<CharacterRecord>> BuildColumns(Action<CharacterRecord> onPick)
+    {
+        return
+        [
+            // Hosts the row-wide click target (SpanAllColumns), so it must stay visible even if
+            // the user right-clicks the header to hide/reorder the other columns.
+            new("Last login", 0, ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending | ImGuiTableColumnFlags.NoHide, col0Width,
+                r => r.LastSeen,
+                r =>
+                {
+                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+                    ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
+                    ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldSub);
+                    ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGoldMid);
+                    ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhiteDim);
+                    bool clicked = ImGui.Selectable(
+                        $"{r.LastSeen.ToLocalTime():yyyy-MM-dd HH:mm}##pick{r.Key}",
+                        false,
+                        ImGuiSelectableFlags.SpanAllColumns);
+                    ImGui.PopStyleColor(4);
+                    if (clicked) onPick(r);
+                },
+                HeaderPadLeft: 8f),
+            new("Name", 1, ImGuiTableColumnFlags.None, col1Width,
+                r => r.Name,
+                r => Common.GoldText(r.Name)),
+            new("World/Slot", 2, ImGuiTableColumnFlags.None, col2Width,
+                r => r.World,
+                r => Common.DimmedText(r.Slot > 0 ? $"{r.World}/{r.Slot}" : r.World)),
+        ];
+    }
+
     public override void Draw()
     {
         if (needsMeasure && records.Count > 0)
@@ -80,86 +112,22 @@ public class CharacterPickerWindow : Window
 
         var footerH = ImGui.GetStyle().ItemSpacing.Y + ImGui.GetFrameHeightWithSpacing();
         var tableH  = ImGui.GetContentRegionAvail().Y - footerH;
-        var flags   = ImGuiTableFlags.ScrollY
-                    | ImGuiTableFlags.BordersInnerH
-                    | ImGuiTableFlags.SizingStretchProp
-                    | ImGuiTableFlags.Sortable;
 
-        string? nextName  = null;
-        string? nextWorld = null;
+        CharacterRecord? picked = null;
+        var columns = BuildColumns(r => picked = r);
 
-        if (ImGui.BeginTable("##charpicker", 3, flags, new Vector2(0, tableH)))
-        {
-            ImGui.TableSetupScrollFreeze(0, 1);
-            // 3rd param = initial fixed width, 4th = user ID for sort specs
-            // Measured pixel widths used as proportional stretch weights, all columns scale together
-            ImGui.TableSetupColumn("Last login", ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, col0Width, 0);
-            ImGui.TableSetupColumn("Name",       ImGuiTableColumnFlags.None,                                                     col1Width, 1);
-            ImGui.TableSetupColumn("World/Slot", ImGuiTableColumnFlags.None,                                                     col2Width, 2);
-
-            Common.PushTableHeader();
-            ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
-            ImGui.TableSetColumnIndex(0);
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-            ImGui.TableHeader("Last login");
-            ImGui.TableSetColumnIndex(1); ImGui.TableHeader("Name");
-            ImGui.TableSetColumnIndex(2); ImGui.TableHeader("World/Slot");
-            Common.PopTableHeader();
-
-            // Sort, must happen after TableHeadersRow so specs are populated
-            var sortSpecs = ImGui.TableGetSortSpecs();
-            if (sortSpecs.SpecsDirty && sortSpecs.SpecsCount > 0)
-            {
-                var spec = sortSpecs.Specs;
-                bool desc = spec.SortDirection == ImGuiSortDirection.Descending;
-                records = (int)spec.ColumnUserID switch
-                {
-                    0 => [.. desc ? records.OrderByDescending(r => r.LastSeen)
-                                  : records.OrderBy(r => r.LastSeen)],
-                    1 => [.. desc ? records.OrderByDescending(r => r.Name)
-                                  : records.OrderBy(r => r.Name)],
-                    2 => [.. desc ? records.OrderByDescending(r => r.World).ThenByDescending(r => r.Slot == 0 ? int.MaxValue : r.Slot)
-                                  : records.OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)],
-                    _ => records,
-                };
-                sortSpecs.SpecsDirty = false;
-            }
-
-            var filter  = search.Trim();
-            var visible = string.IsNullOrEmpty(filter)
-                ? records
-                : records.Where(r =>
-                    r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                    r.World.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
-
-            foreach (var rec in visible)
-            {
-                ImGui.TableNextRow();
-                ImGui.TableSetColumnIndex(0);
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-
-                // SpanAllColumns covers the full row for hover highlight and click
-                ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
-                ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldSub);
-                ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGoldMid);
-                ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhiteDim);
-                bool clicked = ImGui.Selectable(
-                    $"{rec.LastSeen.ToLocalTime():yyyy-MM-dd HH:mm}##pick{rec.Key}",
-                    false,
-                    ImGuiSelectableFlags.SpanAllColumns);
-                ImGui.PopStyleColor(4);
-
-                if (clicked) { nextName = rec.Name; nextWorld = rec.World; }
-
-                ImGui.TableSetColumnIndex(1);
-                Common.GoldText(rec.Name);
-
-                ImGui.TableSetColumnIndex(2);
-                Common.DimmedText(rec.Slot > 0 ? $"{rec.World}/{rec.Slot}" : rec.World);
-            }
-
-            ImGui.EndTable();
-        }
+        var filter = search.Trim();
+        ConfigTable.DrawDataTable(
+            "##charpicker",
+            columns,
+            ref records,
+            r => r.Slot == 0 ? int.MaxValue : r.Slot,
+            r => filter.Length == 0
+                || r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || r.World.Contains(filter, StringComparison.OrdinalIgnoreCase),
+            tableFlags: ImGuiTableFlags.Sortable | ImGuiTableFlags.Hideable | ImGuiTableFlags.Reorderable
+                | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp,
+            heightOverride: tableH);
 
         const float margin = 30f;
         ImGui.SetCursorPosX(margin);
@@ -168,10 +136,10 @@ public class CharacterPickerWindow : Window
         ImGui.InputTextWithHint("##pickersearch", "Search...", ref search, 128);
         Common.PopSearchInput();
 
-        if (nextName != null && nextWorld != null)
+        if (picked != null)
         {
             IsOpen = false;
-            onLogin(nextName, nextWorld);
+            onLogin(picked.Name, picked.World);
         }
     }
 

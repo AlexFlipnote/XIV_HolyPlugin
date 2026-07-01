@@ -57,43 +57,23 @@ public partial class ConfigWindow
             v => configuration.NearbyDebugSelf = v);
         ImGui.SameLine(0, 12);
         ImGui.BeginDisabled(!configuration.NearbyDebugSelf);
-        ImGui.SetNextItemWidth(140);
-        var debugSelfAs = configuration.NearbyDebugSelfAs;
-        PushInput();
-        if (ImGui.Combo("##nearbydebugselfa", ref debugSelfAs, "as Normal\0as Friend\0as FC member\0as Party member\0as Targeting you\0"))
-        {
-            configuration.NearbyDebugSelfAs = debugSelfAs;
-            configuration.Save();
-        }
-        PopInput();
+        var debugSelfAsModes = new[] { "as Normal", "as Friend", "as FC member", "as Party member", "as Targeting you" };
+        ConfigCombo("##nearbydebugselfa", configuration.NearbyDebugSelfAs, debugSelfAsModes,
+            v => configuration.NearbyDebugSelfAs = v, width: 140, padding: false,
+            title: "Nearby: debug self display mode");
         ImGui.EndDisabled();
 
         ImGui.EndDisabled();
 
         // ── Colours ───────────────────────────────────────────────────────────
-        var colParty = configuration.NearbyColParty;
         RowGap(2);
         Common.DimmedTextWrapped("Colours of names inside if the character is...");
         SectionRow();
-        if (ImGui.ColorEdit4("Party##nearbycolparty", ref colParty, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
-        {
-            configuration.NearbyColParty = colParty;
-            configuration.Save();
-        }
+        ConfigColorEdit4("Party##nearbycolparty", configuration.NearbyColParty, v => configuration.NearbyColParty = v);
         ImGui.SameLine(0, 20);
-        var colFriend = configuration.NearbyColFriend;
-        if (ImGui.ColorEdit4("Friend##nearbycolorfriend", ref colFriend, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
-        {
-            configuration.NearbyColFriend = colFriend;
-            configuration.Save();
-        }
+        ConfigColorEdit4("Friend##nearbycolorfriend", configuration.NearbyColFriend, v => configuration.NearbyColFriend = v);
         ImGui.SameLine(0, 20);
-        var colFc = configuration.NearbyColLocalFc;
-        if (ImGui.ColorEdit4("Same FC##nearbycolorfc", ref colFc, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
-        {
-            configuration.NearbyColLocalFc = colFc;
-            configuration.Save();
-        }
+        ConfigColorEdit4("Same FC##nearbycolorfc", configuration.NearbyColLocalFc, v => configuration.NearbyColLocalFc = v);
 
         RowGap();
         PushButton();
@@ -127,12 +107,8 @@ public partial class ConfigWindow
 
         ImGui.BeginDisabled(!configuration.NearbyMarkTargeting);
         SectionRow();
-        var markCol = configuration.NearbyMarkTargetingColour;
-        if (ImGui.ColorEdit4("##nearbymarkcol", ref markCol, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar))
-        {
-            configuration.NearbyMarkTargetingColour = markCol;
-            configuration.Save();
-        }
+        ConfigColorEdit4("##nearbymarkcol", configuration.NearbyMarkTargetingColour, v => configuration.NearbyMarkTargetingColour = v,
+            title: "Targeting mark colour");
         ImGui.SameLine();
         ConfigSliderInt("Mark size##nearbymarksize", configuration.NearbyMarkTargetingSize, 1, 20,
             v => configuration.NearbyMarkTargetingSize = v, width: 200, padding: false);
@@ -148,7 +124,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.NearbyTargeterSound);
         DrawSoundPicker(
-            "nearbytargeter",
+            "nearbytargeter", "Targeting sound",
             Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Targeting", "looking.mp3"),
             configuration.NearbyTargeterSoundPath,
             configuration.NearbyTargeterSoundVolume,
@@ -185,7 +161,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.DoorbellEnterSound);
         DrawSoundPicker(
-            "doorbellenter",
+            "doorbellenter", "Doorbell: enter sound",
             doorbellDefault,
             configuration.DoorbellEnterSoundPath,
             configuration.DoorbellEnterSoundVolume,
@@ -215,7 +191,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereSound);
         DrawSoundPicker(
-            "doorbellalready",
+            "doorbellalready", "Doorbell: already-here sound",
             doorbellDefault,
             configuration.DoorbellAlreadyHereSoundPath,
             configuration.DoorbellAlreadyHereSoundVolume,
@@ -245,7 +221,7 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.DoorbellLeaveSound);
         DrawSoundPicker(
-            "doorbellleave",
+            "doorbellleave", "Doorbell: leave sound",
             doorbellDefault,
             configuration.DoorbellLeaveSoundPath,
             configuration.DoorbellLeaveSoundVolume,
@@ -275,7 +251,7 @@ public partial class ConfigWindow
         Common.DimmedText("1/3 commends:");
         ImGui.Dummy(new Vector2(0, 2));
         DrawSoundPicker(
-            "commendot",
+            "commendot", "Commendation sound: 1/3",
             Path.Combine(cDir, "one-third.mp3"),
             configuration.CommendationOneThirdPath,
             configuration.CommendationOneThirdVolume,
@@ -286,7 +262,7 @@ public partial class ConfigWindow
         Common.DimmedText("2/3 commends:");
         ImGui.Dummy(new Vector2(0, 2));
         DrawSoundPicker(
-            "commendtt",
+            "commendtt", "Commendation sound: 2/3",
             Path.Combine(cDir, "two-thirds.mp3"),
             configuration.CommendationTwoThirdsPath,
             configuration.CommendationTwoThirdsVolume,
@@ -297,7 +273,7 @@ public partial class ConfigWindow
         Common.DimmedText("3/3 commends:");
         ImGui.Dummy(new Vector2(0, 2));
         DrawSoundPicker(
-            "commendth",
+            "commendth", "Commendation sound: 3/3",
             Path.Combine(cDir, "three-thirds.mp3"),
             configuration.CommendationThreeThirdsPath,
             configuration.CommendationThreeThirdsVolume,
@@ -308,7 +284,7 @@ public partial class ConfigWindow
         Common.DimmedText("All 7 (full party):");
         ImGui.Dummy(new Vector2(0, 2));
         DrawSoundPicker(
-            "commendas",
+            "commendas", "Commendation sound: all 7 (full party)",
             Path.Combine(cDir, "all-seven.mp3"),
             configuration.CommendationAllSevenPath,
             configuration.CommendationAllSevenVolume,
@@ -320,8 +296,10 @@ public partial class ConfigWindow
         EndSection(10);
     }
 
-    private void DrawSoundPicker(string id, string defaultPath, string configPath, float volume, Action<string> setPath, Action<float> setVolume, bool showTest = true)
+    private void DrawSoundPicker(string id, string title, string defaultPath, string configPath, float volume, Action<string> setPath, Action<float> setVolume, bool showTest = true)
     {
+        ImGui.BeginGroup();
+
         // Row 1: [Reset to default] [Browse...] [Default sound / Current: filename]
         SectionRow();
         PushButton();
@@ -356,5 +334,8 @@ public partial class ConfigWindow
         if (ImGui.SliderFloat($"##{id}vol", ref vol, 0f, 100f, "%.0f%%"))
             setVolume(vol / 100f);
         PopInput();
+
+        ImGui.EndGroup();
+        Anchor(id, title, "Sound file and volume settings");
     }
 }

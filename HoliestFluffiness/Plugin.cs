@@ -157,7 +157,7 @@ public sealed class Plugin : IDalamudPlugin
         characterDb = new CharacterDb(dbPath);
 
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
-        loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(5); });
+        loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); });
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
@@ -283,7 +283,7 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
-    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(5); }
+    private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); }
 
     private void OnCommand(string command, string args)
     {
@@ -291,7 +291,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             case "about":
                 configWindow.IsOpen = true;
-                configWindow.NavigateTo(7);
+                configWindow.NavigateTo(ConfigSection.About);
                 break;
             case "ping":
                 pingChartWindow.IsOpen = !pingChartWindow.IsOpen;
@@ -311,7 +311,7 @@ public sealed class Plugin : IDalamudPlugin
         if (string.IsNullOrEmpty(trimmed))
         {
             configWindow.IsOpen = true;
-            configWindow.NavigateTo(5);
+            configWindow.NavigateTo(ConfigSection.Characters);
             return;
         }
 
