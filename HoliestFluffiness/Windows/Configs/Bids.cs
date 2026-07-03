@@ -25,12 +25,7 @@ public partial class ConfigWindow
         [
             new("Bid placed", 0, ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortAscending | ImGuiTableColumnFlags.WidthFixed, 90f,
                 t => t.Bid.BidDate,
-                t =>
-                {
-                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-                    ImGui.TextUnformatted(t.Bid.BidDate.ToLocalTime().ToString("yyyy-MM-dd"));
-                },
-                HeaderPadLeft: 8f),
+                t => ImGui.TextUnformatted(t.Bid.BidDate.ToLocalTime().ToString("yyyy-MM-dd"))),
             new("Character", 1, ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.WidthStretch, 0,
                 t => t.Char?.Name ?? t.Bid.CharacterKey,
                 t =>

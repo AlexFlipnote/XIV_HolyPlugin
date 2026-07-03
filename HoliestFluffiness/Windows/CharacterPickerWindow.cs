@@ -74,7 +74,6 @@ public class CharacterPickerWindow : Window
                 r => r.LastSeen,
                 r =>
                 {
-                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
                     ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
                     ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldSub);
                     ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGoldMid);
@@ -85,8 +84,7 @@ public class CharacterPickerWindow : Window
                         ImGuiSelectableFlags.SpanAllColumns);
                     ImGui.PopStyleColor(4);
                     if (clicked) onPick(r);
-                },
-                HeaderPadLeft: 8f),
+                }),
             new("Name", 1, ImGuiTableColumnFlags.None, col1Width,
                 r => r.Name,
                 r => Common.GoldText(r.Name)),

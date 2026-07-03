@@ -16,6 +16,8 @@ public partial class ConfigWindow
     private int bulkUpdateProgress;
     private int bulkUpdateTotal;
 
+    private static string FormatStatNum(long n, bool shorten) => shorten ? Common.ShortenNumber(n) : n.ToString("N0");
+
     private static string CsvEscape(string? s)
     {
         if (string.IsNullOrEmpty(s)) return "";
@@ -36,6 +38,20 @@ public partial class ConfigWindow
 
         if (configuration.CharactersDbEnabled)
         {
+            ConfigCheckbox(
+                "Shorten numbers##dbshortennumbers",
+                configuration.CharactersDbShortenNumbers,
+                v => configuration.CharactersDbShortenNumbers = v,
+                "Displays large numbers as 100K, 1.2M, 3.4B, etc. instead of the full value");
+
+            ConfigCheckbox(
+                "Enable FC points tracking##fcpointstracking",
+                configuration.FcPointsTrackingEnabled,
+                v => configuration.FcPointsTrackingEnabled = v,
+                "Unlike gil/MGP, FC points can only be read by opening the FC window. With this on, " +
+                "the plugin briefly opens it once per login (if you're in an FC) and closes it again to " +
+                "grab the value. Off by default since that flash can be surprising if unexpected.");
+
             ImGui.Dummy(new Vector2(0, 4));
             SectionRow();
 
@@ -61,13 +77,14 @@ public partial class ConfigWindow
                 if (ImGui.Button("Export CSV##dbexport"))
                 {
                     var sb = new StringBuilder();
-                    sb.AppendLine("Key,Name,World,DataCenter,Slot,FreeCompany,SearchInfo,PrivateHouse,FcHouse,Gil,Mgp,LastSeen");
+                    sb.AppendLine("Key,Name,World,DataCenter,Slot,FreeCompany,SearchInfo,PrivateHouse,FcHouse,Gil,Mgp,FcPoints,LastSeen");
                     foreach (var r in characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))
                         sb.AppendLine(string.Join(",", CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
                             r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany), CsvEscape(r.SearchInfo),
                             CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
                             r.Gil < 0 ? "" : r.Gil.ToString(),
                             r.Mgp < 0 ? "" : r.Mgp.ToString(),
+                            r.FcPoints < 0 ? "" : r.FcPoints.ToString(),
                             r.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")));
                     var csv = sb.ToString();
                     fileDialogManager.SaveFileDialog("Export characters", "CSV{.csv}", "characters_export.csv", ".csv",
@@ -104,8 +121,15 @@ public partial class ConfigWindow
             var avgGil        = stats.AverageGil;
             var totalCeruleum = stats.InventoryTotals.GetValueOrDefault(10155u);
             var totalMagitek  = stats.InventoryTotals.GetValueOrDefault(10373u);
+            var totalFcPoints = stats.TotalFcPoints;
 
-            var statNums   = new[] { $"{count:N0}", $"{withFc:N0}", $"{loneWolves:N0}", $"{uniqueFcHouse:N0}", $"{withHouse:N0}", $"{withStory:N0}", $"{totalGil:N0}", $"{avgGil:N0}" };
+            var shorten  = configuration.CharactersDbShortenNumbers;
+            var statNums = new[]
+            {
+                FormatStatNum(count, shorten), FormatStatNum(withFc, shorten), FormatStatNum(loneWolves, shorten),
+                FormatStatNum(uniqueFcHouse, shorten), FormatStatNum(withHouse, shorten), FormatStatNum(withStory, shorten),
+                FormatStatNum(totalGil, shorten), FormatStatNum(avgGil, shorten),
+            };
             var statLabels = new[]
             {
                 $"character{(count == 1 ? "" : "s")} are indexed",
@@ -137,7 +161,7 @@ public partial class ConfigWindow
 
                 if (richest != null)
                 {
-                    var richestNum = $"{richest.Gil:N0}";
+                    var richestNum = FormatStatNum(richest.Gil, shorten);
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0);
                     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + numColW - ImGui.CalcTextSize(richestNum).X);
@@ -146,7 +170,13 @@ public partial class ConfigWindow
                     ImGui.TextUnformatted($"is the highest gil amount, owned by {richest.Name} @ {richest.World}");
                 }
 
-                foreach (var (num, label) in new[] { ($"{totalMgp:N0}", "MGP across all your characters"), ($"{totalCeruleum:N0}", "Ceruleum Tanks across all your characters"), ($"{totalMagitek:N0}", "Magitek Repair Materials across all your characters") })
+                foreach (var (num, label) in new[]
+                {
+                    (FormatStatNum(totalMgp, shorten), "MGP across all your characters"),
+                    (FormatStatNum(totalFcPoints, shorten), "FC points earned across your unique free companies"),
+                    (FormatStatNum(totalCeruleum, shorten), "Ceruleum Tanks across all your characters"),
+                    (FormatStatNum(totalMagitek, shorten), "Magitek Repair Materials across all your characters"),
+                })
                 {
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0);
@@ -179,23 +209,30 @@ public partial class ConfigWindow
                 token.ThrowIfCancellationRequested();
                 bulkUpdateProgress++;
 
-                var loginTcs   = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                var infoTcs    = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                void OnLogin()     => loginTcs.TrySetResult(true);
-                void OnInfoReady() => infoTcs.TrySetResult(true);
-                clientState.Login            += OnLogin;
-                loginInfoHandler.OnInfoReady += OnInfoReady;
+                var loginTcs    = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var infoTcs     = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var fcPointsTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnLogin()         => loginTcs.TrySetResult(true);
+                void OnInfoReady()     => infoTcs.TrySetResult(true);
+                void OnFcPointsReady() => fcPointsTcs.TrySetResult(true);
+                clientState.Login                += OnLogin;
+                loginInfoHandler.OnInfoReady      += OnInfoReady;
+                loginInfoHandler.OnFcPointsReady  += OnFcPointsReady;
                 try
                 {
                     onSwitchCharacter(rec.Name, rec.World);
                     await loginTcs.Task.WaitAsync(TimeSpan.FromSeconds(60), token);
                     await infoTcs.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+                    // FC points may still be mid-refresh (forces the FC window open/closed) after
+                    // OnInfoReady fires; wait for it too so we don't switch characters mid-refresh.
+                    await fcPointsTcs.Task.WaitAsync(TimeSpan.FromSeconds(20), token);
                 }
                 catch (TimeoutException) { /* character didn't respond in time, skip */ }
                 finally
                 {
-                    clientState.Login            -= OnLogin;
-                    loginInfoHandler.OnInfoReady -= OnInfoReady;
+                    clientState.Login                -= OnLogin;
+                    loginInfoHandler.OnInfoReady      -= OnInfoReady;
+                    loginInfoHandler.OnFcPointsReady  -= OnFcPointsReady;
                 }
             }
         }

@@ -5,9 +5,6 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.System.String;
-using FFXIVClientStructs.FFXIV.Client.UI;
-using FFXIVClientStructs.FFXIV.Client.UI.Shell;
 
 namespace HoliestFluffiness;
 
@@ -65,18 +62,7 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
 
         token.ThrowIfCancellationRequested();
 
-        await framework.RunOnFrameworkThread(() => ExecuteCommand($"/fashion \"{configuration.AccessoryName}\""));
-    }
-
-    private static unsafe void ExecuteCommand(string command)
-    {
-        var uiModule = UIModule.Instance();
-        if (uiModule == null) return;
-        var shellModule = uiModule->GetRaptureShellModule();
-        if (shellModule == null) return;
-        var str = Utf8String.FromString(command);
-        shellModule->ExecuteCommandInner(str, uiModule);
-        str->Dtor(true);
+        await framework.RunOnFrameworkThread(() => Common.ExecuteCommand($"/fashion \"{configuration.AccessoryName}\""));
     }
 
     private static unsafe int GetFreeInventorySlots()

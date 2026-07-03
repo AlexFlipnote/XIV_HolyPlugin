@@ -7,6 +7,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
@@ -30,6 +31,35 @@ internal static class Common
 
     internal static bool IsPluginLoaded(IDalamudPluginInterface pluginInterface, string name) =>
         pluginInterface.InstalledPlugins.Any(p => p.InternalName == name && p.IsLoaded);
+
+    private static readonly string[] ShortenNumberSuffixes = ["", "K", "M", "B", "T"];
+
+    // Shortens large numbers for compact display, e.g. 100000 -> "100K", 1200000 -> "1.2M".
+    // Rounds to 1 decimal, dropping the decimal entirely when it would show as ".0".
+    internal static string ShortenNumber(long num)
+    {
+        var sign = num < 0 ? "-" : "";
+        double value = Math.Abs(num);
+        var    tier  = 0;
+
+        while (value >= 1000 && tier < ShortenNumberSuffixes.Length - 1)
+        {
+            value /= 1000;
+            tier++;
+        }
+
+        if (tier == 0) return num.ToString("N0");
+
+        value = Math.Round(value, 1, MidpointRounding.AwayFromZero);
+        if (value >= 1000 && tier < ShortenNumberSuffixes.Length - 1)
+        {
+            value = Math.Round(value / 1000, 1, MidpointRounding.AwayFromZero);
+            tier++;
+        }
+
+        var formatted = value % 1 == 0 ? $"{(long)value}" : $"{value:0.0}";
+        return $"{sign}{formatted}{ShortenNumberSuffixes[tier]}";
+    }
 
     internal static string? GetCurrentPlayerKey(IObjectTable objectTable)
     {
@@ -461,5 +491,16 @@ internal static class Common
         if (!addon->IsVisible || addon->RootNode is null || !addon->RootNode->IsVisible()) return false;
         if ((addon->VisibilityFlags & 5) is not 0) return false;
         return true;
+    }
+
+    internal static unsafe void ExecuteCommand(string command)
+    {
+        var uiModule = UIModule.Instance();
+        if (uiModule == null) return;
+        var shellModule = uiModule->GetRaptureShellModule();
+        if (shellModule == null) return;
+        var str = Utf8String.FromString(command);
+        shellModule->ExecuteCommandInner(str, uiModule);
+        str->Dtor(true);
     }
 }

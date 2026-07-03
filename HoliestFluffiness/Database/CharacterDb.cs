@@ -19,7 +19,8 @@ public readonly record struct CharacterDbStats(
     int WithSearchInfo,
     CharacterRecord? Richest,
     long AverageGil,
-    Dictionary<uint, long> InventoryTotals
+    Dictionary<uint, long> InventoryTotals,
+    long TotalFcPoints
 );
 
 public sealed class CharacterDb : IDisposable
@@ -39,6 +40,7 @@ public sealed class CharacterDb : IDisposable
         AddColumnIfMissing("slot", "INTEGER");
         AddColumnIfMissing("inventory", "TEXT");
         AddColumnIfMissing("mgp", "INTEGER");
+        AddColumnIfMissing("fc_points", "INTEGER");
     }
 
     private void AddColumnIfMissing(string column, string type)
@@ -69,6 +71,7 @@ public sealed class CharacterDb : IDisposable
         var uniqueFc      = new HashSet<string>();
         var uniqueFcHouse = new HashSet<string>();
         var invTotals     = new Dictionary<uint, long>();
+        var fcPointsByFc  = new Dictionary<string, (long Points, DateTime LastSeen)>();
 
         int withFc = 0, withHouse = 0, withSearch = 0, gilCount = 0;
         long gilSum = 0, mgpSum = 0;
@@ -89,6 +92,12 @@ public sealed class CharacterDb : IDisposable
             }
             if (r.Mgp >= 0) mgpSum += r.Mgp;
 
+            // FC points are company-wide, not per-character; keep only the most recently
+            // seen reading per unique FC so members of the same company aren't summed twice.
+            if (!string.IsNullOrEmpty(r.FreeCompany) && r.FcPoints >= 0 &&
+                (!fcPointsByFc.TryGetValue(r.FreeCompany, out var seen) || r.LastSeen > seen.LastSeen))
+                fcPointsByFc[r.FreeCompany] = (r.FcPoints, r.LastSeen);
+
             if (r.Inventory != null &&
                 JsonSerializer.Deserialize<Dictionary<uint, int>>(r.Inventory) is { } items)
             {
@@ -100,7 +109,8 @@ public sealed class CharacterDb : IDisposable
         return new CharacterDbStats(
             all.Count, gilSum, mgpSum,
             withFc, uniqueFc.Count, withHouse, uniqueFcHouse.Count, withSearch,
-            richest, gilCount == 0 ? 0 : gilSum / gilCount, invTotals);
+            richest, gilCount == 0 ? 0 : gilSum / gilCount, invTotals,
+            fcPointsByFc.Values.Sum(v => v.Points));
     }
 
     public event Action? Changed;
@@ -164,6 +174,7 @@ public sealed class CharacterDb : IDisposable
         rec.FcHouse      = null;
         rec.Gil          = -1;
         rec.Mgp          = -1;
+        rec.FcPoints     = -1;
         rec.Inventory    = null;
         db.Update(rec);
         Changed?.Invoke();

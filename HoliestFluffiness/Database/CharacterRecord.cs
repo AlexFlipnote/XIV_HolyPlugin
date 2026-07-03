@@ -36,6 +36,9 @@ public class CharacterRecord
     [Column("mgp")]
     public long Mgp { get; set; } = -1;
 
+    [Column("fc_points")]
+    public long FcPoints { get; set; } = -1;
+
     [Column("last_seen")]
     public DateTime LastSeen { get; set; }
 

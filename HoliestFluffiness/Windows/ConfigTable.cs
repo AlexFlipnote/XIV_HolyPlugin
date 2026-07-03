@@ -7,18 +7,14 @@ using Dalamud.Bindings.ImGui;
 namespace HoliestFluffiness.Windows;
 
 // A column in a DrawDataTable. SortKey == null marks a non-sortable column (pair with
-// ImGuiTableColumnFlags.NoSort, e.g. a trailing Actions column). HeaderPadLeft nudges the header
-// label right by that many pixels - only needed by a column sitting flush against a window that
-// has zero WindowPadding of its own (e.g. CharacterPickerWindow), where the table has no natural
-// left margin to inherit.
+// ImGuiTableColumnFlags.NoSort, e.g. a trailing Actions column).
 public readonly record struct TableColumn<T>(
     string Label,
     uint UserId,
     ImGuiTableColumnFlags Flags,
     float WidthOrWeight,
     Func<T, IComparable>? SortKey,
-    Action<T> DrawCell,
-    float HeaderPadLeft = 0f);
+    Action<T> DrawCell);
 
 // Standalone (not tied to ConfigWindow) so any window can draw a table with the same DNA:
 // native Hideable/Reorderable columns get show/hide, drag-reorder, and reset for free from Dear
@@ -60,12 +56,28 @@ internal static class ConfigTable
 
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+
+        // Whichever column currently renders flush against the table's true left edge needs an
+        // extra nudge - unlike every other column, it has no divider on its left to lean on for
+        // margin. Dragging headers can move a different column into that slot, so this is
+        // measured fresh every frame (via each visible column's actual screen X) rather than
+        // hardcoded to whichever column happens to be declared first.
+        int leftmostIdx = 0;
+        float leftmostX = float.MaxValue;
+        for (int i = 0; i < columns.Count; i++)
+        {
+            ImGui.TableSetColumnIndex(i);
+            if (!ImGui.TableGetColumnFlags(i).HasFlag(ImGuiTableColumnFlags.IsVisible)) continue;
+            var x = ImGui.GetCursorScreenPos().X;
+            if (x < leftmostX) { leftmostX = x; leftmostIdx = i; }
+        }
+
         for (int i = 0; i < columns.Count; i++)
         {
             var col = columns[i];
             ImGui.TableSetColumnIndex(i);
-            if (col.HeaderPadLeft > 0f)
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + col.HeaderPadLeft);
+            if (i == leftmostIdx)
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             ImGui.TableHeader(col.Flags.HasFlag(ImGuiTableColumnFlags.NoHeaderLabel) ? "" : col.Label);
         }
         Common.PopTableHeader();
@@ -91,10 +103,12 @@ internal static class ConfigTable
             if (filter != null && !filter(row)) continue;
 
             ImGui.TableNextRow();
-            foreach (var col in columns)
+            for (int i = 0; i < columns.Count; i++)
             {
                 ImGui.TableNextColumn();
-                col.DrawCell(row);
+                if (i == leftmostIdx)
+                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+                columns[i].DrawCell(row);
             }
         }
 

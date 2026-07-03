@@ -11,6 +11,10 @@ public partial class ConfigWindow
 {
     private record CharacterRow(CharacterRecord Rec, Dictionary<uint, int> Items);
 
+    private string FormatTableNum(long n) => configuration.CharactersDbShortenNumbers
+        ? Common.ShortenNumber(n)
+        : n.ToString("N0", CultureInfo.InvariantCulture);
+
     private List<CharacterRow>? cachedRecords;
     private string charFilter = "";
     private string? csvExportMessage;
@@ -59,12 +63,7 @@ public partial class ConfigWindow
         {
             new("Last Seen", uid++, ImGuiTableColumnFlags.PreferSortDescending, 0,
                 r => r.Rec.LastSeen,
-                r =>
-                {
-                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-                    ImGui.TextUnformatted(r.Rec.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm"));
-                },
-                HeaderPadLeft: 8f),
+                r => ImGui.TextUnformatted(r.Rec.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))),
             new("Character", uid++, ImGuiTableColumnFlags.NoHide, 0,
                 r => r.Rec.Name,
                 r => DrawCharacterNameCell(r.Rec, lifestreamOn, currentKey)),
@@ -88,10 +87,13 @@ public partial class ConfigWindow
                 r => ImGui.TextUnformatted(r.Rec.FcHouse ?? "")),
             new("Gil", uid++, ImGuiTableColumnFlags.None, 0,
                 r => r.Rec.Gil,
-                r => ImGui.TextUnformatted(r.Rec.Gil < 0 ? "" : r.Rec.Gil.ToString("N0", CultureInfo.InvariantCulture))),
+                r => ImGui.TextUnformatted(r.Rec.Gil < 0 ? "" : FormatTableNum(r.Rec.Gil))),
             new("MGP", uid++, ImGuiTableColumnFlags.None, 0,
                 r => r.Rec.Mgp,
-                r => ImGui.TextUnformatted(r.Rec.Mgp < 0 ? "" : r.Rec.Mgp.ToString("N0", CultureInfo.InvariantCulture))),
+                r => ImGui.TextUnformatted(r.Rec.Mgp < 0 ? "" : FormatTableNum(r.Rec.Mgp))),
+            new("FC Points", uid++, ImGuiTableColumnFlags.None, 0,
+                r => r.Rec.FcPoints,
+                r => ImGui.TextUnformatted(r.Rec.FcPoints < 0 ? "" : FormatTableNum(r.Rec.FcPoints))),
         };
 
         foreach (var (itemId, itemName) in LoginInfoHandler.TrackedItems)
@@ -101,7 +103,7 @@ public partial class ConfigWindow
                 r =>
                 {
                     if (r.Items.TryGetValue(itemId, out var qty))
-                        ImGui.TextUnformatted(qty.ToString("N0", CultureInfo.InvariantCulture));
+                        ImGui.TextUnformatted(FormatTableNum(qty));
                     else
                         Common.DimmedText("-");
                 }));

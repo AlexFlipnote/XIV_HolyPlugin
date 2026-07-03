@@ -35,6 +35,8 @@ public class Configuration : IPluginConfiguration
     // Order of the 5 info items: 0=Character, 1=SearchInfo, 2=PrivateHouse, 3=FreeCompany, 4=FcHouse
     public List<int> LoginInfoOrder { get; set; } = [0, 1, 2, 3, 4];
     public bool CharactersDbEnabled { get; set; } = false;
+    public bool CharactersDbShortenNumbers { get; set; } = false;
+    public bool FcPointsTrackingEnabled { get; set; } = false;
     public int LastSelectedSection { get; set; } = 0;
 
     // Server info section

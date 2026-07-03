@@ -137,13 +137,36 @@ public sealed class NearbyWindow : Window, IDisposable
 
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+
+        // Whichever column currently renders flush against the table's true left edge needs an
+        // extra nudge - unlike every other column, it has no divider on its left to lean on for
+        // margin. Dragging headers can move a different column into that slot, so this is
+        // measured fresh every frame rather than hardcoded to the Name column.
+        int leftmostIdx = 0;
+        float leftmostX = float.MaxValue;
+        for (int i = 0; i < 5; i++)
+        {
+            ImGui.TableSetColumnIndex(i);
+            if (!ImGui.TableGetColumnFlags(i).HasFlag(ImGuiTableColumnFlags.IsVisible)) continue;
+            var x = ImGui.GetCursorScreenPos().X;
+            if (x < leftmostX) { leftmostX = x; leftmostIdx = i; }
+        }
+
         ImGui.TableSetColumnIndex(0);
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        if (leftmostIdx == 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         ImGui.TableHeader("Name");
-        ImGui.TableSetColumnIndex(1); ImGui.TableHeader("Job");
-        ImGui.TableSetColumnIndex(2); ImGui.TableHeader("Lv");
-        ImGui.TableSetColumnIndex(3); ImGui.TableHeader("World");
-        ImGui.TableSetColumnIndex(4); ImGui.TableHeader("FC");
+        ImGui.TableSetColumnIndex(1);
+        if (leftmostIdx == 1) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.TableHeader("Job");
+        ImGui.TableSetColumnIndex(2);
+        if (leftmostIdx == 2) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.TableHeader("Lv");
+        ImGui.TableSetColumnIndex(3);
+        if (leftmostIdx == 3) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.TableHeader("World");
+        ImGui.TableSetColumnIndex(4);
+        if (leftmostIdx == 4) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+        ImGui.TableHeader("FC");
         Common.PopTableHeader();
 
         // NearbyHandler replaces these list references on update (~2x/sec), so reference
@@ -179,7 +202,7 @@ public sealed class NearbyWindow : Window, IDisposable
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
+            if (leftmostIdx == 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
 
             var rowMin     = ImGui.GetCursorScreenPos() with { X = ImGui.GetWindowPos().X };
             var rowMax     = new Vector2(ImGui.GetWindowPos().X + ImGui.GetWindowSize().X, rowMin.Y + ImGui.GetTextLineHeightWithSpacing());
@@ -210,15 +233,19 @@ public sealed class NearbyWindow : Window, IDisposable
             }
 
             ImGui.TableNextColumn();
+            if (leftmostIdx == 1) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             Common.DimmedText(p.JobAbbr);
 
             ImGui.TableNextColumn();
+            if (leftmostIdx == 2) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             Common.DimmedText(p.Level.ToString());
 
             ImGui.TableNextColumn();
+            if (leftmostIdx == 3) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             Common.DimmedText(p.HomeWorld);
 
             ImGui.TableNextColumn();
+            if (leftmostIdx == 4) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
             Common.DimmedText(p.CompanyTag);
         }
 

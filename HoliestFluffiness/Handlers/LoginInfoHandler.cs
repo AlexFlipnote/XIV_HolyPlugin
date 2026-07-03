@@ -10,7 +10,9 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using HoliestFluffiness.Windows;
 
 namespace HoliestFluffiness;
@@ -34,6 +36,12 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     }
 
     public event Action? OnInfoReady;
+
+    // Fires once per RunAsync call, always ,  immediately if there was nothing to force-refresh,
+    // or after the background FC-points task finishes (success or failure). Lets callers that switch
+    // characters (e.g. the bulk DB updater) wait for the FC window's open/close cycle to fully finish
+    // before switching away, instead of racing it.
+    public event Action? OnFcPointsReady;
 
     // Called on login, retries every second for up to 10s waiting for data to load.
     public async Task RunAsync(CancellationToken token, bool instant = false)
@@ -182,6 +190,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 FcHouse      = fc == null ? null     : (fcHouse ?? existing?.FcHouse),
                 Gil          = gil >= 0 ? gil        : existing?.Gil ?? 0,
                 Mgp          = mgp >= 0 ? mgp        : existing?.Mgp ?? -1,
+                FcPoints     = fc == null ? -1    : existing?.FcPoints ?? -1,
                 Inventory    = inventory               ?? existing?.Inventory,
                 LastSeen     = DateTime.UtcNow,
             };
@@ -189,6 +198,43 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         }
 
         OnInfoReady?.Invoke();
+
+        // Only past this point is it safe to force the FC window open/closed: login has fully
+        // settled (character + FC tag resolved, initial record written). Runs in the background so
+        // it doesn't delay anything downstream of RunAsync on the login notification. Always forced
+        // (there's no reliable passive signal for "never requested" ,  the agent exists unconditionally
+        // and a stale/zero reading is indistinguishable from a real one).
+        if (dbEnabled && configuration.FcPointsTrackingEnabled && fc != null && charInfo != null)
+        {
+            var dbKey = charInfo.DbKey;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var refreshed = await CollectFcPointsAsync(token, allowForceRefresh: true);
+                    if (refreshed < 0) return;
+
+                    var rec = await Task.Run(() => characterDb.GetByKey(dbKey), token);
+                    if (rec == null) return;
+
+                    rec.FcPoints = refreshed;
+                    await Task.Run(() => characterDb.Upsert(rec), token);
+                    log.Debug("FC points refreshed for {Key}: {Points}", dbKey, refreshed);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    log.Error(ex, "FC points refresh failed for {Key}", dbKey);
+                }
+                finally
+                {
+                    OnFcPointsReady?.Invoke();
+                }
+            }, token);
+        }
+        else
+        {
+            OnFcPointsReady?.Invoke();
+        }
     }
 
     private async Task<bool> IsOnDifferentWorldAsync()
@@ -218,11 +264,13 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var newFcHouse      = await CollectFcHouseAsync(CancellationToken.None);
         var newGil          = await CollectGilAsync(CancellationToken.None);
         var newMgp          = await CollectMgpAsync(CancellationToken.None);
+        var newFcPoints     = await CollectFcPointsAsync(CancellationToken.None);
         var newPlate        = await CollectPlateAsync(CancellationToken.None);
         var newInventory    = await CollectInventoryAsync(CancellationToken.None);
 
         existing.FreeCompany = newFc?.Display;
         existing.FcHouse     = newFc == null ? null : (newFcHouse ?? existing.FcHouse);
+        existing.FcPoints    = newFc == null ? -1   : (newFcPoints >= 0 ? newFcPoints : existing.FcPoints);
         if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
         if (newGil            >= 0)    existing.Gil          = newGil;
         if (newMgp            >= 0)    existing.Mgp          = newMgp;
@@ -256,6 +304,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var newFcHouse      = await CollectFcHouseAsync(token);
                 var newGil          = await CollectGilAsync(token);
                 var newMgp          = await CollectMgpAsync(token);
+                var newFcPoints     = await CollectFcPointsAsync(token);
                 var newPlate        = await CollectPlateAsync(token);
                 var newInventory    = await CollectInventoryAsync(token);
 
@@ -266,6 +315,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var newFcDisplay  = newFc?.Display;
                 var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
                 var newMgpValue   = newMgp >= 0 ? newMgp    : existing.Mgp;
+                var newFcPointsValue = newFc == null ? -1   : (newFcPoints >= 0 ? newFcPoints : existing.FcPoints);
                 var newPlateText  = newPlate?.TextValue      ?? existing.SearchInfo;
                 var newPH         = newPrivateHouse          ?? existing.PrivateHouse;
                 var newFcH        = newFc == null ? null     : (newFcHouse ?? existing.FcHouse);
@@ -276,6 +326,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                     existing.FcHouse      == newFcH        &&
                     existing.Gil          == newGilValue   &&
                     existing.Mgp          == newMgpValue   &&
+                    existing.FcPoints     == newFcPointsValue &&
                     existing.SearchInfo   == newPlateText  &&
                     existing.Inventory    == newInv)
                     continue;
@@ -285,6 +336,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 existing.FcHouse      = newFcH;
                 existing.Gil          = newGilValue;
                 existing.Mgp          = newMgpValue;
+                existing.FcPoints     = newFcPointsValue;
                 existing.SearchInfo   = newPlateText;
                 existing.Inventory    = newInv;
                 existing.LastSeen     = DateTime.UtcNow;
@@ -510,6 +562,112 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
         return result;
     }
+
+    private const string FcWindowAddonName = "FreeCompany";
+    private const string FcWindowOpenCommand = "/freecompanycmd";
+
+    // Not exposed by InfoProxyFreeCompany; read straight off the FreeCompanyCreditShop agent instead
+    // (same technique used by other FC-tracking plugins). The agent itself always exists (agents are
+    // pre-allocated for the client's lifetime), so a null/negative check can't tell "never requested"
+    // apart from "genuinely zero" ,  the raw offset just reads 0 until the game actually asks the
+    // server for credit-shop data. allowForceRefresh always triggers that request rather than trusting
+    // whatever's already sitting there.
+    private async Task<long> CollectFcPointsAsync(CancellationToken token, bool allowForceRefresh = false)
+    {
+        if (!configuration.CharactersDbEnabled || !configuration.FcPointsTrackingEnabled) return -1;
+        token.ThrowIfCancellationRequested();
+
+        if (!allowForceRefresh) return await ReadFcPointsRawAsync(token);
+
+        return await ForceRefreshFcWindowAsync(token);
+    }
+
+    private async Task<long> ReadFcPointsRawAsync(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        long result = -1;
+
+        await framework.RunOnFrameworkThread(() =>
+        {
+            unsafe
+            {
+                var module = AgentModule.Instance();
+                if (module == null) return;
+                var agent = module->GetAgentByInternalId(AgentId.FreeCompanyCreditShop);
+                if (agent == null) return;
+                result = *(int*)((nint)agent + 256);
+            }
+        });
+
+        return result;
+    }
+
+    // Silently pops the FC window open (so the client asks the server for credit-shop data), closes
+    // it again, then polls the raw value until it actually changes from what it read before opening.
+    // The data request is an async server round trip that can land after the window's already
+    // closed, so a fixed short delay isn't enough ,  wait for a real change instead. If the player
+    // already had the window open themselves, we leave it alone entirely (no open command, no forced
+    // close) and just wait to see if a value change lands.
+    private async Task<long> ForceRefreshFcWindowAsync(CancellationToken token)
+    {
+        var before = await ReadFcPointsRawAsync(token);
+
+        bool alreadyOpen = false;
+        await framework.RunOnFrameworkThread(() =>
+        {
+            unsafe
+            {
+                var addon = GetFcWindowAddon();
+                alreadyOpen = addon != null && Common.IsAddonVisible(addon);
+            }
+        });
+
+        if (!alreadyOpen)
+            await framework.RunOnFrameworkThread(() => Common.ExecuteCommand(FcWindowOpenCommand));
+
+        for (var i = 0; i < 20; i++)
+        {
+            token.ThrowIfCancellationRequested();
+
+            bool ready = false;
+            await framework.RunOnFrameworkThread(() =>
+            {
+                unsafe
+                {
+                    var addon = GetFcWindowAddon();
+                    ready = addon != null && addon->IsReady;
+                }
+            });
+            if (ready) break;
+
+            await Task.Delay(200, token);
+        }
+
+        if (!alreadyOpen)
+        {
+            await framework.RunOnFrameworkThread(() =>
+            {
+                unsafe
+                {
+                    var addon = GetFcWindowAddon();
+                    if (addon != null) addon->Close(true);
+                }
+            });
+        }
+
+        for (var i = 0; i < 20; i++)
+        {
+            token.ThrowIfCancellationRequested();
+            var current = await ReadFcPointsRawAsync(token);
+            if (current != before) return current;
+            await Task.Delay(300, token);
+        }
+
+        return await ReadFcPointsRawAsync(token);
+    }
+
+    private static unsafe AtkUnitBase* GetFcWindowAddon() =>
+        (AtkUnitBase*)AtkStage.Instance()->RaptureAtkUnitManager->GetAddonByName(FcWindowAddonName);
 
     private async Task<string?> CollectInventoryAsync(CancellationToken token)
     {
