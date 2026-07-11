@@ -68,10 +68,9 @@ public sealed unsafe class RepairHandler : IDisposable
         addonLifecycle.RegisterListener(AddonEvent.PostUpdate,          AddonName, OnPostUpdate);
     }
 
-    // Fires every frame before PostUpdate. Our injected node from the previous PostUpdate
-    // is still visible. We hide it before counting,  but only if it still has our sentinel
-    // byte (0x01) in the timer text. If the game called loadIcon on that slot to show a
-    // real status, it will have overwritten the sentinel, meaning the slot is now the game's.
+    // Fires before PostUpdate. Hide our injected node from the previous frame before counting,
+    // but only if it still carries our '%' sentinel; if the game reused the slot for a real
+    // status the sentinel is gone, so we leave it visible and count it as the game's.
     private void OnRequestedUpdate(AddonEvent _, AddonArgs args)
     {
         var addon = (AtkUnitBase*)args.Addon.Address;
@@ -82,7 +81,7 @@ public sealed unsafe class RepairHandler : IDisposable
             var prev = addon->UldManager.NodeList[lastSlotUsed];
             if (prev != null && prev->IsVisible() && SlotIsOurs(prev))
                 prev->NodeFlags ^= NodeFlags.Visible;
-            // If sentinel is gone the game took this slot,  leave it visible and count it.
+            // If sentinel is gone the game took this slot; leave it visible and count it.
         }
         lastSlotUsed = -1;
         ourCompAddr  = 0;
@@ -90,8 +89,8 @@ public sealed unsafe class RepairHandler : IDisposable
         cachedGameCount = CountGameNodes(addon);
     }
 
-    // Returns true if the timer text ends with '%', which is how we write our percentage.
-    // Game timer text uses s/m/h/d suffixes,  never '%',  so this reliably identifies our slot.
+    // True if the timer text ends with '%' (how we write our percentage). Game timers use
+    // s/m/h/d suffixes, never '%', so this reliably identifies our slot.
     private static bool SlotIsOurs(AtkResNode* slotNode)
     {
         var compNode = slotNode->GetAsAtkComponentNode();
@@ -217,7 +216,7 @@ public sealed unsafe class RepairHandler : IDisposable
     }
 
     // Shows "45%" on the icon timer text in yellow (low) or red (critical).
-    // The trailing '%' also serves as our ownership marker,  game timers use s/m/h/d.
+    // The trailing '%' also serves as our ownership marker; game timers use s/m/h/d.
     private static void SetTimerText(AtkComponentBase* comp, int idx, float pct, bool critical)
     {
         if (comp->UldManager.NodeListCount <= idx) return;

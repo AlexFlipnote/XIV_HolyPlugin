@@ -16,10 +16,9 @@ public readonly record struct TableColumn<T>(
     Func<T, IComparable>? SortKey,
     Action<T> DrawCell);
 
-// Standalone (not tied to ConfigWindow) so any window can draw a table with the same DNA:
-// native Hideable/Reorderable columns get show/hide, drag-reorder, and reset for free from Dear
-// ImGui's own right-click header menu, persisted via its table-settings ini keyed on tableId - no
-// plugin-side column state. Used by Characters/Bids (inside ConfigWindow) and CharacterPickerWindow.
+// Standalone so any window can draw a table with the same behaviour: native Hideable/Reorderable
+// columns get show/hide, drag-reorder, and reset from ImGui's right-click header menu, persisted via
+// its table-settings ini keyed on tableId. Used by Characters/Bids and CharacterPickerWindow.
 internal static class ConfigTable
 {
     private const ImGuiTableFlags DefaultFlags = ImGuiTableFlags.Sortable
@@ -47,9 +46,8 @@ internal static class ConfigTable
         ImGui.TableSetupScrollFreeze(0, 1);
         foreach (var col in columns)
         {
-            // Columns with no visible header text carry no identifying label in the right-click
-            // menu either, so let the user hide them by accident with nothing to click to bring
-            // them back - keep them permanently visible.
+            // Header-less columns have no entry in the right-click menu, so keep them non-hideable
+            // (the user would have no way to bring them back).
             var flags = col.Label.StartsWith("##", StringComparison.Ordinal) ? col.Flags | ImGuiTableColumnFlags.NoHide : col.Flags;
             ImGui.TableSetupColumn(col.Label, flags, col.WidthOrWeight, col.UserId);
         }
@@ -57,11 +55,8 @@ internal static class ConfigTable
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
-        // Whichever column currently renders flush against the table's true left edge needs an
-        // extra nudge - unlike every other column, it has no divider on its left to lean on for
-        // margin. Dragging headers can move a different column into that slot, so this is
-        // measured fresh every frame (via each visible column's actual screen X) rather than
-        // hardcoded to whichever column happens to be declared first.
+        // The leftmost visible column needs an extra nudge (no left divider to give it margin).
+        // Reordering can change which column that is, so find it fresh each frame by screen X.
         int leftmostIdx = 0;
         float leftmostX = float.MaxValue;
         for (int i = 0; i < columns.Count; i++)

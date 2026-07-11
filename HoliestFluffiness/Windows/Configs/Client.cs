@@ -64,6 +64,11 @@ public partial class ConfigWindow
             v => configuration.ClientFlashOnReadyCheck = v);
 
         ConfigCheckbox(
+            "Countdown started##clientflashcountdown",
+            configuration.ClientFlashOnCountdown,
+            v => configuration.ClientFlashOnCountdown = v);
+
+        ConfigCheckbox(
             "Alarm##clientflashalarm",
             configuration.ClientFlashOnAlarm,
             v => configuration.ClientFlashOnAlarm = v);

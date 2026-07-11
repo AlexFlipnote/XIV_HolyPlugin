@@ -107,13 +107,8 @@ public partial class ConfigWindow : Window
         ExitSearchMode();
     }
 
-    // searchModeActive is deliberately sticky (only cleared here, never by focus loss alone).
-    // A click on a result row can cause the search InputText to lose ImGui focus on that very
-    // same frame, before the row itself is even processed, if entering/staying in search mode
-    // depended on re-reading IsItemFocused() every frame, that same click would collapse the
-    // results list back to the previous section before the row's own click got a chance to fire.
-    // Changing the widget's ID (searchBoxGeneration) additionally forces ImGui to drop any
-    // lingering keyboard focus so the box visually deactivates too.
+    // Sticky: search mode is only cleared here, never by focus loss (a result-row click drops the
+    // input's focus on the same frame). Bumping searchBoxGeneration makes ImGui drop keyboard focus too.
     private void ExitSearchMode()
     {
         searchQuery = "";
@@ -156,9 +151,8 @@ public partial class ConfigWindow : Window
         fileDialogManager.Draw();
     }
 
-    // Silently draws every settings-bearing section once, into a clipped 1x1 child with all
-    // input blocked, purely so every Config*/Anchor call registers into SearchIndex before the
-    // user ever opens a tab. Runs once per game session on the first time this window draws.
+    // Draws every section once into a hidden, input-blocked child so every Config*/Anchor call
+    // registers into SearchIndex before the user opens a tab. Runs once per session on first draw.
     private static bool searchIndexWarmed;
 
     private void WarmSearchIndex()
@@ -167,10 +161,8 @@ public partial class ConfigWindow : Window
 
         ImGui.SetCursorPos(Vector2.Zero);
         ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 0f);
-        // Deliberately NOT sized down to near-zero: a fully clipped/zero-area child gets marked
-        // SkipItems by ImGui, which makes every widget inside it (Checkbox, SliderInt, ...) bail
-        // out immediately without registering, exactly the bug this warmup exists to avoid. Alpha
-        // 0 + NoInputs already make it invisible and unclickable, so a real, unclipped size is safe.
+        // Must use a real size: a zero-area child gets SkipItems'd, so nothing inside registers.
+        // Alpha 0 + NoInputs already make it invisible and unclickable.
         ImGui.BeginChild("##searchwarmup", ImGui.GetContentRegionAvail(), false,
             ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoNav);
 
@@ -206,9 +198,7 @@ public partial class ConfigWindow : Window
         foodCheckHandler?.Invalidate();
     }
 
-    // Reopening the window while a data-table section was already selected (persisted from a
-    // previous session) skips NavigateTo/SidebarItem entirely, so without this the data would
-    // go stale until the user manually clicked Refresh or switched tabs and back.
+    // Refresh table data when reopening on a persisted data-table section (NavigateTo isn't called).
     public override void OnOpen()
     {
         if (selectedSection == ConfigSection.Characters) LoadCharacters();
@@ -246,7 +236,7 @@ public partial class ConfigWindow : Window
                 LoadBids();
         } else
         {
-            // If the database ain't enabled, don't bother seperating and making bulk
+            // DB disabled: no separator, just the toggle
             SidebarItem("Database", ConfigSection.Database);
         }
 
@@ -422,10 +412,8 @@ public partial class ConfigWindow : Window
             Common.DimmedTextWrapped(entry.Desc);
         }
 
-        // The manual SetCursorScreenPos calls above leave the cursor wherever the overlay text
-        // ended, not at the bottom of the row, without pinning it back to the Selectable's own
-        // rect, rows creep upward and overlap after enough of them, and clicks then resolve to
-        // whichever overlapping row's Selectable ends up on top instead of the one you can see.
+        // Pin the cursor back to the row's bottom; the SetCursorScreenPos calls above otherwise
+        // leave it mid-row, causing subsequent rows to creep up and overlap.
         ImGui.SetCursorScreenPos(new Vector2(min.X, max.Y));
 
         ImGui.Dummy(new Vector2(0, 2));
@@ -494,12 +482,8 @@ public partial class ConfigWindow : Window
     }
 
     // ── Search anchoring ──────────────────────────────────────────────────────
-    // Every searchable control (or BeginGroup'd cluster of controls) calls Anchor(key, title, desc)
-    // right after drawing itself. This both (a) self-registers into SearchIndex for the current
-    // section, so the search box needs no separately-maintained list, and (b) scrolls the key into
-    // view once, right after a search-result click sets pendingJumpKey, and draws a fading
-    // highlight rect while flashKey == key. title/desc are omitted for controls that don't carry
-    // a meaningful standalone label (e.g. a bare checkbox glued to a slider via SameLine).
+    // Every searchable control calls Anchor(key, title, desc) after drawing itself: it self-registers
+    // into SearchIndex and, after a result click, scrolls to the key and flashes a highlight rect.
 
     private static string? ExtractKey(string label)
     {
@@ -507,8 +491,7 @@ public partial class ConfigWindow : Window
         return idx >= 0 ? label[(idx + 2)..] : null;
     }
 
-    // Null when the label has no visible text before "##" (e.g. a bare checkbox glued to a
-    // sibling slider) such controls aren't meaningful standalone search results on their own.
+    // Null when the label has no visible text before "##" (not a standalone search result).
     private static string? ExtractTitle(string label)
     {
         var idx = label.IndexOf("##", StringComparison.Ordinal);
@@ -528,10 +511,8 @@ public partial class ConfigWindow : Window
 
         if (pendingJumpKey == key)
         {
-            // Retried for a few frames rather than consumed on the first hit: the target
-            // section's "##sec" child can be appearing for the first time this session (you
-            // never browsed there normally), and ImGui hasn't got a settled scroll range for a
-            // window on its very first frame, SetScrollHereY silently no-ops until it does.
+            // Retried over a few frames: SetScrollHereY no-ops until ImGui has a settled scroll
+            // range, which a section's child lacks on its very first frame.
             ImGui.SetScrollHereY(0.3f);
             if (--pendingJumpFramesLeft <= 0)
                 pendingJumpKey = null;
@@ -688,12 +669,11 @@ public partial class ConfigWindow : Window
         }
         else
         {
-            // Separate display text from ImGui ID so we can position them independently
+            // Split display text from ImGui ID so they can be positioned independently
             var sep  = label.IndexOf("##", StringComparison.Ordinal);
             var text = sep >= 0 ? label[..sep] : label;
             var id   = sep >= 0 ? label[sep..] : "##" + label;
 
-            // Draw the checkbox box only (no visible label)
             PushCheckbox();
             if (ImGui.Checkbox(id, ref current))
             {
@@ -718,9 +698,7 @@ public partial class ConfigWindow : Window
     }
 
     // ── New Config* helpers (combo/color/text/int) ───────────────────────────
-    // Follow the same convention as ConfigCheckbox/ConfigSliderInt/ConfigSliderFloat above:
-    // label carries a "Display text##anchorkey" suffix used both as the ImGui ID and the
-    // search-anchor key, and the group is auto-registered with Anchor() for search jump/flash.
+    // Same convention as above: label is "Display text##anchorkey", auto-registered via Anchor().
 
     private void ConfigCombo(string label, int currentIndex, string[] items, Action<int> setter,
         float width = 180, string? hint = null, bool padding = true, string? desc = null, string? title = null)

@@ -138,10 +138,8 @@ public sealed class NearbyWindow : Window, IDisposable
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
-        // Whichever column currently renders flush against the table's true left edge needs an
-        // extra nudge - unlike every other column, it has no divider on its left to lean on for
-        // margin. Dragging headers can move a different column into that slot, so this is
-        // measured fresh every frame rather than hardcoded to the Name column.
+        // The leftmost visible column needs an extra nudge (no left divider for margin); find it
+        // fresh each frame since reordering can change which column that is.
         int leftmostIdx = 0;
         float leftmostX = float.MaxValue;
         for (int i = 0; i < 5; i++)
@@ -169,8 +167,8 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.TableHeader("FC");
         Common.PopTableHeader();
 
-        // NearbyHandler replaces these list references on update (~2x/sec), so reference
-        // equality tells us whether the underlying data actually changed since last frame.
+        // Handler swaps these list references on update (~2x/sec), so reference equality tells us
+        // whether the data changed since last frame.
         if (!ReferenceEquals(cachedNearbySource, handler.NearbyPlayers) ||
             !ReferenceEquals(cachedTargetersSource, handler.CurrentTargeters) ||
             cachedSearchText != searchText)

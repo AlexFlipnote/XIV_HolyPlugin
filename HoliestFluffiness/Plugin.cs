@@ -193,6 +193,7 @@ public sealed class Plugin : IDalamudPlugin
         doorbellHandler.OnLeft        += OnDoorbellLeft;
         doorbellHandler.OnAlreadyHere += OnDoorbellAlreadyHere;
         readyCheckHandler.ReadyCheckEnded += foodCheckHandler.Invalidate;
+        foodCheckHandler.CountdownStarted += OnCountdownStartedFlash;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
         pingChartWindow        = new PingChartWindow(serverInfoHandler, configuration);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
@@ -697,6 +698,12 @@ public sealed class Plugin : IDalamudPlugin
             FlashTaskbar();
     }
 
+    private void OnCountdownStartedFlash()
+    {
+        if (configuration.ClientFlashOnCountdown)
+            FlashTaskbar();
+    }
+
     private unsafe AtkValue* OnNormalCraftCallback(AtkModuleInterface.AtkEventInterface* thisPtr, AtkValue* returnValue, AtkValue* values, uint valueCount, ulong eventKind)
     {
         if (configuration.ClientFlashOnSynthesis && valueCount > 0 && values[0].Int == -2)
@@ -808,6 +815,7 @@ public sealed class Plugin : IDalamudPlugin
         dutyTimerHandler.Dispose();
         castBarHandler.Dispose();
         loginEnhancementHandler.Dispose();
+        foodCheckHandler.CountdownStarted -= OnCountdownStartedFlash;
         foodCheckHandler.Dispose();
         foodCheckOverlay.Dispose();
         titleFont.Dispose();

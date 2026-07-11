@@ -26,6 +26,7 @@ public sealed class CommendationHandler : IDisposable
         this.partyList     = partyList;
 
         clientState.Login            += OnLogin;
+        clientState.Logout           += OnLogout;
         clientState.TerritoryChanged += OnTerritoryChanged;
         framework.Update             += OnUpdate;
 
@@ -36,6 +37,14 @@ public sealed class CommendationHandler : IDisposable
     {
         lastCommendationCount = -1;
         currentPartySize = largestPartySize = lastAreaPartySize = Math.Max(partyList.Length, 1);
+    }
+
+    // Reset the baseline on logout so a previous character's commendation count can't
+    // survive into the next character and falsely trigger on their first zone change.
+    private void OnLogout(int type, int code)
+    {
+        lastCommendationCount = -1;
+        currentPartySize = largestPartySize = lastAreaPartySize = 1;
     }
 
     private void OnUpdate(IFramework fw)
@@ -62,6 +71,7 @@ public sealed class CommendationHandler : IDisposable
     public void Dispose()
     {
         clientState.Login            -= OnLogin;
+        clientState.Logout           -= OnLogout;
         clientState.TerritoryChanged -= OnTerritoryChanged;
         framework.Update             -= OnUpdate;
     }

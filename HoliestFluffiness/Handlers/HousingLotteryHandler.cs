@@ -173,7 +173,7 @@ public sealed class HousingLotteryHandler : IDisposable
         var district = HousingDistricts.Normalize(locMatch.Groups[3].Value.Trim());
         int bidNum   = int.Parse(bidNumMatch.Groups[1].Value);
 
-        // Active statuses ,  bid still exists, keep tracking
+        // Active statuses: bid still exists, keep tracking
         bool isActive = status.Contains("Current Entry",             StringComparison.OrdinalIgnoreCase)
                      || status.Contains("Results period in progress", StringComparison.OrdinalIgnoreCase)
                      || status.Contains("Entry period in progress",   StringComparison.OrdinalIgnoreCase);
@@ -192,7 +192,7 @@ public sealed class HousingLotteryHandler : IDisposable
             return;
         }
 
-        // Active ,  add if not already tracked
+        // Active: add if not already tracked
         bool exists = characterDb.GetBidsByCharacter(charKey)
             .Exists(b => b.District == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
         if (exists) return;
@@ -271,7 +271,7 @@ public sealed class HousingLotteryHandler : IDisposable
     private static unsafe string ReadAtkString(AtkValue* val)
     {
         if (val == null) return string.Empty;
-        // 8 = String, 33 = String8 ,  avoid System.ValueType namespace collision
+        // 8 = String, 33 = String8
         var t = (byte)val->Type;
         if (t != 8 && t != 33) return string.Empty;
         return val->String.ToString(); // CStringPointer.ToString() handles null safely

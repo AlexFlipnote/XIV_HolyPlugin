@@ -13,8 +13,7 @@ public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
-    // Named so the "Set to default" button in Social.cs can reference the same values
-    // instead of re-typing the literals (which previously drifted out of sync risk-free).
+    // Named so Social.cs's "Set to default" button can reuse the same values
     public static readonly Vector4 DefaultNearbyColParty   = new(100/255f, 180/255f, 255/255f, 1f);
     public static readonly Vector4 DefaultNearbyColFriend  = new(1f, 127/255f, 0f, 1f);
     public static readonly Vector4 DefaultNearbyColLocalFc = new(220/255f, 200/255f, 80/255f, 1f);
@@ -59,6 +58,7 @@ public class Configuration : IPluginConfiguration
     public bool ClientFlashOnAlarm     { get; set; } = false;
     public bool ClientFlashOnCombat    { get; set; } = false;
     public bool ClientFlashOnSynthesis { get; set; } = false;
+    public bool ClientFlashOnCountdown { get; set; } = false;
     public bool TitleMovieDisabled { get; set; } = false;
     public bool HotbarLockHidden { get; set; } = false;
     public bool FastMouseClickFixEnabled { get; set; } = false;

@@ -32,6 +32,9 @@ public class FoodCheckHandler : IDisposable
     private ulong countdownParam;
     private bool wasCountingDown;
 
+    // Fired once each time a countdown transitions from stopped to running.
+    public event System.Action? CountdownStarted;
+
     private List<FoodCheckEntry> lowFoodEntries = [];
     private CancellationTokenSource? clearCts;
 
@@ -105,6 +108,7 @@ public class FoodCheckHandler : IDisposable
             if (counting && !wasCountingDown)
             {
                 wasCountingDown = true;
+                CountdownStarted?.Invoke();
                 RunCheck(ignoreDutyFilter: false);
             }
             else if (!counting && wasCountingDown)
@@ -195,9 +199,19 @@ public class FoodCheckHandler : IDisposable
         var cfc       = territory?.ContentFinderCondition.ValueNullable;
         if (cfc == null || cfc.Value.RowId == 0) return false;
 
-        if (config.FoodCheckScopeHighEnd && cfc.Value.HighEndDuty)            return true;
-        if (config.FoodCheckScopeSavage  && cfc.Value.ContentType.RowId == 5) return true;
-        if (config.FoodCheckScopeExtreme && cfc.Value.ContentType.RowId == 4) return true;
+        if (config.FoodCheckScopeHighEnd && cfc.Value.HighEndDuty) return true;
+
+        // ContentType 5 = Raids and 4 = Trials, but those categories include NORMAL
+        // tiers too. Savage/Extreme are distinguished by their permanent name, which
+        // also covers old content whose HighEndDuty flag may have been cleared.
+        var name = cfc.Value.Name.ExtractText();
+        if (config.FoodCheckScopeSavage && name.EndsWith("(Savage)")) return true;
+        // Extremes use two naming schemes: an "(Extreme)" suffix, or a
+        // "the Minstrel's Ballad:" prefix (older trials, no suffix).
+        if (config.FoodCheckScopeExtreme
+            && (name.EndsWith("(Extreme)")
+                || name.StartsWith("the Minstrel's Ballad", StringComparison.OrdinalIgnoreCase)))
+            return true;
         return false;
     }
 

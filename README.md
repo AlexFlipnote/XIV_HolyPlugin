@@ -30,7 +30,7 @@ A comprehensive suite of quality-of-life tools, grouped the same way as the in-p
 - **Disable Idle Movie:** Skips the looping intro video on the title screen.
 - **Fast Mouse Click Fix:** Removes an artificial delay the client imposes between mouse clicks.
 - **Window Title:** Customizes the game window's title, optionally appending your logged-in character's name.
-- **Taskbar Flash:** Flashes the FFXIV taskbar icon on tells, ready checks, alarms, combat, or synthesis completion.
+- **Taskbar Flash:** Flashes the FFXIV taskbar icon on tells, ready checks, alarms, combat, synthesis completion, or countdown start.
 - **Auto-Reconnect (No-Kill):** Intercepts lobby disconnects and reconnects you automatically instead of booting you to the title screen, integrating with [Lifestream](https://github.com/NightmareXIV/Lifestream) to log back into the correct character.
 - **Physics Cap:** Throttles the game's physics simulation to a target FPS so hair/cloth physics behave correctly and your GPU isn't overworked while AFK.
 - **Anti-AFK:** Sends a silent keypress when your AFK timer runs high so you never get idle-kicked.

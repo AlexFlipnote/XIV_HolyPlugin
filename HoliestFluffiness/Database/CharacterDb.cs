@@ -29,9 +29,8 @@ public sealed class CharacterDb : IDisposable
 
     public CharacterDb(string path)
     {
-        // SQLite-net caches TableMappings in a static dict keyed by type full name.
-        // After a Dalamud hot-reload the stale entry points to the old load context's
-        // type, causing an InvalidCastException. Clear it before opening the connection.
+        // SQLite-net caches TableMappings statically by type name; after a Dalamud hot-reload the
+        // stale entry points to the old load context's type (InvalidCastException). Clear it first.
         ClearStaleMapping<CharacterRecord>();
         ClearStaleMapping<HousingBidRecord>();
         db = new SQLiteConnection(path);
@@ -61,9 +60,8 @@ public sealed class CharacterDb : IDisposable
         catch { /* reflection may fail on trimmed/obfuscated builds */ }
     }
 
-    // Single pass over the table instead of the ~9 separate full-table reads the individual
-    // Count*/Total*/Richest/Average queries used to do (this is called from Draw() every
-    // frame the Database config tab is open, so 9 reads became 1).
+    // Single pass over the table rather than ~9 separate full-table reads; called from Draw() every
+    // frame the Database config tab is open.
     public CharacterDbStats GetStats()
     {
         var all = db.Table<CharacterRecord>().ToList();
