@@ -648,7 +648,7 @@ public sealed class Plugin : IDalamudPlugin
                 }
 
                 var zone = _loginZone;
-                if (bid != null && zone.HasValue && zone.Value.district == bid.District && zone.Value.ward == bid.Ward)
+                if (bid != null && zone.HasValue && HousingDistricts.Normalize(zone.Value.district) == bid.District && zone.Value.ward == bid.Ward)
                     Log.Debug("[GoToBid] Already in {D} W{W} after login, skipping teleport.", bid.District, bid.Ward);
                 else
                     await Framework.RunOnFrameworkThread(() => InvokeLifestreamTeleport(tp));
