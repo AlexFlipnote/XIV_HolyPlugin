@@ -28,6 +28,7 @@ using HoliestFluffiness.Windows;
 using System.Reflection;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using Rx = System.Text.RegularExpressions.Regex;
 
 namespace HoliestFluffiness;
 
@@ -221,7 +222,7 @@ public sealed class Plugin : IDalamudPlugin
         });
         CommandManager.AddHandler(HwCommand, new CommandInfo(OnHwCommand)
         {
-            HelpMessage = "Open the character list. Use /hw SEARCH to fuzzy-find a character, or /hw WORLD INDEX to switch to a specific slot."
+            HelpMessage = "Open the character list. /hw SEARCH fuzzy-finds a character, /hw WORLD INDEX switches to a slot, and /hw WORLD INDEX DESTINATION also travels after login (e.g. /hw Ragnarok 2 fc, or /hw Ragnarok 2 mist 5 30)."
         });
         CommandManager.AddHandler(HwPlusCommand, new CommandInfo(OnHwPlusCommand)
         {
@@ -314,7 +315,8 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        // world, index, and (optionally) a Lifestream destination string
+        var parts = trimmed.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 1)
         {
             var query = parts[0];
@@ -329,18 +331,25 @@ public sealed class Plugin : IDalamudPlugin
             else
                 ChatGui.PrintError($"[HF] Ambiguous: {string.Join(", ", matches.Select(r => $"{r.Name}@{r.World}"))}");
         }
-        else if (parts.Length == 2 && int.TryParse(parts[1], out int slot) && slot >= 1 && slot <= 8)
+        else if (int.TryParse(parts[1], out int slot) && slot >= 1 && slot <= 8)
         {
             var world = WorldResolver.Resolve(parts[0], DataManager) ?? parts[0];
             var rec = characterDb.GetByWorldAndSlot(world, slot);
-            if (rec != null)
+            if (rec == null)
+            {
+                ChatGui.PrintError($"[HF] No character in slot {slot} on world '{world}'.");
+                return;
+            }
+
+            var destination = parts.Length >= 3 ? parts[2].Trim() : null;
+            if (string.IsNullOrEmpty(destination))
                 SwitchToCharacter(rec.Name, rec.World);
             else
-                ChatGui.PrintError($"[HF] No character in slot {slot} on world '{world}'.");
+                GoToDestination(rec, destination);
         }
         else
         {
-            ChatGui.PrintError("[HF] Usage: /hw WORLD INDEX  (e.g. /hw Ragnarok 2)");
+            ChatGui.PrintError("[HF] Usage: /hw WORLD INDEX [DESTINATION]  (e.g. /hw Ragnarok 2, /hw Ragnarok 2 fc, /hw Ragnarok 2 mist 5 30)");
         }
     }
 
@@ -498,6 +507,122 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    // Switches to the given character (if not already active) and hands a raw
+    // Lifestream destination to /li once logged in. Lifestream parses everything
+    // itself: property shortcuts (fc/gc/apt/home/ws/shared/inn/auto), plot
+    // addresses ("mist 5 30"), aethernet names, etc. Plot addresses are retried
+    // with the current world prepended, so no world token is needed here.
+    private void GoToDestination(CharacterRecord rec, string destination)
+    {
+        var player     = ObjectTable[0] as IPlayerCharacter;
+        var currentKey = player != null
+            ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
+            : null;
+
+        if (currentKey == rec.Key)
+        {
+            InvokeLifestreamTeleport(destination);
+        }
+        else
+        {
+            pendingLifestreamArgs = destination;
+            SwitchToCharacter(rec.Name, rec.World);
+        }
+    }
+
+    // Turns a raw /li destination into a friendly label for the swap toast, or
+    // null when there is no follow-up destination. Plot addresses and aethernet
+    // names are already readable, so they pass through unchanged.
+    private static string? DescribeLifestreamDestination(string? raw)
+    {
+        var d = raw?.Trim();
+        if (string.IsNullOrEmpty(d)) return null;
+
+        var lower = d.ToLowerInvariant();
+        var head  = lower.Split(' ', 2)[0];
+        return lower switch
+        {
+            "fc" or "free" or "company" or "free company" => "Free Company estate",
+            "home" or "house" or "private"                => "Private estate",
+            "apt" or "apartment"                          => "Apartment",
+            "ws" or "workshop"                            => "FC workshop",
+            "shared"                                      => "Shared estate",
+            "auto"                                        => "Estate",
+            "mb" or "market"                              => "Market board",
+            _ when head is "gc" or "gcc" or "hc" or "hcc" or "fcgc" or "gcfc" => "Grand Company",
+            _ when head is "inn" or "hinn"                => "Inn",
+            _ when head is "island" or "is" or "sanctuary" => "Island Sanctuary",
+            _                                             => FormatHousingAddress(d) ?? d,
+        };
+    }
+
+    private static readonly (string Alias, string Name)[] DistrictAliases =
+    {
+        ("the lavender beds", "Lavender Beds"),
+        ("lavender beds",     "Lavender Beds"),
+        ("lavender",          "Lavender Beds"),
+        ("lb",                "Lavender Beds"),
+        ("the goblet",        "The Goblet"),
+        ("goblet",            "The Goblet"),
+        ("empyreum",          "Empyreum"),
+        ("empy",              "Empyreum"),
+        ("shirogane",         "Shirogane"),
+        ("shiro",             "Shirogane"),
+        ("mist",              "Mist"),
+    };
+
+    // Formats a raw /li housing address ("mist 5 30", "shiro, ward 7, plot 30",
+    // "Ragnarok, Shirogane, ward 7, plot 30") into "Shirogane, Ward 7, Plot 30".
+    // Returns null when the string isn't a recognisable housing address so the
+    // caller can fall back to showing it verbatim.
+    private static string? FormatHousingAddress(string raw)
+    {
+        var s = Rx.Replace(raw.ToLowerInvariant(), @"[,\.\(\)\t]", " ");
+        s = " " + Rx.Replace(s, @"\s+", " ").Trim() + " ";
+
+        string? district = null;
+        foreach (var (alias, name) in DistrictAliases)
+        {
+            if (s.Contains($" {alias} "))
+            {
+                district = name;
+                s = s.Replace($" {alias} ", " ");
+                break;
+            }
+        }
+        if (district == null) return null;
+
+        bool isApartment = Rx.IsMatch(s, @"\b(?:apartment|apt)\b") || Rx.IsMatch(s, @"\ba\s*\d");
+        bool isSub       = Rx.IsMatch(s, @"\b(?:subdivision|sub)\b");
+
+        int? ward = MatchNum(s, @"\b(?:ward|w)\s*(\d{1,2})\b");
+        int? unit = isApartment
+            ? MatchNum(s, @"\b(?:apartment|apt|a)\s*(\d{1,3})\b")
+            : MatchNum(s, @"\b(?:plot|p)\s*(\d{1,2})\b");
+
+        // Keyword-less form ("mist 5 30"): fall back to bare numbers in order.
+        if (ward == null || unit == null)
+        {
+            var nums = Rx.Matches(s, @"\d{1,3}");
+            if (ward == null && nums.Count >= 1) ward = int.Parse(nums[0].Value);
+            if (unit == null && nums.Count >= 2) unit = int.Parse(nums[1].Value);
+        }
+
+        if (ward == null) return district;
+
+        var sub  = isSub ? ", Subdivision" : "";
+        var kind = isApartment ? "Apartment" : "Plot";
+        return unit == null
+            ? $"{district}, Ward {ward}{sub}"
+            : $"{district}, Ward {ward}, {kind} {unit}{sub}";
+    }
+
+    private static int? MatchNum(string s, string pattern)
+    {
+        var m = Rx.Match(s, pattern);
+        return m.Success ? int.Parse(m.Groups[1].Value) : null;
+    }
+
     private bool IsAlreadyInBidLocation(HousingBidRecord bid) =>
         HousingDistricts.TerritoryIds.TryGetValue(bid.District, out var expected) &&
         ClientState.TerritoryType == expected;
@@ -518,6 +643,9 @@ public sealed class Plugin : IDalamudPlugin
     private async void SwitchToCharacter(string name, string world)
     {
         switchingCharacter = true;
+        // Set by GoToDestination/GoToBid before switching; surfaces the follow-up
+        // destination on the toast so the user sees the full journey at a glance.
+        var destLabel = DescribeLifestreamDestination(pendingLifestreamArgs);
         try
         {
             await loginInfoHandler.QuickSaveAsync();
@@ -526,7 +654,9 @@ public sealed class Plugin : IDalamudPlugin
             {
                 Common.ShowToast(
                     "Swap character",
-                    $"Switching to {name} ({world})"
+                    destLabel == null
+                        ? $"Switching to {name} ({world})"
+                        : $"Switching to {name} ({world})\nDestination: {destLabel}"
                 );
                 // Return type is ErrorCode enum, use object to avoid InvalidCastException
                 PluginInterface.GetIpcSubscriber<string, string, object>("Lifestream.ChangeCharacter")
