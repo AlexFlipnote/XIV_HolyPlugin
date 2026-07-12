@@ -50,7 +50,7 @@ public partial class ConfigWindow
                 v => configuration.FcPointsTrackingEnabled = v,
                 "Unlike gil/MGP, FC points can only be read by opening the FC window. With this on, " +
                 "the plugin briefly opens it once per login (if you're in an FC) and closes it again to " +
-                "grab the value. Off by default since that flash can be surprising if unexpected.");
+                "grab the value.");
 
             ImGui.Dummy(new Vector2(0, 4));
             SectionRow();

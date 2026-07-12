@@ -40,6 +40,7 @@ public sealed class CharacterDb : IDisposable
         AddColumnIfMissing("inventory", "TEXT");
         AddColumnIfMissing("mgp", "INTEGER");
         AddColumnIfMissing("fc_points", "INTEGER");
+        AddColumnIfMissing("fc_leader", "INTEGER");
     }
 
     private void AddColumnIfMissing(string column, string type)

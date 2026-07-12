@@ -21,6 +21,9 @@ public class CharacterRecord
     [Column("free_company")]
     public string? FreeCompany { get; set; }
 
+    [Column("fc_leader")]
+    public bool FcLeader { get; set; }
+
     [Column("search_info")]
     public string? SearchInfo { get; set; }
 

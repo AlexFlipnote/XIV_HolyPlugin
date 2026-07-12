@@ -24,7 +24,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         { 10155u, "Ceruleum" },
         { 10373u, "Magitek" },
     };
-    private record FcData(string Tag, string Name)
+    private record FcData(string Tag, string Name, bool IsLeader)
     {
         public string Display => $"«{Tag}» {Name}";
     }
@@ -183,6 +183,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 World        = charInfo.World,
                 DataCenter   = charInfo.Dc,
                 FreeCompany  = fc?.Display,
+                FcLeader     = fc?.IsLeader ?? false,
                 SearchInfo   = plate?.TextValue      ?? existing?.SearchInfo,
                 PrivateHouse = privateHouse          ?? existing?.PrivateHouse,
                 FcHouse      = fc == null ? null     : (fcHouse ?? existing?.FcHouse),
@@ -265,6 +266,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var newInventory    = await CollectInventoryAsync(CancellationToken.None);
 
         existing.FreeCompany = newFc?.Display;
+        existing.FcLeader    = newFc?.IsLeader ?? false;
         existing.FcHouse     = newFc == null ? null : (newFcHouse ?? existing.FcHouse);
         existing.FcPoints    = newFc == null ? -1   : (newFcPoints >= 0 ? newFcPoints : existing.FcPoints);
         if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
@@ -309,6 +311,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
                 // Only accept confident values; fall back to existing for anything that didn't load
                 var newFcDisplay  = newFc?.Display;
+                var newFcLeader   = newFc?.IsLeader ?? false;
                 var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
                 var newMgpValue   = newMgp >= 0 ? newMgp    : existing.Mgp;
                 var newFcPointsValue = newFc == null ? -1   : (newFcPoints >= 0 ? newFcPoints : existing.FcPoints);
@@ -318,6 +321,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var newInv        = newInventory             ?? existing.Inventory;
 
                 if (existing.FreeCompany  == newFcDisplay  &&
+                    existing.FcLeader     == newFcLeader   &&
                     existing.PrivateHouse == newPH         &&
                     existing.FcHouse      == newFcH        &&
                     existing.Gil          == newGilValue   &&
@@ -328,6 +332,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                     continue;
 
                 existing.FreeCompany  = newFcDisplay;
+                existing.FcLeader     = newFcLeader;
                 existing.PrivateHouse = newPH;
                 existing.FcHouse      = newFcH;
                 existing.Gil          = newGilValue;
@@ -442,24 +447,40 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var attempts = instant ? 1 : 10;
         for (var i = 0; i < attempts; i++)
         {
-            string tag       = string.Empty;
-            string name      = string.Empty;
-            bool   proxyNull = false;
+            string tag        = string.Empty;
+            string name       = string.Empty;
+            string master     = string.Empty;
+            string playerName = string.Empty;
+            bool   proxyNull  = false;
 
             await framework.RunOnFrameworkThread(() =>
             {
                 if (objectTable[0] is IPlayerCharacter pc)
-                    tag = pc.CompanyTag.ToString();
+                {
+                    tag        = pc.CompanyTag.ToString();
+                    playerName = pc.Name.TextValue;
+                }
 
                 unsafe
                 {
                     var fc = InfoProxyFreeCompany.Instance();
                     proxyNull = fc == null;
-                    if (fc != null) name = fc->NameString;
+                    if (fc != null)
+                    {
+                        name   = fc->NameString;
+                        master = fc->MasterString;
+                    }
                 }
             });
 
-            if (tag.Length > 0) return new FcData(tag, name); // has FC
+            // Master ownership can be transferred at any time, so leadership is recomputed from the
+            // live proxy on every collection (never cached) — a demoted ex-master flips back to false.
+            if (tag.Length > 0)
+            {
+                var isLeader = master.Length > 0 && playerName.Length > 0 &&
+                               string.Equals(master, playerName, StringComparison.Ordinal);
+                return new FcData(tag, name, isLeader); // has FC
+            }
             if (proxyNull)      return null;                  // proxy gone, no FC
 
             // proxy present but tag still empty: still loading, wait and retry

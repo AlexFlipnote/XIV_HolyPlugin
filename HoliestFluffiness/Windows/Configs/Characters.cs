@@ -75,7 +75,19 @@ public partial class ConfigWindow
                 r => ImGui.TextUnformatted(r.Rec.DataCenter)),
             new("FC", uid++, ImGuiTableColumnFlags.None, 0,
                 r => r.Rec.FreeCompany ?? "",
-                r => ImGui.TextUnformatted(r.Rec.FreeCompany ?? "")),
+                r =>
+                {
+                    var fc = r.Rec.FreeCompany ?? "";
+                    if (fc.Length > 0 && r.Rec.FcLeader)
+                    {
+                        Common.GreenText(fc);
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Leader of this Free Company");
+                    }
+                    else
+                    {
+                        ImGui.TextUnformatted(fc);
+                    }
+                }),
             new("Search Info", uid++, ImGuiTableColumnFlags.None, 0,
                 r => r.Rec.SearchInfo ?? "",
                 r => ImGui.TextUnformatted(r.Rec.SearchInfo ?? "")),
@@ -156,11 +168,18 @@ public partial class ConfigWindow
             columns,
             ref rows,
             r => r.Rec.Slot == 0 ? int.MaxValue : r.Rec.Slot,
-            r => filter.Length == 0
-                || r.Rec.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                || r.Rec.World.Contains(worldFilter, StringComparison.OrdinalIgnoreCase)
-                || r.Rec.DataCenter.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                || (r.Rec.FreeCompany ?? "").Contains(filter, StringComparison.OrdinalIgnoreCase));
+            r =>
+            {
+                if (filter.Length == 0) return true;
+                bool Has(string? s) => s != null && s.Contains(filter, StringComparison.OrdinalIgnoreCase);
+                return Has(r.Rec.Name)
+                    || r.Rec.World.Contains(worldFilter, StringComparison.OrdinalIgnoreCase)
+                    || Has(r.Rec.DataCenter)
+                    || Has(r.Rec.FreeCompany)
+                    || Has(r.Rec.SearchInfo)
+                    || Has(r.Rec.PrivateHouse)
+                    || Has(r.Rec.FcHouse);
+            });
         cachedRecords = rows;
 
         if (pendingReset != null) { characterDb.Reset(pendingReset); LoadCharacters(); }
