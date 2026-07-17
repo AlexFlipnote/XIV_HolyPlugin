@@ -4,6 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Statuses;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
@@ -84,8 +86,7 @@ public class FoodCheckHandler : IDisposable
         lowFoodEntries = [];
     }
 
-    // Called from Plugin.cs when a ready check is initiated
-    public void OnReadyCheck() => RunCheck(ignoreDutyFilter: false);
+    public void OnReadyCheck() => framework.RunOnTick(() => RunCheck(ignoreDutyFilter: false), delayTicks: 1);
 
     // Called from the test button, skips the duty scope filter, clears after 5 s
     public void ForceCheck() => RunCheck(ignoreDutyFilter: true, clearDelayMs: 5_000);
@@ -147,21 +148,19 @@ public class FoodCheckHandler : IDisposable
         var result = new List<FoodCheckEntry>();
         var hud    = AgentHUD.Instance();
 
-        // Party members, read statuses directly from IPartyMember, no object table lookup needed
+        var characters = new Dictionary<uint, IPlayerCharacter>();
+        foreach (var obj in objectTable)
+            if (obj is IPlayerCharacter pc)
+                characters.TryAdd(pc.EntityId, pc);
+
         for (var i = 0; i < partyList.Length; i++)
         {
             var member = partyList[i];
             if (member == null) continue;
 
-            var remaining = 0;
-            foreach (var status in member.Statuses)
-            {
-                if (status.GameData.RowId == WellFedStatusId)
-                {
-                    remaining = (int)status.RemainingTime;
-                    break;
-                }
-            }
+            var remaining = characters.TryGetValue(member.EntityId, out var character)
+                ? ReadWellFed(character.StatusList)
+                : ReadWellFed(member.Statuses);
 
             result.Add(new FoodCheckEntry(
                 member.Name.TextValue,
@@ -171,16 +170,18 @@ public class FoodCheckHandler : IDisposable
         }
 
         // Solo or all party lookups empty, check local player directly
-        if (result.Count == 0 && objectTable[0] is Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter local)
-        {
-            var remaining = 0;
-            foreach (var status in local.StatusList)
-                if (status.StatusId == WellFedStatusId) { remaining = (int)status.RemainingTime; break; }
-
-            result.Add(new FoodCheckEntry(local.Name.TextValue, local.EntityId, 0, remaining));
-        }
+        if (result.Count == 0 && objectTable[0] is IPlayerCharacter local)
+            result.Add(new FoodCheckEntry(local.Name.TextValue, local.EntityId, 0, ReadWellFed(local.StatusList)));
 
         return result;
+    }
+
+    private static int ReadWellFed(StatusList statuses)
+    {
+        foreach (var status in statuses)
+            if (status.StatusId == WellFedStatusId)
+                return (int)status.RemainingTime;
+        return 0;
     }
 
     private static unsafe int GetHudSlot(AgentHUD* hud, uint entityId)

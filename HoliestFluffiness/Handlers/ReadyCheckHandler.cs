@@ -22,6 +22,8 @@ public class ReadyCheckHandler : IDisposable
     private unsafe delegate void EndReadyCheckDelegate(AgentReadyCheck* self);
     private readonly Hook<EndReadyCheckDelegate> endHook;
 
+    private const int SafetyClearMs = 45_000;
+
     private List<ReadyCheckEntry> data = [];
     private bool active;
     private CancellationTokenSource? clearCts;
@@ -54,12 +56,12 @@ public class ReadyCheckHandler : IDisposable
         if (!clientState.IsLoggedIn) return;
         active = true;
         IsValid = true;
-        clearCts?.Cancel();
+        ScheduleClear(SafetyClearMs);
     }
 
     public List<ReadyCheckEntry> GetData() => data;
 
-    public void Invalidate() { IsValid = false; data.Clear(); savedPartyIds.Clear(); }
+    public void Invalidate() { active = false; IsValid = false; data.Clear(); savedPartyIds.Clear(); }
 
     private unsafe void CapturePartyIds()
     {
