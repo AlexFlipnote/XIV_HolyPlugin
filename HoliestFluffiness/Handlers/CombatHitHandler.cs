@@ -114,13 +114,20 @@ public sealed unsafe class CombatHitHandler : IDisposable
     }
 
     // Called by the Test button in the config UI. defaultAbsolute is the full path to the bundled default sound.
-    public void TestHit(FlyTextKind kind, bool showText, string text, string soundPath, string defaultAbsolute, float volume)
+    // Each half is previewed only when its toggle is on: the fly text when custom text is enabled, the
+    // sound when sound is enabled, so the test reflects exactly what the current settings would produce.
+    public void TestHit(FlyTextKind kind, bool showText, string text, bool soundEnabled,
+                        string soundPath, string defaultAbsolute, float volume)
     {
-        var label = showText && !string.IsNullOrEmpty(text)
-            ? new SeStringBuilder().AddText(text).Build()
-            : SeString.Empty;
-        flyTextGui.AddFlyText(kind, 1, 3333, 0, SeString.Empty, label, 0, 0, 0);
-        SoundEngine.Play(string.IsNullOrEmpty(soundPath) ? defaultAbsolute : soundPath, volume);
+        if (showText)
+        {
+            var label = string.IsNullOrEmpty(text)
+                ? SeString.Empty
+                : new SeStringBuilder().AddText(text).Build();
+            flyTextGui.AddFlyText(kind, 1, 3333, 0, SeString.Empty, label, 0, 0, 0);
+        }
+        if (soundEnabled)
+            SoundEngine.Play(string.IsNullOrEmpty(soundPath) ? defaultAbsolute : soundPath, volume);
     }
 
     private string Resolve(string configPath, string defaultRelative) =>

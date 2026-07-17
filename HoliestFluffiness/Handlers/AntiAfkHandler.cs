@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
 
@@ -10,6 +11,7 @@ public sealed class AntiAfkHandler : IDisposable
 {
     private readonly Configuration config;
     private readonly IFramework framework;
+    private readonly IObjectTable objectTable;
     private readonly IPluginLog log;
     private readonly IntPtr windowHandle;
     private CancellationTokenSource? cts;
@@ -17,14 +19,17 @@ public sealed class AntiAfkHandler : IDisposable
     private const uint WM_KEYDOWN = 0x100;
     private const uint WM_KEYUP   = 0x101;
     private const int  LControl   = 162;
+    private const uint AfkOnlineStatus = 17;
+    private readonly Random rng = new Random();
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-    public AntiAfkHandler(Configuration config, IFramework framework, IPluginLog log, IntPtr windowHandle)
+    public AntiAfkHandler(Configuration config, IFramework framework, IObjectTable objectTable, IPluginLog log, IntPtr windowHandle)
     {
         this.config       = config;
         this.framework    = framework;
+        this.objectTable  = objectTable;
         this.log          = log;
         this.windowHandle = windowHandle;
         if (config.AntiAfkEnabled)
@@ -60,28 +65,49 @@ public sealed class AntiAfkHandler : IDisposable
             try
             {
                 float maxTimer = 0f;
+                bool  manualAfk = false;
+                float jitter = (float)rng.NextDouble() * 5f;
+                float effectiveLimit = Math.Max(0, config.AntiAfkTimerLimit - jitter);
+
                 framework.RunOnFrameworkThread(() =>
                 {
                     var m = UIModule.Instance()->GetInputTimerModule();
                     maxTimer = Math.Max(m->AfkTimer, Math.Max(m->ContentInputTimer, m->InputTimer));
+                    if (config.AntiAfkRespectManualAfk)
+                        manualAfk = (objectTable[0] as IPlayerCharacter)?.OnlineStatus.RowId == AfkOnlineStatus;
                 }).GetAwaiter().GetResult();
 
-                log.Verbose($"[HF] AntiAfk timer: {maxTimer:F1}s");
-
-                if (maxTimer > config.AntiAfkTimerLimit)
+                if (manualAfk)
                 {
-                    log.Debug($"[HF] AntiAfk: keypress at {maxTimer:F1}s");
+                    log.Debug("[HF] AntiAfk paused: player manually AFK");
+                    token.WaitHandle.WaitOne(5000); // Wait 5s if paused
+                    continue;
+                }
+
+                if (maxTimer > effectiveLimit)
+                {
+                    log.Debug($"[HF] AntiAfk: keypress at {maxTimer:F1}s (Limit: {effectiveLimit:F1}s)");
                     SendMessage(windowHandle, WM_KEYDOWN, (IntPtr)LControl, IntPtr.Zero);
                     Thread.Sleep(50);
                     SendMessage(windowHandle, WM_KEYUP, (IntPtr)LControl, IntPtr.Zero);
+
+                    // Reset wait to standard interval after action
+                    token.WaitHandle.WaitOne(5000);
+                }
+                else
+                {
+                    float timeUntilLimit = effectiveLimit - maxTimer;
+                    int sleepMs = (int)Math.Clamp(timeUntilLimit * 500, 1000, 10000);
+
+                    log.Verbose($"[HF] AntiAfk sleeping for {sleepMs}ms");
+                    token.WaitHandle.WaitOne(sleepMs);
                 }
             }
             catch (Exception ex)
             {
                 log.Error(ex, "[HF] AntiAfk error");
+                token.WaitHandle.WaitOne(5000); // Safety wait on error
             }
-
-            token.WaitHandle.WaitOne(10_000);
         }
     }
 

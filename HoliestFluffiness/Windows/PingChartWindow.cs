@@ -30,19 +30,26 @@ public sealed class PingChartWindow : Window, IDisposable
 
     public override void PreDraw()
     {
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,          Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.Text,              Theme.ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,           Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.FrameBg,           Theme.ColPrimary);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        Vector4.Zero);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  Theme.ColGold);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.WindowBg,          Theme.Fade(Theme.ColSecondary));
+            ImGui.PushStyleColor(ImGuiCol.Text,              Theme.ColWhite);
+            ImGui.PushStyleColor(ImGuiCol.TitleBg,           Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.FrameBg,           Theme.ColPrimary);
+            ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        Vector4.Zero);
+            ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  Theme.ColGold);
+        }
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
+        }
     }
 
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(8);
+        ImGui.PopStyleColor(Theme.UseCustom ? 8 : 1);
     }
 
     public override void Draw()

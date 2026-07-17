@@ -39,12 +39,21 @@ public partial class ConfigWindow
         if (ImGui.Button("GitHub##about"))
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/AlexFlipnote/XIV_HolyPlugin") { UseShellExecute = true });
         PopButton();
-        ImGui.SameLine();
-        PushButton();
-        if (ImGui.Button("Discord##about"))
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://discord.gg/3QwgQrCbbM") { UseShellExecute = true });
-        PopButton();
 
-        EndSection();
+        SubsectionLabel("Make it yours",
+            "You read all the way down here, so here's your reward: a couple of knobs to make the plugin look how you like.");
+
+        ConfigCheckbox(
+            "Disable custom theme##themecustom",
+            configuration.ThemeDisableCustom,
+            v => configuration.ThemeDisableCustom = v,
+            "Off keeps our gold-and-dark FC palette. Turn it on to fall back to your default Dalamud theme.");
+
+        ConfigSliderFloat("Window opacity##themeopacity", configuration.ThemeOpacity, 0.30f, 1.00f,
+            v => configuration.ThemeOpacity = v,
+            format: "%.2f", hint: "(1.00 = solid)",
+            desc: "Fades the window backgrounds so you can see through them. Text and highlights stay solid.");
+
+        EndSection(10);
     }
 }

@@ -12,6 +12,10 @@ public partial class ConfigWindow
 
     internal void SetNearbyHandler(NearbyHandler handler) => nearbyHandler = handler;
 
+    // Previews a doorbell event (0=enter, 1=already-here, 2=leave); wired to Plugin.TestDoorbell.
+    private Action<int>? onTestDoorbell;
+    internal void SetDoorbellTest(Action<int> test) => onTestDoorbell = test;
+
     private void DrawSocialSection()
     {
         BeginSection("Social", "Nearby players, targeting tracker, house doorbell, commendation sounds, and nameplate tweaks.");
@@ -137,100 +141,32 @@ public partial class ConfigWindow
         SubsectionLabel("House doorbell",
             "Alerts when players enter or leave a house, or are already present when you arrive.");
 
-        var doorbellDefault = Path.Combine(
-            pluginInterface.AssemblyLocation.DirectoryName!,
-            "Sounds", "Doorbell", "doorbell.wav"
-        );
+        var doorbellDir = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Doorbell");
 
-        // Entered
-        ConfigCheckbox(
-            "Someone entered##doorbellenterenabled",
-            configuration.DoorbellEnterEnabled,
-            v => configuration.DoorbellEnterEnabled = v);
-        ImGui.BeginDisabled(!configuration.DoorbellEnterEnabled);
-        ImGui.SameLine();
-        ConfigCheckbox(
-            "Print in chat##doorbellenterchat",
-            configuration.DoorbellEnterChat,
-            v => configuration.DoorbellEnterChat = v);
-        ImGui.SameLine();
-        ConfigCheckbox(
-            "Play a sound##doorbellentersonud",
-            configuration.DoorbellEnterSound,
-            v => configuration.DoorbellEnterSound = v);
-        ImGui.Dummy(new Vector2(0, 2));
-        ImGui.BeginDisabled(!configuration.DoorbellEnterSound);
-        DrawSoundPicker(
-            "doorbellenter", "Doorbell: enter sound",
-            doorbellDefault,
-            configuration.DoorbellEnterSoundPath,
-            configuration.DoorbellEnterSoundVolume,
-            p => { configuration.DoorbellEnterSoundPath   = p; configuration.Save(); },
-            v => { configuration.DoorbellEnterSoundVolume = v; configuration.Save(); });
-        ImGui.EndDisabled();
-        ImGui.EndDisabled();
+        DrawDoorbellBlock(
+            "doorbellenter", "Someone entered", Path.Combine(doorbellDir, "doorbell.wav"), () => onTestDoorbell?.Invoke(0),
+            configuration.DoorbellEnterChat,    v => configuration.DoorbellEnterChat = v,
+            configuration.DoorbellEnterText,    v => configuration.DoorbellEnterText = v, Configuration.DefaultDoorbellEnterText,
+            configuration.DoorbellEnterSound,   v => configuration.DoorbellEnterSound = v,
+            configuration.DoorbellEnterSoundPath,   p => { configuration.DoorbellEnterSoundPath   = p; configuration.Save(); },
+            configuration.DoorbellEnterSoundVolume, v => { configuration.DoorbellEnterSoundVolume = v; configuration.Save(); },
+            firstSet: true);
 
-        ImGui.Dummy(new Vector2(0, 8));
+        DrawDoorbellBlock(
+            "doorbellalready", "Already inside when you arrive", Path.Combine(doorbellDir, "doorbell.wav"), () => onTestDoorbell?.Invoke(1),
+            configuration.DoorbellAlreadyHereChat,    v => configuration.DoorbellAlreadyHereChat = v,
+            configuration.DoorbellAlreadyHereText,    v => configuration.DoorbellAlreadyHereText = v, Configuration.DefaultDoorbellAlreadyHereText,
+            configuration.DoorbellAlreadyHereSound,   v => configuration.DoorbellAlreadyHereSound = v,
+            configuration.DoorbellAlreadyHereSoundPath,   p => { configuration.DoorbellAlreadyHereSoundPath   = p; configuration.Save(); },
+            configuration.DoorbellAlreadyHereSoundVolume, v => { configuration.DoorbellAlreadyHereSoundVolume = v; configuration.Save(); });
 
-        // Already here
-        ConfigCheckbox(
-            "Already inside when you arrive##doorbellalreadyenabled",
-            configuration.DoorbellAlreadyHereEnabled,
-            v => configuration.DoorbellAlreadyHereEnabled = v);
-        ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereEnabled);
-        ImGui.SameLine();
-        ConfigCheckbox(
-            "Print in chat##doorbellalreadychat",
-            configuration.DoorbellAlreadyHereChat,
-            v => configuration.DoorbellAlreadyHereChat = v);
-        ImGui.SameLine();
-        ConfigCheckbox(
-            "Play a sound##doorbellalreadysound",
-            configuration.DoorbellAlreadyHereSound,
-            v => configuration.DoorbellAlreadyHereSound = v);
-        ImGui.Dummy(new Vector2(0, 2));
-        ImGui.BeginDisabled(!configuration.DoorbellAlreadyHereSound);
-        DrawSoundPicker(
-            "doorbellalready", "Doorbell: already-here sound",
-            doorbellDefault,
-            configuration.DoorbellAlreadyHereSoundPath,
-            configuration.DoorbellAlreadyHereSoundVolume,
-            p => { configuration.DoorbellAlreadyHereSoundPath   = p; configuration.Save(); },
-            v => { configuration.DoorbellAlreadyHereSoundVolume = v; configuration.Save(); });
-        ImGui.EndDisabled();
-        ImGui.EndDisabled();
-
-        ImGui.Dummy(new Vector2(0, 8));
-
-        // Left
-        ConfigCheckbox(
-            "Someone left##doorbelllaveenabled",
-            configuration.DoorbellLeaveEnabled,
-            v => configuration.DoorbellLeaveEnabled = v);
-        ImGui.BeginDisabled(!configuration.DoorbellLeaveEnabled);
-        ImGui.SameLine();
-        ConfigCheckbox(
-            "Print in chat##doorbellleavechat",
-            configuration.DoorbellLeaveChat,
-            v => configuration.DoorbellLeaveChat = v);
-        ImGui.SameLine();
-        ConfigCheckbox(
-            "Play a sound##doorbellleavesound",
-            configuration.DoorbellLeaveSound,
-            v => configuration.DoorbellLeaveSound = v);
-        ImGui.Dummy(new Vector2(0, 2));
-        ImGui.BeginDisabled(!configuration.DoorbellLeaveSound);
-        DrawSoundPicker(
-            "doorbellleave", "Doorbell: leave sound",
-            doorbellDefault,
-            configuration.DoorbellLeaveSoundPath,
-            configuration.DoorbellLeaveSoundVolume,
-            p => { configuration.DoorbellLeaveSoundPath   = p; configuration.Save(); },
-            v => { configuration.DoorbellLeaveSoundVolume = v; configuration.Save(); });
-        ImGui.EndDisabled();
-        ImGui.EndDisabled();
-
-        ImGui.Dummy(new Vector2(0, 4));
+        DrawDoorbellBlock(
+            "doorbellleave", "Someone left", Path.Combine(doorbellDir, "leave.wav"), () => onTestDoorbell?.Invoke(2),
+            configuration.DoorbellLeaveChat,    v => configuration.DoorbellLeaveChat = v,
+            configuration.DoorbellLeaveText,    v => configuration.DoorbellLeaveText = v, Configuration.DefaultDoorbellLeaveText,
+            configuration.DoorbellLeaveSound,   v => configuration.DoorbellLeaveSound = v,
+            configuration.DoorbellLeaveSoundPath,   p => { configuration.DoorbellLeaveSoundPath   = p; configuration.Save(); },
+            configuration.DoorbellLeaveSoundVolume, v => { configuration.DoorbellLeaveSoundVolume = v; configuration.Save(); });
 
         // ── Commendations ─────────────────────────────────────────────────────
 
@@ -310,7 +246,7 @@ public partial class ConfigWindow
         if (ImGui.Button($"Browse...##{id}browse"))
             fileDialogManager.OpenFileDialog(
                 "Select sound file",
-                ".wav,.mp3,.ogg,.aif,.aiff,.wma",
+                SoundEngine.FileFilter,
                 (ok, p) => { if (ok) setPath(p); });
         PopButton();
         ImGui.SameLine();
@@ -331,11 +267,75 @@ public partial class ConfigWindow
         ImGui.SetNextItemWidth(200);
         var vol = volume * 100f;
         PushInput();
+        // Slider drags 0-100% (100% = normal full volume). No AlwaysClamp, so Ctrl+Click entry can
+        // exceed the bar up to 300% to boost quiet files; the setter caps it there.
         if (ImGui.SliderFloat($"##{id}vol", ref vol, 0f, 100f, "%.0f%%"))
-            setVolume(vol / 100f);
+            setVolume(Math.Clamp(vol, 0f, 300f) / 100f);
         PopInput();
 
         ImGui.EndGroup();
         Anchor(id, title, "Sound file and volume settings");
+    }
+
+    // One doorbell event (enter / already-here / leave). Section-text label with a Test button, an
+    // optional chat line (with a "<player>" token and reset button) and an optional sound. Mirrors
+    // DrawCombatBlock so both share the same clean layout.
+    private void DrawDoorbellBlock(
+        string id, string label, string defaultSoundPath, Action onTest,
+        bool chat,        Action<bool>   setChat,
+        string text,      Action<string> setText, string defaultText,
+        bool sound,       Action<bool>   setSound,
+        string soundPath, Action<string> setSoundPath,
+        float volume,     Action<float>  setVolume,
+        bool firstSet = false)
+    {
+        ImGui.BeginGroup();
+
+        if (firstSet) SectionRow();
+        else RowGap(6);
+
+        Common.DimmedTextWrapped(label);
+
+        ImGui.SameLine();
+        PushButton();
+        if (ImGui.Button($"Test##{id}test")) onTest();
+        PopButton();
+
+        // Row 1: [x] Print in chat  [message]  [Reset]  <player> = name
+        PushCheckbox();
+        var c = chat;
+        SectionRow();
+        if (ImGui.Checkbox($"Print in chat##{id}chat", ref c)) { setChat(c); configuration.Save(); }
+        PopCheckbox();
+        ImGui.SameLine(0, 8);
+        ImGui.BeginDisabled(!chat);
+        ImGui.SetNextItemWidth(220);
+        var t = text;
+        PushInput();
+        if (ImGui.InputText($"##{id}txt", ref t, 128)) { setText(t); configuration.Save(); }
+        PopInput();
+        ImGui.SameLine();
+        PushButton();
+        if (ImGui.Button($"Reset##{id}txtrst")) { setText(defaultText); configuration.Save(); }
+        PopButton();
+        ImGui.SameLine();
+        Common.DimmedText("<player> = name");
+        ImGui.EndDisabled();
+
+        // Row 2: [x] Play a sound
+        SectionRow();
+        PushCheckbox();
+        var s = sound;
+        if (ImGui.Checkbox($"Play a sound##{id}en", ref s)) { setSound(s); configuration.Save(); }
+        PopCheckbox();
+
+        // Sound file + volume (dimmed when disabled). No per-picker test; the Test button above covers it.
+        ImGui.BeginDisabled(!sound);
+        ImGui.Dummy(new Vector2(0, 2));
+        DrawSoundPicker(id, $"Doorbell: {label}", defaultSoundPath, soundPath, volume, setSoundPath, setVolume, showTest: false);
+        ImGui.EndDisabled();
+
+        ImGui.EndGroup();
+        Anchor(id, $"Doorbell: {label}", "Doorbell chat text and sound settings");
     }
 }

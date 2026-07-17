@@ -20,6 +20,10 @@ public class Configuration : IPluginConfiguration
 
     public int Version { get; set; } = 1;
 
+    // Theme section (unlocked from the About page)
+    public bool  ThemeDisableCustom { get; set; } = false;
+    public float ThemeOpacity       { get; set; } = 1f;
+
     public bool AccessoryEnabled { get; set; } = false;
     public int AccessoryInventory { get; set; } = 0;
     public int AccessoryInventoryMin { get; set; } = 0;
@@ -76,6 +80,7 @@ public class Configuration : IPluginConfiguration
     // Anti-AFK section
     public bool AntiAfkEnabled { get; set; } = false;
     public int AntiAfkTimerLimit { get; set; } = 30;
+    public bool AntiAfkRespectManualAfk { get; set; } = false;
 
     // Duty timer + cast bar (Indicators)
     public bool DutyTimerEnabled       { get; set; } = false;
@@ -96,7 +101,7 @@ public class Configuration : IPluginConfiguration
     public bool    NearbyFilterAfk           { get; set; } = false;
     public bool    NearbyFilterLowLevel      { get; set; } = false;
     public bool    NearbyDebugSelf           { get; set; } = false;
-    public int     NearbyDebugSelfAs         { get; set; } = 0; // 0=Friend 1=FC 2=Party 3=TargetingYou
+    public int     NearbyDebugSelfAs         { get; set; } = 0; // 0=Normal 1=Friend 2=FC 3=Party 4=TargetingYou
     public Vector4 NearbyColParty            { get; set; } = DefaultNearbyColParty;
     public Vector4 NearbyColFriend           { get; set; } = DefaultNearbyColFriend;
     public Vector4 NearbyColLocalFc          { get; set; } = DefaultNearbyColLocalFc;
@@ -118,22 +123,27 @@ public class Configuration : IPluginConfiguration
     public string CommendationAllSevenPath      { get; set; } = "";
     public float  CommendationAllSevenVolume    { get; set; } = 0.5f;
 
-    // Doorbell section
-    public bool   DoorbellEnterEnabled       { get; set; } = false;
+    // Doorbell section (fires whenever chat and/or sound is enabled for the event)
     public bool   DoorbellEnterChat          { get; set; } = false;
     public bool   DoorbellEnterSound         { get; set; } = false;
     public string DoorbellEnterSoundPath     { get; set; } = "";
     public float  DoorbellEnterSoundVolume   { get; set; } = 0.5f;
-    public bool   DoorbellLeaveEnabled       { get; set; } = false;
     public bool   DoorbellLeaveChat          { get; set; } = false;
     public bool   DoorbellLeaveSound         { get; set; } = false;
     public string DoorbellLeaveSoundPath     { get; set; } = "";
     public float  DoorbellLeaveSoundVolume   { get; set; } = 0.5f;
-    public bool   DoorbellAlreadyHereEnabled { get; set; } = false;
     public bool   DoorbellAlreadyHereChat    { get; set; } = false;
     public bool   DoorbellAlreadyHereSound   { get; set; } = false;
     public string DoorbellAlreadyHereSoundPath   { get; set; } = "";
     public float  DoorbellAlreadyHereSoundVolume { get; set; } = 0.5f;
+
+    // Doorbell chat templates. "<player>" is replaced with a clickable player link when printed.
+    public const string DefaultDoorbellEnterText       = "<player> has come inside.";
+    public const string DefaultDoorbellLeaveText       = "<player> has left the house.";
+    public const string DefaultDoorbellAlreadyHereText = "<player> was here when you arrived.";
+    public string DoorbellEnterText       { get; set; } = DefaultDoorbellEnterText;
+    public string DoorbellLeaveText       { get; set; } = DefaultDoorbellLeaveText;
+    public string DoorbellAlreadyHereText { get; set; } = DefaultDoorbellAlreadyHereText;
 
     // Dynamic traveler (Social)
     public bool DynamicTravelerEnabled    { get; set; } = false;

@@ -210,9 +210,9 @@ public sealed class NearbyWindow : Window, IDisposable
             if (rowHovered)
                 ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ImGui.GetColorU32(Theme.ColGoldSub));
 
-            var col = p.IsParty   ? config.NearbyColParty
-                    : p.IsFriend  ? config.NearbyColFriend
-                    : p.IsLocalFc ? config.NearbyColLocalFc
+            var col = p.IsParty     ? config.NearbyColParty
+                    : p.IsFriend    ? config.NearbyColFriend
+                    : p.IsLocalFc   ? config.NearbyColLocalFc
                     : Theme.ColWhite;
 
             ImGui.PushStyleColor(ImGuiCol.Text, col);
@@ -300,10 +300,17 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.SetNextWindowPos(new Vector2(mainPos.X + mainSize.X + 2, mainPos.Y), ImGuiCond.Always);
         ImGui.SetNextWindowSize(new Vector2(275, mainSize.Y), ImGuiCond.Always);
 
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, Theme.ColGoldSub);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.Fade(Theme.ColSecondary));
+            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, Theme.ColGoldSub);
+        }
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 10));
 
         const ImGuiWindowFlags flags =
@@ -317,7 +324,7 @@ public sealed class NearbyWindow : Window, IDisposable
             DrawHistoryPanel();
         ImGui.End();
 
-        ImGui.PopStyleColor(4);
+        ImGui.PopStyleColor(Theme.UseCustom ? 4 : 1);
         ImGui.PopStyleVar(1);
     }
 

@@ -34,17 +34,24 @@ public class NoKillWindow : Window
     public override void PreDraw()
     {
         ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,       Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, Theme.ColHighlight);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
+            ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.Fade(Theme.ColSecondary));
+            ImGui.PushStyleColor(ImGuiCol.TitleBg,       Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.TitleBgActive, Theme.ColHighlight);
+        }
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(16, 12));
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
     }
 
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(4);
+        ImGui.PopStyleColor(Theme.UseCustom ? 4 : 1);
         ImGui.PopStyleVar(2);
     }
 

@@ -287,6 +287,12 @@ public partial class ConfigWindow
 
         Common.DimmedTextWrapped(label);
 
+        ImGui.SameLine();
+        PushButton();
+        if (ImGui.Button($"Test##{id}test"))
+            combatHitHandler.TestHit(testKind, showText, text, enabled, sound, defaultSound, vol);
+        PopButton();
+
         // Row 1: [x] Enable custom text  [textbox]
         PushCheckbox();
         var st = showText;
@@ -300,6 +306,7 @@ public partial class ConfigWindow
         PushInput();
         if (ImGui.InputText($"##{id}txt", ref t, 64)) setText(t);
         PopInput();
+
         ImGui.EndDisabled();
 
         // Row 2: [x] Enable sound
@@ -321,7 +328,7 @@ public partial class ConfigWindow
         if (ImGui.Button($"Browse...##{id}brw"))
             fileDialogManager.OpenFileDialog(
                 "Select sound file",
-                ".wav,.mp3,.ogg,.aif,.aiff,.wma",
+                SoundEngine.FileFilter,
                 (ok, p) => { if (ok) setSound(p); });
         PopButton();
         ImGui.SameLine();
@@ -331,15 +338,9 @@ public partial class ConfigWindow
         ImGui.SetNextItemWidth(160);
         var v = vol * 100f;
         PushInput();
-        if (ImGui.SliderFloat($"##{id}vol", ref v, 0f, 100f, "%.0f%%")) setVol(v / 100f);
+        // Slider drags 0-100%; no AlwaysClamp so Ctrl+Click can type up to 300%, capped by the setter.
+        if (ImGui.SliderFloat($"##{id}vol", ref v, 0f, 100f, "%.0f%%")) setVol(Math.Clamp(v, 0f, 300f) / 100f);
         PopInput();
-        ImGui.SameLine();
-        PushButton();
-        if (ImGui.Button($"Test##{id}test"))
-            combatHitHandler.TestHit(testKind, showText, text, sound, defaultSound, vol);
-        PopButton();
-        ImGui.SameLine();
-        Common.DimmedText("Test the sound + text");
 
         ImGui.EndDisabled();
 

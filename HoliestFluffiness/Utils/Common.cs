@@ -70,74 +70,86 @@ internal static class Common
     }
 
     // ── ImGui style helpers ───────────────────────────────────────────────────
+    //
+    // Each Push*/Pop* pair ALWAYS pushes and pops the same fixed colour count, so
+    // callers can pop with a raw ImGui.PopStyleColor(N) and never desync the stack.
+    // When the custom theme is off we push the ambient Dalamud colour for each slot,
+    // which is a visual no-op (Dalamud's own theme shows through). The only exception
+    // is the window background, which is faded by the opacity knob in both modes.
+
+    // Current Dalamud/ImGui style colour for a slot (used as the default-theme no-op).
+    private static Vector4 Amb(ImGuiCol slot) => ImGui.GetStyle().Colors[(int)slot];
+
+    // Themed colour when custom is on, ambient no-op when off.
+    private static Vector4 T(Vector4 custom, ImGuiCol slot) => Theme.UseCustom ? custom : Amb(slot);
 
     // Full themed window: WindowBg, Text, TitleBar, FrameBg, Scrollbar, ResizeGrip (13 colors)
     internal static void PushWindowTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,             Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.Text,                 Theme.ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,              Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.FrameBg,              Theme.ColPrimary);
-        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,             Theme.Fade(Theme.UseCustom ? Theme.ColSecondary : Amb(ImGuiCol.WindowBg)));
+        ImGui.PushStyleColor(ImGuiCol.Text,                 T(Theme.ColWhite,     ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,              T(Theme.ColHighlight, ImGuiCol.TitleBg));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        T(Theme.ColHighlight, ImGuiCol.TitleBgActive));
+        ImGui.PushStyleColor(ImGuiCol.FrameBg,              T(Theme.ColPrimary,   ImGuiCol.FrameBg));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       T(Theme.ColHighlight, ImGuiCol.FrameBgHovered));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          T(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        T(Theme.ColGoldSub,   ImGuiCol.ScrollbarGrab));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, T(Theme.ColGoldMid,   ImGuiCol.ScrollbarGrabHovered));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  T(Theme.ColGold,      ImGuiCol.ScrollbarGrabActive));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,           T(Theme.ColGoldSub,   ImGuiCol.ResizeGrip));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,    T(Theme.ColGoldMid,   ImGuiCol.ResizeGripHovered));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,     T(Theme.ColGold,      ImGuiCol.ResizeGripActive));
     }
     internal static void PopWindowTheme() => ImGui.PopStyleColor(13);
 
     // Scrollbar sub-theme (4 colors) use standalone or as part of a manual push block
     internal static void PushScrollbarTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          T(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        T(Theme.ColGoldSub,   ImGuiCol.ScrollbarGrab));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, T(Theme.ColGoldMid,   ImGuiCol.ScrollbarGrabHovered));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  T(Theme.ColGold,      ImGuiCol.ScrollbarGrabActive));
     }
     internal static void PopScrollbarTheme() => ImGui.PopStyleColor(4);
 
     // Resize grip sub-theme (3 colors)
     internal static void PushResizeGripTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        T(Theme.ColGoldSub, ImGuiCol.ResizeGrip));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, T(Theme.ColGoldMid, ImGuiCol.ResizeGripHovered));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  T(Theme.ColGold,    ImGuiCol.ResizeGripActive));
     }
     internal static void PopResizeGripTheme() => ImGui.PopStyleColor(3);
 
     // Gold button (4 colors: Button + ButtonHovered + ButtonActive + Text)
     internal static void PushGoldButton()
     {
-        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGoldSub, ImGuiCol.Button));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, T(Theme.ColGoldMid, ImGuiCol.ButtonHovered));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  T(Theme.ColGold,    ImGuiCol.ButtonActive));
+        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColGold,    ImGuiCol.Text));
     }
     internal static void PopGoldButton() => ImGui.PopStyleColor(4);
 
     // Grey (secondary) button (4 colors: Button + ButtonHovered + ButtonActive + Text)
     internal static void PushGreyButton()
     {
-        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGrey);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreyHov);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreyAct);
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
+        ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGrey,    ImGuiCol.Button));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, T(Theme.ColGreyHov, ImGuiCol.ButtonHovered));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  T(Theme.ColGreyAct, ImGuiCol.ButtonActive));
+        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColWhite,   ImGuiCol.Text));
     }
     internal static void PopGreyButton() => ImGui.PopStyleColor(4);
 
-    // Gold-coloured TextUnformatted (1 color push/pop)
+    // Gold-coloured TextUnformatted (1 color push/pop; ambient text on default theme)
     internal static void GoldText(string text)
     {
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text, T(Theme.ColGold, ImGuiCol.Text));
         ImGui.TextUnformatted(text);
         ImGui.PopStyleColor();
     }
 
-    // Green-coloured TextUnformatted (1 color push/pop)
+    // Green-coloured TextUnformatted (1 color push/pop; semantic, kept in both themes)
     internal static void GreenText(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
@@ -145,7 +157,7 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
-    // Red-coloured TextUnformatted (1 color push/pop)
+    // Red-coloured TextUnformatted (1 color push/pop; semantic, kept in both themes)
     internal static void RedText(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColRed);
@@ -156,15 +168,15 @@ internal static class Common
     // Table header theme (2 colors: TableHeaderBg + Text)
     internal static void PushTableHeader()
     {
-        ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, Theme.ColPrimary);
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, T(Theme.ColPrimary, ImGuiCol.TableHeaderBg));
+        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColGold,    ImGuiCol.Text));
     }
     internal static void PopTableHeader() => ImGui.PopStyleColor(2);
 
     // Search/filter InputTextWithHint border theme (1 color + 1 style var)
     internal static void PushSearchInput()
     {
-        ImGui.PushStyleColor(ImGuiCol.Border, Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.Border, T(Theme.ColGoldMid, ImGuiCol.Border));
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
     }
     internal static void PopSearchInput()

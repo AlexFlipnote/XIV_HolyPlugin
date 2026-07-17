@@ -47,6 +47,8 @@ jobs:
           cp HoliestFluffiness/bin/Release/HoliestFluffiness.pdb dist/HoliestFluffiness/ 2>/dev/null || true
           cp HoliestFluffiness/bin/Release/NAudio.Core.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/bin/Release/NAudio.Wasapi.dll dist/HoliestFluffiness/
+          cp HoliestFluffiness/bin/Release/NAudio.Vorbis.dll dist/HoliestFluffiness/
+          cp HoliestFluffiness/bin/Release/NVorbis.dll dist/HoliestFluffiness/
           cp HoliestFluffiness/HoliestFluffiness.json dist/HoliestFluffiness/
           if [ -d HoliestFluffiness/Images ]; then cp -r HoliestFluffiness/Images dist/HoliestFluffiness/Images; fi
           if [ -d HoliestFluffiness/Sounds ]; then cp -r HoliestFluffiness/Sounds dist/HoliestFluffiness/Sounds; fi

@@ -148,6 +148,8 @@ public sealed class Plugin : IDalamudPlugin
     {
         configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         configuration.Initialize(PluginInterface);
+        Theme.Config = configuration;
+        Theme.Sync();
         SoundEngine.Initialize(Log);
 
         using var proc = Process.GetCurrentProcess();
@@ -164,7 +166,7 @@ public sealed class Plugin : IDalamudPlugin
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
-        antiAfkHandler         = new AntiAfkHandler(configuration, Framework, Log, windowHandle);
+        antiAfkHandler         = new AntiAfkHandler(configuration, Framework, ObjectTable, Log, windowHandle);
         fastMouseClickFixHandler = new FastMouseClickFixHandler(configuration, SigScanner, Log);
         readyCheckHandler      = new ReadyCheckHandler(configuration, GameInterop, ClientState, ChatGui, Framework, ObjectTable, Log);
         readyCheckOverlay      = new ReadyCheckOverlay(configuration, readyCheckHandler, GameGui, TextureProvider, DataManager);
@@ -204,6 +206,7 @@ public sealed class Plugin : IDalamudPlugin
         configWindow.SetFoodCheckHandler(foodCheckHandler);
         configWindow.SetNearbyHandler(nearbyHandler);
         configWindow.SetCombatHitHandler(combatHitHandler);
+        configWindow.SetDoorbellTest(TestDoorbell);
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
         configWindow.SetLoginEnhancementHandler(loginEnhancementHandler);
 
@@ -241,6 +244,9 @@ public sealed class Plugin : IDalamudPlugin
             HelpMessage = "Run a food check on the current party (alias for /hf foodcheck)."
         });
 
+        // Snapshot the theme flag before anything draws, so a mid-frame toggle of the
+        // "Disable custom theme" checkbox can't desync PushStyleColor/PopStyleColor.
+        PluginInterface.UiBuilder.Draw += Theme.Sync;
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.Draw += nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw += () => Common.DrawToasts(configuration);
@@ -421,41 +427,67 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnDoorbellEntered(string name, string _, uint worldId)
     {
-        if (!configuration.DoorbellEnterEnabled) return;
         if (configuration.DoorbellEnterSound)
             SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellEnterSoundVolume);
         if (configuration.DoorbellEnterChat)
-            PrintDoorbellChat(name, worldId, " has come inside.");
+            PrintDoorbellChat(name, worldId, configuration.DoorbellEnterText);
     }
 
     private void OnDoorbellLeft(string name, string _, uint worldId)
     {
-        if (!configuration.DoorbellLeaveEnabled) return;
         if (configuration.DoorbellLeaveSound)
             SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav"), configuration.DoorbellLeaveSoundVolume);
         if (configuration.DoorbellLeaveChat)
-            PrintDoorbellChat(name, worldId, " has left the house.");
+            PrintDoorbellChat(name, worldId, configuration.DoorbellLeaveText);
     }
 
     private void OnDoorbellAlreadyHere(List<(string Name, string World, uint WorldId)> players)
     {
-        if (!configuration.DoorbellAlreadyHereEnabled) return;
         if (configuration.DoorbellAlreadyHereSound)
             SoundEngine.Play(ResolveSound(configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellAlreadyHereSoundVolume);
         if (configuration.DoorbellAlreadyHereChat)
             foreach (var p in players)
-                PrintDoorbellChat(p.Name, p.WorldId, " was here when you arrived.");
+                PrintDoorbellChat(p.Name, p.WorldId, configuration.DoorbellAlreadyHereText);
     }
 
-    private void PrintDoorbellChat(string name, uint worldId, string suffix)
+    // Previews a doorbell event from the config UI Test button: plays the sound and prints the chat
+    // line for whichever parts are enabled, using the local player as the sample name. which: 0=enter,
+    // 1=already-here, 2=leave.
+    private void TestDoorbell(int which)
     {
-        ChatGui.Print(new XivChatEntry
+        var (chat, sound, text, soundPath, defaultRel, vol) = which switch
         {
-            Message = new SeStringBuilder()
-                .Add(new PlayerPayload(name, worldId))
-                .AddText(suffix)
-                .Build()
-        });
+            1 => (configuration.DoorbellAlreadyHereChat, configuration.DoorbellAlreadyHereSound, configuration.DoorbellAlreadyHereText,
+                  configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav", configuration.DoorbellAlreadyHereSoundVolume),
+            2 => (configuration.DoorbellLeaveChat, configuration.DoorbellLeaveSound, configuration.DoorbellLeaveText,
+                  configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav", configuration.DoorbellLeaveSoundVolume),
+            _ => (configuration.DoorbellEnterChat, configuration.DoorbellEnterSound, configuration.DoorbellEnterText,
+                  configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav", configuration.DoorbellEnterSoundVolume),
+        };
+
+        if (sound)
+            SoundEngine.Play(ResolveSound(soundPath, defaultRel), vol);
+        if (chat)
+        {
+            var player  = ObjectTable[0] as IPlayerCharacter;
+            var name    = player?.Name.TextValue ?? "Firstname Lastname";
+            var worldId = player?.HomeWorld.RowId ?? 0;
+            PrintDoorbellChat(name, worldId, text);
+        }
+    }
+
+    // Builds the doorbell chat line from a user template, replacing every "<player>" token with a
+    // clickable player link. The "[Doorbell]" tag is always prepended so the line stays identifiable.
+    private void PrintDoorbellChat(string name, uint worldId, string template)
+    {
+        var builder = new SeStringBuilder().AddText("[Doorbell] ");
+        var parts = Rx.Split(template, "<player>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (i > 0) builder.Add(new PlayerPayload(name, worldId));
+            if (parts[i].Length > 0) builder.AddText(parts[i]);
+        }
+        ChatGui.Print(new XivChatEntry { Message = builder.Build() });
     }
 
     private string ResolveSound(string configPath, string defaultRelative) =>
@@ -915,6 +947,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(HwMinCommand);
         CommandManager.RemoveHandler(NearbyCommand);
         CommandManager.RemoveHandler(FoodCheckCommand);
+        PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;

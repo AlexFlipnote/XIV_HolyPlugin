@@ -209,11 +209,14 @@ public partial class ConfigWindow : Window
 
     private void DrawSidebar(float width, float height)
     {
-        ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.ColPrimary);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.Fade(Theme.ColPrimary));
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(6, 6));
         ImGui.BeginChild("##sidebar", new Vector2(width, height), false);
 
@@ -246,15 +249,18 @@ public partial class ConfigWindow : Window
 
         ImGui.EndChild();
         ImGui.PopStyleVar();
-        ImGui.PopStyleColor(5);
+        if (Theme.UseCustom) ImGui.PopStyleColor(5);
     }
 
     private void SidebarSeparator()
     {
-        var x     = ImGui.GetCursorScreenPos().X + 8f;
-        var y     = ImGui.GetCursorScreenPos().Y;
-        var width = ImGui.GetContentRegionAvail().X - 16f;
-        ImGui.GetWindowDrawList().AddLine(new Vector2(x, y), new Vector2(x + width, y), ImGui.GetColorU32(Theme.ColGoldMid), 1f);
+        if (Theme.UseCustom)
+        {
+            var x     = ImGui.GetCursorScreenPos().X + 8f;
+            var y     = ImGui.GetCursorScreenPos().Y;
+            var width = ImGui.GetContentRegionAvail().X - 16f;
+            ImGui.GetWindowDrawList().AddLine(new Vector2(x, y), new Vector2(x + width, y), ImGui.GetColorU32(Theme.ColGoldMid), 1f);
+        }
         ImGui.Dummy(new Vector2(0, 4));
     }
 
@@ -274,7 +280,17 @@ public partial class ConfigWindow : Window
     {
         bool active = selectedSection == index;
 
-        if (active)
+        if (!Theme.UseCustom)
+        {
+            // Default theme: mark the selected row with the user's own Header accent (never gold),
+            // leave the rest as plain transparent buttons with default text.
+            var styleCols = ImGui.GetStyle().Colors;
+            ImGui.PushStyleColor(ImGuiCol.Button,        active ? styleCols[(int)ImGuiCol.Header] : Vector4.Zero);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, styleCols[(int)ImGuiCol.HeaderHovered]);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  styleCols[(int)ImGuiCol.HeaderActive]);
+            ImGui.PushStyleColor(ImGuiCol.Text,          styleCols[(int)ImGuiCol.Text]);
+        }
+        else if (active)
         {
             ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGold);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGold);
@@ -309,11 +325,14 @@ public partial class ConfigWindow : Window
 
     private void DrawMain(float height)
     {
-        ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.Fade(Theme.ColSecondary));
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8, 0));
         ImGui.BeginChild("##main", new Vector2(0, height), false);
 
@@ -339,7 +358,7 @@ public partial class ConfigWindow : Window
 
         ImGui.EndChild();
         ImGui.PopStyleVar();
-        ImGui.PopStyleColor(5);
+        if (Theme.UseCustom) ImGui.PopStyleColor(5);
     }
 
     // ── Search results ────────────────────────────────────────────────────────
@@ -364,11 +383,11 @@ public partial class ConfigWindow : Window
         var matches = cachedSearchMatches;
 
         ImGui.Dummy(new Vector2(0, 6));
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        if (Theme.UseCustom) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         using (titleFont?.Push())
             ImGui.TextUnformatted(showAll ? $"All settings ({matches.Count})" : $"Search results ({matches.Count})");
-        ImGui.PopStyleColor();
+        if (Theme.UseCustom) ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
 
         if (matches.Count == 0)
@@ -388,21 +407,24 @@ public partial class ConfigWindow : Window
         var width = ImGui.GetContentRegionAvail().X - 8f;
         var height = entry.Desc != null ? 42f : 26f;
 
-        ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGold);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Header,        Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGold);
+        }
         bool clicked = ImGui.Selectable($"##searchres_{entry.Section}_{entry.Key}", false,
             ImGuiSelectableFlags.None, new Vector2(width, height));
-        ImGui.PopStyleColor(3);
+        if (Theme.UseCustom) ImGui.PopStyleColor(3);
 
         var min   = ImGui.GetItemRectMin();
         var max   = ImGui.GetItemRectMax();
         var textX = min.X + 6f;
 
         ImGui.SetCursorScreenPos(new Vector2(textX, min.Y + 4f));
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        if (Theme.UseCustom) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted(entry.Title);
-        ImGui.PopStyleColor();
+        if (Theme.UseCustom) ImGui.PopStyleColor();
         ImGui.SameLine();
         Common.DimmedText($"[ {entry.Section} ]");
 
@@ -426,6 +448,7 @@ public partial class ConfigWindow : Window
 
     private void DrawResizeGrip()
     {
+        if (!Theme.UseCustom) return; // default theme keeps ImGui's own resize grip
         const float gripSize = 15f;
         var winPos  = ImGui.GetWindowPos();
         var winSize = ImGui.GetWindowSize();
@@ -451,12 +474,12 @@ public partial class ConfigWindow : Window
         ImGui.BeginChild(title + "##sec", new Vector2(0, 0), false);
 
         ImGui.Dummy(new Vector2(0, 6));
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        if (Theme.UseCustom) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         using (titleFont?.Push())
             ImGui.TextUnformatted(title);
         if (afterTitle != null) { ImGui.SameLine(); afterTitle(); }
-        ImGui.PopStyleColor();
+        if (Theme.UseCustom) ImGui.PopStyleColor();
         if (desc != null)
         {
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
@@ -554,6 +577,7 @@ public partial class ConfigWindow : Window
     private void ConfigSliderFloat(string label, float current, float min, float max, Action<float> setter,
         float width = 220, string? format = null, string? hint = null, string? desc = null)
     {
+        SectionRow();
         ImGui.BeginGroup();
         ImGui.SetNextItemWidth(width);
         PushInput();
@@ -572,9 +596,9 @@ public partial class ConfigWindow : Window
     {
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
-        ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
+        if (Theme.UseCustom) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted(label);
-        ImGui.PopStyleColor();
+        if (Theme.UseCustom) ImGui.PopStyleColor();
         if (desc != null)
         {
             SectionRow();
@@ -587,68 +611,86 @@ public partial class ConfigWindow : Window
 
     private void PushGlobalStyle()
     {
-        ImGui.PushStyleColor(ImGuiCol.Text,                Theme.ColWhite);
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,            Theme.ColSecondary);
-        ImGui.PushStyleColor(ImGuiCol.FrameBg,             Theme.ColPrimary);
-        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,      Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.FrameBgActive,       Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,          Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,   Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,    Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.TitleBg,             Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,       Theme.ColHighlight);
-        ImGui.PushStyleColor(ImGuiCol.SliderGrab,          Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.SliderGrabActive,    Theme.ColGoldMid);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text,                Theme.ColWhite);
+            ImGui.PushStyleColor(ImGuiCol.WindowBg,            Theme.Fade(Theme.ColSecondary));
+            ImGui.PushStyleColor(ImGuiCol.FrameBg,             Theme.ColPrimary);
+            ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,      Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.FrameBgActive,       Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ResizeGrip,          Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered,   Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,    Theme.ColGold);
+            ImGui.PushStyleColor(ImGuiCol.TitleBg,             Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.TitleBgActive,       Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.SliderGrab,          Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.SliderGrabActive,    Theme.ColGoldMid);
+        }
+        else
+        {
+            // Default theme: still honour the opacity knob by fading only the window
+            // background (the content children are transparent, so this is the bg).
+            ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,   new Vector2(8, 6));
     }
 
     private void PopGlobalStyle()
     {
-        ImGui.PopStyleColor(12);
+        ImGui.PopStyleColor(Theme.UseCustom ? 12 : 1);
         ImGui.PopStyleVar(2);
     }
 
     private void PushButton()
     {
-        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
     }
 
     private void PopButton()
     {
-        ImGui.PopStyleColor(4);
+        if (Theme.UseCustom) ImGui.PopStyleColor(4);
         ImGui.PopStyleVar();
     }
 
     private void PushCheckbox()
     {
-        ImGui.PushStyleColor(ImGuiCol.CheckMark, Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Border,    Theme.ColGold);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.CheckMark, Theme.ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Border,    Theme.ColGold);
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
     }
 
     private void PopCheckbox()
     {
-        ImGui.PopStyleColor(2);
+        if (Theme.UseCustom) ImGui.PopStyleColor(2);
         ImGui.PopStyleVar();
     }
 
     private void PushInput()
     {
-        ImGui.PushStyleColor(ImGuiCol.Border,        Theme.ColGold);
-        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGrey);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreyHov);
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreyAct);
+        if (Theme.UseCustom)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Border,        Theme.ColGold);
+            ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGrey);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreyHov);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreyAct);
+        }
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
     }
 
     private void PopInput()
     {
-        ImGui.PopStyleColor(4);
+        if (Theme.UseCustom) ImGui.PopStyleColor(4);
         ImGui.PopStyleVar();
     }
 

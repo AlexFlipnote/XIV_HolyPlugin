@@ -124,6 +124,12 @@ public partial class ConfigWindow
             },
             "Periodically presses LCtrl when the AFK timer exceeds the threshold to prevent being kicked.");
 
+        ConfigCheckbox(
+            "Respect manual /afk##antiafkrespect",
+            configuration.AntiAfkRespectManualAfk,
+            v => configuration.AntiAfkRespectManualAfk = v,
+            "Pauses anti-AFK while you are marked away with the /afk command, so you can go AFK on purpose.");
+
         ConfigSliderInt("AFK timer threshold (s)##antiafklimit", configuration.AntiAfkTimerLimit, 5, 60,
             v => configuration.AntiAfkTimerLimit = v,
             hint: "(default 30)");

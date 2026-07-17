@@ -107,9 +107,9 @@ public sealed class NearbyHandler : IDisposable
 
         if (config.NearbyDebugSelf)
         {
-            var isFriend  = config.NearbyDebugSelfAs == 1;
-            var isLocalFc = config.NearbyDebugSelfAs == 2;
-            var isParty   = config.NearbyDebugSelfAs == 3;
+            var isFriend    = config.NearbyDebugSelfAs == 1;
+            var isLocalFc   = config.NearbyDebugSelfAs == 2;
+            var isParty     = config.NearbyDebugSelfAs == 3;
             players.Add(new NearbyPlayer(
                 local.Name.TextValue,
                 local.HomeWorld.ValueNullable?.Name.ExtractText() ?? "",
@@ -123,7 +123,7 @@ public sealed class NearbyHandler : IDisposable
 
         // Party first, then friends, then local FC, then rest; alphabetical within each group
         NearbyPlayers = [.. players
-            .OrderByDescending(p => p.IsParty ? 3 : p.IsFriend ? 2 : p.IsLocalFc ? 1 : 0)
+            .OrderByDescending(p => p.IsParty ? 4 : p.IsFriend ? 3 : p.IsLocalFc ? 2 : 0)
             .ThenBy(p => p.Name)];
     }
 
