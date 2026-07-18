@@ -61,7 +61,7 @@ public sealed unsafe class DutyTimerHandler : IDisposable
 
         if (remaining > 0)
         {
-            var text = $"{timeRemainingLabel}: {remaining}s";
+            var text = $"{timeRemainingLabel} ({remaining})";
             Span<byte> buf = stackalloc byte[Encoding.UTF8.GetMaxByteCount(text.Length) + 1];
             var len = Encoding.UTF8.GetBytes(text, buf);
             buf[len] = 0;
