@@ -2,16 +2,11 @@ using System;
 using System.IO;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using HoliestFluffiness.Handlers;
 
 namespace HoliestFluffiness.Windows;
 
 public partial class ConfigWindow
 {
-    private NearbyHandler nearbyHandler = null!;
-
-    internal void SetNearbyHandler(NearbyHandler handler) => nearbyHandler = handler;
-
     // Previews a doorbell event (0=enter, 1=already-here, 2=leave); wired to Plugin.TestDoorbell.
     private Action<int>? onTestDoorbell;
     internal void SetDoorbellTest(Action<int> test) => onTestDoorbell = test;

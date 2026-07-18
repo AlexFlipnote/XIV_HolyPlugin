@@ -74,13 +74,13 @@ public sealed class AntiAfkHandler : IDisposable
                     var m = UIModule.Instance()->GetInputTimerModule();
                     maxTimer = Math.Max(m->AfkTimer, Math.Max(m->ContentInputTimer, m->InputTimer));
                     if (config.AntiAfkRespectManualAfk)
-                        manualAfk = (objectTable[0] as IPlayerCharacter)?.OnlineStatus.RowId == AfkOnlineStatus;
+                        manualAfk = objectTable[0] is IPlayerCharacter pc && pc.OnlineStatus.RowId == AfkOnlineStatus;
                 }).GetAwaiter().GetResult();
 
                 if (manualAfk)
                 {
                     log.Debug("[HF] AntiAfk paused: player manually AFK");
-                    token.WaitHandle.WaitOne(5000); // Wait 5s if paused
+                    token.WaitHandle.WaitOne(5000);
                     continue;
                 }
 

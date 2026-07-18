@@ -101,8 +101,7 @@ public sealed class HousingLotteryHandler : IDisposable
 
     private void OnResultYesClicked(AddonEventType type, AddonEventData data)
     {
-        var player = objectTable[0] as IPlayerCharacter;
-        if (player == null) return;
+        if (objectTable[0] is not IPlayerCharacter player) return;
         var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
         if (string.IsNullOrEmpty(world)) return;
         var charKey = $"{player.Name.TextValue}@{world}";
@@ -157,8 +156,7 @@ public sealed class HousingLotteryHandler : IDisposable
 
     private void ProcessEntry(string status, string location, string bidNumStr, string bidTypeStr)
     {
-        var player = objectTable[0] as IPlayerCharacter;
-        if (player == null) return;
+        if (objectTable[0] is not IPlayerCharacter player) return;
 
         var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
         if (string.IsNullOrEmpty(world)) return;
@@ -219,8 +217,7 @@ public sealed class HousingLotteryHandler : IDisposable
         var text = message.Message.ToString();
         if (!text.Contains("lottery", StringComparison.OrdinalIgnoreCase)) return;
 
-        var player = objectTable[0] as IPlayerCharacter;
-        if (player == null) return;
+        if (objectTable[0] is not IPlayerCharacter player) return;
         var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
         if (string.IsNullOrEmpty(world)) return;
         var charKey = $"{player.Name.TextValue}@{world}";

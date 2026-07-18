@@ -10,7 +10,6 @@ public sealed class NoKillHandler : IDisposable
 {
     private delegate char LobbyErrorDelegate(long a1, long a2, long a3);
     private readonly Hook<LobbyErrorDelegate>? hook;
-    private readonly Configuration config;
     private readonly IPluginLog log;
 
     public event Action<bool>? OnLobbyError; // bool = isAuthError
@@ -45,7 +44,6 @@ public sealed class NoKillHandler : IDisposable
 
     public NoKillHandler(Configuration config, ISigScanner sigScanner, IGameInteropProvider gameInterop, IPluginLog log)
     {
-        this.config = config;
         this.log    = log;
         try
         {

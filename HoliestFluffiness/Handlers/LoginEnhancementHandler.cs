@@ -132,9 +132,7 @@ public sealed unsafe class LoginEnhancementHandler : IDisposable
     public void Dispose()
     {
         addonLifecycle.UnregisterListener(AddonEvent.PostSetup, "Logo", OnLogoSetup);
-        charaSelectHook?.Disable();
         charaSelectHook?.Dispose();
-        loginWaitHook?.Disable();
         loginWaitHook?.Dispose();
     }
 }

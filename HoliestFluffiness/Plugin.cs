@@ -9,13 +9,13 @@ using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Chat;
-using Dalamud.Game.Gui.Dtr;
 using Dalamud.Hooking;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Interface;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.Windowing;
@@ -103,6 +103,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly FoodCheckHandler foodCheckHandler;
     private readonly FoodCheckOverlay foodCheckOverlay;
     private readonly IFontHandle titleFont;
+    private IReadOnlyTitleScreenMenuEntry? titleMenuEntry;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -189,7 +190,7 @@ public sealed class Plugin : IDalamudPlugin
         serverInfoHandler.SetNearbyHandler(nearbyHandler);
         commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
         commendationHandler.OnCommendation += OnCommendationReceived;
-        doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
+        doorbellHandler        = new DoorbellHandler(ClientState, ObjectTable, Framework);
         combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop, Log);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework, windowHandle);
@@ -218,11 +219,9 @@ public sealed class Plugin : IDalamudPlugin
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, fastMouseClickFixHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetTitleFont(titleFont);
         configWindow.SetFoodCheckHandler(foodCheckHandler);
-        configWindow.SetNearbyHandler(nearbyHandler);
         configWindow.SetCombatHitHandler(combatHitHandler);
         configWindow.SetDoorbellTest(TestDoorbell);
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
-        configWindow.SetLoginEnhancementHandler(loginEnhancementHandler);
         configWindow.SetHideMpBarsHandler(hideMpBarsHandler);
 
         windowSystem.AddWindow(configWindow);
@@ -246,11 +245,11 @@ public sealed class Plugin : IDalamudPlugin
         });
         CommandManager.AddHandler(HwPlusCommand, new CommandInfo(OnHwPlusCommand)
         {
-            HelpMessage = "Switch to the next character on your current world (cycles through slots 1–8)."
+            HelpMessage = "Switch to the next character on your current world (cycles through slots 1-8)."
         });
         CommandManager.AddHandler(HwMinCommand, new CommandInfo(OnHwMinusCommand)
         {
-            HelpMessage = "Switch to the previous character on your current world (cycles through slots 1–8)."
+            HelpMessage = "Switch to the previous character on your current world (cycles through slots 1-8)."
         });
         CommandManager.AddHandler(NearbyCommand, new CommandInfo(OnNearbyCommand)
         {
@@ -275,7 +274,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
         var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.Images.menu_icon.png");
-        TitleScreenMenu.AddEntry("Change Character", icon, OpenMainUi);
+        titleMenuEntry = TitleScreenMenu.AddEntry("Change Character", icon, OpenMainUi);
 
         ClientState.Login  += OnLogin;
         ClientState.Logout += OnLogout;
@@ -513,8 +512,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void CycleCharacter(int direction)
     {
-        var player = ObjectTable[0] as IPlayerCharacter;
-        if (player == null) { ChatGui.PrintError("[HF] Not logged in."); return; }
+        if (ObjectTable[0] is not IPlayerCharacter player) { ChatGui.PrintError("[HF] Not logged in."); return; }
 
         var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
         if (string.IsNullOrEmpty(world)) { ChatGui.PrintError("[HF] Could not determine home world."); return; }
@@ -535,8 +533,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         var args = $"{rec.World}, {bid.District}, ward {bid.Ward}, plot {bid.Plot}";
 
-        var player     = ObjectTable[0] as IPlayerCharacter;
-        var currentKey = player != null
+        var currentKey = ObjectTable[0] is IPlayerCharacter player
             ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
             : null;
 
@@ -564,8 +561,7 @@ public sealed class Plugin : IDalamudPlugin
     // with the current world prepended, so no world token is needed here.
     private void GoToDestination(CharacterRecord rec, string destination)
     {
-        var player     = ObjectTable[0] as IPlayerCharacter;
-        var currentKey = player != null
+        var currentKey = ObjectTable[0] is IPlayerCharacter player
             ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
             : null;
 
@@ -775,8 +771,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         _loginZone         = null;
         switchingCharacter = false;
-        var player = ObjectTable[0] as IPlayerCharacter;
-        if (player != null)
+        if (ObjectTable[0] is IPlayerCharacter player)
         {
             lastKnownName  = player.Name.TextValue;
             lastKnownWorld = player.HomeWorld.ValueNullable?.Name.ExtractText();
@@ -919,8 +914,7 @@ public sealed class Plugin : IDalamudPlugin
     private void UpdateClientTitle()
     {
         if (!configuration.ClientAppendNameOnLogin) { ApplyClientTitle(); return; }
-        var player = ObjectTable[0] as IPlayerCharacter;
-        if (player == null) { ApplyClientTitle(); return; }
+        if (ObjectTable[0] is not IPlayerCharacter player) { ApplyClientTitle(); return; }
         var world  = player.CurrentWorld.ValueNullable?.Name.ExtractText() ?? "";
         var prefix = configuration.ClientTitlePrefix.Trim();
         SetWindowText(windowHandle, string.IsNullOrEmpty(prefix)
@@ -971,7 +965,17 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
+        if (titleMenuEntry != null)
+        {
+            TitleScreenMenu.RemoveEntry(titleMenuEntry);
+            titleMenuEntry = null;
+        }
         windowSystem.RemoveAllWindows();
+        // RemoveAllWindows only unregisters from the draw loop; IDisposable windows must be disposed explicitly.
+        fateListWindow.Dispose();
+        nearbyWindow.Dispose();
+        pingChartWindow.Dispose();
+        fpsChartWindow.Dispose();
         charaSelectHandler.Dispose();
         housingLotteryHandler.Dispose();
         serverInfoHandler.Dispose();

@@ -129,7 +129,6 @@ public class LoginInfoWindow : Window
 
         ImGui.SameLine(0, gap);
 
-        // Change character button second (grey)
         Common.PushGreyButton();
         if (ImGui.Button("Change character", new Vector2(changeWidth, 0)))
             onOpenCharList?.Invoke();

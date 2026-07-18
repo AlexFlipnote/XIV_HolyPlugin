@@ -265,7 +265,6 @@ public sealed unsafe class RepairHandler : IDisposable
         addonLifecycle.UnregisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnRequestedUpdate);
         addonLifecycle.UnregisterListener(AddonEvent.PostUpdate,          AddonName, OnPostUpdate);
         if (tooltipShown) AtkStage.Instance()->TooltipManager.HideTooltip(cachedAddonId);
-        receiveEventHook?.Disable();
         receiveEventHook?.Dispose();
         Marshal.FreeHGlobal(tooltipMemory);
     }

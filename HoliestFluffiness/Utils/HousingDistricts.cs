@@ -24,7 +24,7 @@ internal static class HousingDistricts
         _   => null,
     };
 
-    // Byte index 1–5 from AgentContentsTimer memory layout
+    // Byte index 1-5 from AgentContentsTimer memory layout
     internal static string FromAgentIndex(byte index) => index switch
     {
         1 => "Mist",

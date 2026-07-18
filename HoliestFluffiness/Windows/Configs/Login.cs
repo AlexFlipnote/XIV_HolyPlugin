@@ -1,18 +1,13 @@
-using System;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using HoliestFluffiness.Handlers;
 
 namespace HoliestFluffiness.Windows;
 
 public partial class ConfigWindow
 {
-    private LoginEnhancementHandler loginEnhancementHandler = null!;
-    internal void SetLoginEnhancementHandler(LoginEnhancementHandler handler) => loginEnhancementHandler = handler;
-
     private CancellationTokenSource? testAllCts;
     private CancellationTokenSource? accessoryCts;
 
@@ -185,11 +180,11 @@ public partial class ConfigWindow
     {
         ImGui.BeginDisabled(!enabled);
         RowGap(8);
-        ConfigInputInt("Stop if N or fewer free inventory slots (0–140)##max", configuration.AccessoryInventory, 0, 140,
+        ConfigInputInt("Stop if N or fewer free inventory slots (0-140)##max", configuration.AccessoryInventory, 0, 140,
             v => configuration.AccessoryInventory = v, hint: "(0 = skip check)", padding: false,
             desc: "Accessory equip is skipped if you have this many free inventory slots or fewer");
 
-        ConfigInputInt("Stop if N or more free inventory slots (0–140)##min", configuration.AccessoryInventoryMin, 0, 140,
+        ConfigInputInt("Stop if N or more free inventory slots (0-140)##min", configuration.AccessoryInventoryMin, 0, 140,
             v => configuration.AccessoryInventoryMin = v, hint: "(0 = skip check)",
             desc: "Accessory equip is skipped if you have this many free inventory slots or more");
 

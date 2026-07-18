@@ -10,8 +10,6 @@ public partial class ConfigWindow
     private List<(HousingBidRecord Bid, CharacterRecord? Char)>? cachedBids;
     private string bidFilter = "";
 
-    private static readonly string[] Districts = ["Mist", "Lavender Beds", "The Goblet", "Shirogane", "Empyreum"];
-
     private void LoadBids()
     {
         var allBids  = characterDb.GetAllBids();

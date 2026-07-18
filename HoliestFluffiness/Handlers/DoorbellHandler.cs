@@ -9,16 +9,23 @@ namespace HoliestFluffiness.Handlers;
 
 public sealed class DoorbellHandler : IDisposable
 {
-    private readonly Configuration configuration;
     private readonly IClientState  clientState;
     private readonly IObjectTable  objectTable;
     private readonly IFramework    framework;
 
-    private sealed class KnownPlayer { public string Name = ""; public string World = ""; public uint WorldId; public int Unseen; }
+    private sealed class KnownPlayer { public string Name = ""; public string World = ""; public uint WorldId; public long LastSeenMs; }
     private readonly Dictionary<uint, KnownPlayer> knownPlayers = new();
     private readonly Stopwatch timeInHouse = new();
     private readonly List<(string Name, string World, uint WorldId)> alreadyHereQueue = new();
     private bool alreadyHereFired;
+
+    // Reused per-scan scratch buffers so OnUpdate allocates nothing on the hot path.
+    private readonly HashSet<uint> seen = new();
+    private readonly List<uint> expired = new();
+    private long nextScanMs;
+
+    private const long ScanIntervalMs = 250;   // full object-table scan at ~4 Hz, not every frame
+    private const long LeaveTimeoutMs = 1000;   // consider a player gone after this long unseen
 
     public event Action<string, string, uint>? OnEntered;
     public event Action<string, string, uint>? OnLeft;
@@ -35,9 +42,8 @@ public sealed class DoorbellHandler : IDisposable
         1374, 1375, 1376,          // Minimalist Dark (7.5)
     ];
 
-    public DoorbellHandler(Configuration configuration, IClientState clientState, IObjectTable objectTable, IFramework framework)
+    public DoorbellHandler(IClientState clientState, IObjectTable objectTable, IFramework framework)
     {
-        this.configuration = configuration;
         this.clientState   = clientState;
         this.objectTable   = objectTable;
         this.framework     = framework;
@@ -51,6 +57,7 @@ public sealed class DoorbellHandler : IDisposable
         knownPlayers.Clear();
         alreadyHereQueue.Clear();
         alreadyHereFired = false;
+        nextScanMs = 0;
         timeInHouse.Stop();
         framework.Update -= OnUpdate;
 
@@ -63,7 +70,11 @@ public sealed class DoorbellHandler : IDisposable
 
     private void OnUpdate(IFramework fw)
     {
-        var seen = new HashSet<uint>();
+        var nowMs = timeInHouse.ElapsedMilliseconds;
+        if (nowMs < nextScanMs) return;
+        nextScanMs = nowMs + ScanIntervalMs;
+
+        seen.Clear();
 
         foreach (var obj in objectTable)
         {
@@ -77,30 +88,31 @@ public sealed class DoorbellHandler : IDisposable
             {
                 var worldId = pc.HomeWorld.RowId;
                 var world   = pc.HomeWorld.ValueNullable?.Name.ExtractText() ?? "";
-                knownPlayers[id] = new KnownPlayer { Name = pc.Name.TextValue, World = world, WorldId = worldId };
+                knownPlayers[id] = new KnownPlayer { Name = pc.Name.TextValue, World = world, WorldId = worldId, LastSeenMs = nowMs };
 
-                if (timeInHouse.ElapsedMilliseconds > 2000)
+                if (nowMs > 2000)
                     OnEntered?.Invoke(pc.Name.TextValue, world, worldId);
                 else
                     alreadyHereQueue.Add((pc.Name.TextValue, world, worldId));
             }
             else
             {
-                knownPlayers[id].Unseen = 0;
+                knownPlayers[id].LastSeenMs = nowMs;
             }
         }
 
-        foreach (var id in knownPlayers.Keys.ToList())
+        expired.Clear();
+        foreach (var kv in knownPlayers)
+            if (!seen.Contains(kv.Key) && nowMs - kv.Value.LastSeenMs > LeaveTimeoutMs)
+                expired.Add(kv.Key);
+        foreach (var id in expired)
         {
-            if (seen.Contains(id)) continue;
             var player = knownPlayers[id];
-            player.Unseen++;
-            if (player.Unseen <= 60) continue;
             OnLeft?.Invoke(player.Name, player.World, player.WorldId);
             knownPlayers.Remove(id);
         }
 
-        if (!alreadyHereFired && alreadyHereQueue.Count > 0 && timeInHouse.ElapsedMilliseconds > 2000)
+        if (!alreadyHereFired && alreadyHereQueue.Count > 0 && nowMs > 2000)
         {
             alreadyHereFired = true;
             OnAlreadyHere?.Invoke(alreadyHereQueue.ToList());

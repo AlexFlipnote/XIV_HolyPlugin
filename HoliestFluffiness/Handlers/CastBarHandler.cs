@@ -139,9 +139,7 @@ public sealed unsafe class CastBarHandler : IDisposable
     {
         clientState.TerritoryChanged -= OnTerritoryChanged;
         addonLifecycle.UnregisterListener(AddonEvent.PreRefresh, "_CastBar", OnCastBarPreRefresh);
-        teleportHook?.Disable();
         teleportHook?.Dispose();
-        castBarOpenHook?.Disable();
         castBarOpenHook?.Dispose();
     }
 }

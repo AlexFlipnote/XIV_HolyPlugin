@@ -51,6 +51,7 @@ public sealed class ServerInfoHandler : IDisposable
 
     private int lastFps;
     private uint lastDcId;
+    private int lastNearbyCount = -1;
     private IPAddress serverAddress = IPAddress.Loopback;
 
     public ServerInfoHandler(Configuration config, IDtrBar dtrBar, IFramework framework,
@@ -106,6 +107,8 @@ public sealed class ServerInfoHandler : IDisposable
         if (!shown) return;
 
         var count = nearbyHandler?.NearbyPlayers.Count ?? 0;
+        if (count == lastNearbyCount) return;
+        lastNearbyCount = count;
         dtrNearby.Text    = $"\U0000e033 {count}";
         dtrNearby.Tooltip = $"{count} nearby";
     }

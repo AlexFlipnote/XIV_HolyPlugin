@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Fates;
@@ -27,11 +26,18 @@ public sealed class FateListWindow : Window, IDisposable
     // Column indices, shared by header setup and the sort comparer.
     private const int ColIcon = 0, ColName = 1, ColLevel = 2, ColProgress = 3, ColTime = 4;
 
+    // Reused each frame; FATE handles wrap native pointers so they are re-fetched, not cached across frames.
+    private readonly List<IFate> fatesBuf = [];
+    private int sortCol = ColTime;
+    private bool sortAsc = true;
+    private readonly Comparison<IFate> fateComparer;
+
     public FateListWindow(IFateTable fateTable, ITextureProvider textureProvider)
         : base("Active FATEs##HFFates")
     {
         this.fateTable       = fateTable;
         this.textureProvider = textureProvider;
+        fateComparer         = CompareFates;
 
         Size          = new Vector2(440, 380);
         SizeCondition = ImGuiCond.FirstUseEver;
@@ -54,11 +60,12 @@ public sealed class FateListWindow : Window, IDisposable
 
     public override void Draw()
     {
-        var fates = fateTable
-            .Where(f => f is { State: FateState.Running or FateState.Preparing })
-            .ToList();
+        fatesBuf.Clear();
+        foreach (var f in fateTable)
+            if (f is { State: FateState.Running or FateState.Preparing })
+                fatesBuf.Add(f);
 
-        if (fates.Count == 0)
+        if (fatesBuf.Count == 0)
         {
             ImGui.Dummy(new Vector2(0, 12));
             const string msg = "No active FATEs in this area.";
@@ -67,7 +74,7 @@ public sealed class FateListWindow : Window, IDisposable
             return;
         }
 
-        DrawTable(fates);
+        DrawTable(fatesBuf);
     }
 
     private void DrawTable(List<IFate> fates)
@@ -137,7 +144,6 @@ public sealed class FateListWindow : Window, IDisposable
             ImGui.PopStyleColor();
         }
 
-        // Level
         if (ImGui.TableSetColumnIndex(ColLevel))
         {
             if (rowY < 0) rowY = ImGui.GetCursorScreenPos().Y;
@@ -168,7 +174,6 @@ public sealed class FateListWindow : Window, IDisposable
             ImGui.TextUnformatted($"{fate.Progress}%");
         }
 
-        // Time remaining
         if (ImGui.TableSetColumnIndex(ColTime))
         {
             if (rowY < 0) rowY = ImGui.GetCursorScreenPos().Y;
@@ -217,28 +222,30 @@ public sealed class FateListWindow : Window, IDisposable
     }
 
     // Sorts by the table's active sort column, falling back to time remaining.
-    private static void SortFates(List<IFate> fates)
+    private void SortFates(List<IFate> fates)
     {
         var specs = ImGui.TableGetSortSpecs();
-        var col       = ColTime;
-        var ascending = true;
+        sortCol = ColTime;
+        sortAsc = true;
         if (!specs.IsNull && specs.SpecsCount > 0)
         {
-            col       = specs.Specs.ColumnIndex;
-            ascending = specs.Specs.SortDirection != ImGuiSortDirection.Descending;
+            sortCol = specs.Specs.ColumnIndex;
+            sortAsc = specs.Specs.SortDirection != ImGuiSortDirection.Descending;
         }
 
-        fates.Sort((a, b) =>
+        fates.Sort(fateComparer);
+    }
+
+    private int CompareFates(IFate a, IFate b)
+    {
+        var cmp = sortCol switch
         {
-            var cmp = col switch
-            {
-                ColName     => string.Compare(a.Name.TextValue, b.Name.TextValue, StringComparison.OrdinalIgnoreCase),
-                ColLevel    => a.Level.CompareTo(b.Level),
-                ColProgress => a.Progress.CompareTo(b.Progress),
-                _           => a.TimeRemaining.CompareTo(b.TimeRemaining),
-            };
-            return ascending ? cmp : -cmp;
-        });
+            ColName     => string.Compare(a.Name.TextValue, b.Name.TextValue, StringComparison.OrdinalIgnoreCase),
+            ColLevel    => a.Level.CompareTo(b.Level),
+            ColProgress => a.Progress.CompareTo(b.Progress),
+            _           => a.TimeRemaining.CompareTo(b.TimeRemaining),
+        };
+        return sortAsc ? cmp : -cmp;
     }
 
     private static string LevelLabel(IFate fate)

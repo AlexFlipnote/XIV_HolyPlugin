@@ -85,8 +85,7 @@ internal static class Common
 
     internal static string? GetCurrentPlayerKey(IObjectTable objectTable)
     {
-        var player = objectTable[0] as IPlayerCharacter;
-        return player != null
+        return objectTable[0] is IPlayerCharacter player
             ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
             : null;
     }

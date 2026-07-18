@@ -103,7 +103,7 @@ public sealed class NearbyWindow : Window, IDisposable
 
         foreach (var t in handler.CurrentTargeters)
         {
-            var obj = objectTable.FirstOrDefault(o => o.GameObjectId == t.GameObjectId);
+            var obj = objectTable.SearchById(t.GameObjectId);
             if (obj == null) continue;
             if (!gameGui.WorldToScreen(obj.Position, out var screen)) continue;
 
@@ -225,7 +225,7 @@ public sealed class NearbyWindow : Window, IDisposable
             if (rowHovered)
             {
                 hoveredNearbyRow = true;
-                var focusObj = objectTable.FirstOrDefault(o => o.GameObjectId == p.GameObjectId);
+                var focusObj = objectTable.SearchById(p.GameObjectId);
                 if (focusObj != null) targetManager.FocusTarget = focusObj;
             }
 
@@ -422,7 +422,7 @@ public sealed class NearbyWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             hoveredTargeterRow = true;
-            var obj = objectTable.FirstOrDefault(o => o.GameObjectId == t.GameObjectId);
+            var obj = objectTable.SearchById(t.GameObjectId);
             if (obj != null) targetManager.FocusTarget = obj;
         }
 
@@ -441,7 +441,7 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.TextDisabled($"{name} @ {world}");
         ImGui.Separator();
 
-        var obj = objectTable.FirstOrDefault(o => o.GameObjectId == gameObjectId);
+        var obj = objectTable.SearchById(gameObjectId);
 
         if (!forTargeter)
         {

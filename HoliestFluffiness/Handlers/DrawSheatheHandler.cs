@@ -126,7 +126,9 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
             return hook!.Original(thisPtr, newState, sendPacket, isInstant);
 
         // Genuine keybind press: swallow the native toggle and let the emote do it instead.
-        pendingEmote = drawing ? "/draw" : "/sheathe";
+        // The "motion" modifier suppresses the emote's chat log message (regardless of the
+        // "Display emote log messages" setting) while still playing the weapon animation.
+        pendingEmote = drawing ? "/draw motion" : "/sheathe motion";
         return 0;
     }
 

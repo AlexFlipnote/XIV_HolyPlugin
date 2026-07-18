@@ -63,14 +63,14 @@ public sealed class PhysicsHandler : IDisposable
     public void Recalculate()
     {
         expectedFrameTime = (long)(TimeSpan.TicksPerSecond / config.PhysicsTargetFps);
-        sliceStart = DateTime.Now.Ticks;
+        sliceStart = DateTime.UtcNow.Ticks;
         sliceEnd   = sliceStart + expectedFrameTime;
         sliceRan   = false;
     }
 
     private void OnUpdate(IFramework fw)
     {
-        var now = DateTime.Now.Ticks;
+        var now = DateTime.UtcNow.Ticks;
         while (now > sliceEnd)
         {
             sliceStart = sliceEnd + 1;

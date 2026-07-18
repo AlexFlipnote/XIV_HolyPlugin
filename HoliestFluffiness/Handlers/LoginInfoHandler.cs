@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
-using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -474,7 +473,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             });
 
             // Master ownership can be transferred at any time, so leadership is recomputed from the
-            // live proxy on every collection (never cached) — a demoted ex-master flips back to false.
+            // live proxy on every collection (never cached); a demoted ex-master flips back to false.
             if (tag.Length > 0)
             {
                 var isLeader = master.Length > 0 && playerName.Length > 0 &&

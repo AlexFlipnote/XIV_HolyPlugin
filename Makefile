@@ -4,10 +4,18 @@ OUT_DEBUG  := $(PLUGIN)/bin/x64/Debug
 OUT_REL    := $(PLUGIN)/bin/x64/Release
 DIST       := dist/$(PLUGIN)
 
-.PHONY: build release pack clean
+.PHONY: all build lint release pack clean scan
 
+# Default target: a lint-enforced build. `make` alone fails on style violations (unused usings, etc.),
+# so the standard stays green without anyone remembering to run a separate step.
+all: lint
+
+# Fast iteration build without lint enforcement, for tight edit/build loops.
 build:
 	dotnet build $(PROJ)
+
+lint:
+	dotnet build $(PROJ) --no-incremental /p:EnforceCodeStyleInBuild=true /p:GenerateDocumentationFile=true /p:NoWarn=1591 /p:WarningsAsErrors=IDE0005
 
 release:
 	dotnet build $(PROJ) -c Release

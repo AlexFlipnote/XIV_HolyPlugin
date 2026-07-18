@@ -26,6 +26,8 @@ public class ReadyCheckHandler : IDisposable
 
     private List<ReadyCheckEntry> data = [];
     private bool active;
+    private long nextProcessMs;   // throttles the per-frame ProcessData rebuild while a check is live
+    private const long ProcessIntervalMs = 200;
     private CancellationTokenSource? clearCts;
     private HashSet<ulong> savedPartyIds = [];
 
@@ -128,7 +130,13 @@ public class ReadyCheckHandler : IDisposable
 
     private void OnUpdate(IFramework fw)
     {
-        if (clientState.IsLoggedIn && active) ProcessData();
+        if (clientState.IsLoggedIn && active)
+        {
+            var nowMs = Environment.TickCount64;
+            if (nowMs < nextProcessMs) return;
+            nextProcessMs = nowMs + ProcessIntervalMs;
+            ProcessData();
+        }
         else if (IsValid && !active) CheckPartyChanged();
     }
 
