@@ -62,7 +62,6 @@ public sealed class NearbyWindow : Window, IDisposable
 
     public override bool DrawConditions()
     {
-        if (!config.NearbyEnabled) return false;
         if (config.NearbyHideInCombat && condition[ConditionFlag.InCombat]) return false;
         if (config.NearbyHideInDuty && (
             condition[ConditionFlag.BoundByDuty] ||
@@ -232,7 +231,14 @@ public sealed class NearbyWindow : Window, IDisposable
 
             ImGui.TableNextColumn();
             if (leftmostIdx == 1) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-            Common.DimmedText(p.JobAbbr);
+            if (config.NearbyColorJobs)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, Common.JobRoleColor(p.JobAbbr));
+                ImGui.TextUnformatted(p.JobAbbr);
+                ImGui.PopStyleColor();
+            }
+            else
+                Common.DimmedText(p.JobAbbr);
 
             ImGui.TableNextColumn();
             if (leftmostIdx == 2) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
@@ -244,7 +250,14 @@ public sealed class NearbyWindow : Window, IDisposable
 
             ImGui.TableNextColumn();
             if (leftmostIdx == 4) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
-            Common.DimmedText(p.CompanyTag);
+            if (p.IsLocalFc)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, config.NearbyColLocalFc);
+                ImGui.TextUnformatted(p.CompanyTag);
+                ImGui.PopStyleColor();
+            }
+            else
+                Common.DimmedText(p.CompanyTag);
         }
 
         if (prevHoveredNearby && !hoveredNearbyRow)
@@ -304,7 +317,7 @@ public sealed class NearbyWindow : Window, IDisposable
         {
             ImGui.PushStyleColor(ImGuiCol.WindowBg,      Theme.Fade(Theme.ColSecondary));
             ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColWhite);
-            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,   Theme.Fade(Theme.ColHighlight));
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, Theme.ColGoldSub);
         }
         else

@@ -212,7 +212,7 @@ public partial class ConfigWindow : Window
         if (Theme.UseCustom)
         {
             ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.Fade(Theme.ColPrimary));
-            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.Fade(Theme.ColHighlight));
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
@@ -328,7 +328,7 @@ public partial class ConfigWindow : Window
         if (Theme.UseCustom)
         {
             ImGui.PushStyleColor(ImGuiCol.ChildBg,              Theme.Fade(Theme.ColSecondary));
-            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.ColHighlight);
+            ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          Theme.Fade(Theme.ColHighlight));
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        Theme.ColGoldSub);
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, Theme.ColGoldMid);
             ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  Theme.ColGold);
@@ -614,7 +614,11 @@ public partial class ConfigWindow : Window
         if (Theme.UseCustom)
         {
             ImGui.PushStyleColor(ImGuiCol.Text,                Theme.ColWhite);
-            ImGui.PushStyleColor(ImGuiCol.WindowBg,            Theme.Fade(Theme.ColSecondary));
+            // The sidebar and main children fully cover the window and each paint their own
+            // faded ChildBg, so a faded WindowBg here would stack a second translucent layer
+            // (making the config window read as more opaque than the opacity knob asks for).
+            // Keep the window bg fully transparent and let the children carry the single layer.
+            ImGui.PushStyleColor(ImGuiCol.WindowBg,            Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.FrameBg,             Theme.ColPrimary);
             ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,      Theme.ColHighlight);
             ImGui.PushStyleColor(ImGuiCol.FrameBgActive,       Theme.ColHighlight);

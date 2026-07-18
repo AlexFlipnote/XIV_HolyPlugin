@@ -32,6 +32,28 @@ internal static class Common
     internal static bool IsPluginLoaded(IDalamudPluginInterface pluginInterface, string name) =>
         pluginInterface.InstalledPlugins.Any(p => p.InternalName == name && p.IsLoaded);
 
+    // Role lookup by job abbreviation (base classes included). Anything not listed
+    // (crafters, gatherers, unknown) falls through to the neutral "other" colour.
+    private static readonly HashSet<string> TankJobs =
+        new(StringComparer.OrdinalIgnoreCase) { "PLD", "WAR", "DRK", "GNB", "GLA", "MRD" };
+    private static readonly HashSet<string> HealerJobs =
+        new(StringComparer.OrdinalIgnoreCase) { "WHM", "SCH", "AST", "SGE", "CNJ" };
+    private static readonly HashSet<string> DpsJobs =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "MNK", "DRG", "NIN", "SAM", "RPR", "VPR", "PGL", "LNC", "ROG",  // melee
+            "BRD", "MCH", "DNC", "ARC",                                     // physical ranged
+            "BLM", "SMN", "RDM", "PCT", "BLU", "THM", "ACN",                // casters
+        };
+
+    // Colour for a job abbreviation grouped by role. Used by the nearby-players
+    // window when "colour job names" is enabled.
+    internal static Vector4 JobRoleColor(string jobAbbr) =>
+          TankJobs.Contains(jobAbbr)   ? Theme.ColRoleTank
+        : HealerJobs.Contains(jobAbbr) ? Theme.ColRoleHealer
+        : DpsJobs.Contains(jobAbbr)    ? Theme.ColRoleDps
+        : Theme.ColRoleOther;
+
     private static readonly string[] ShortenNumberSuffixes = ["", "K", "M", "B", "T"];
 
     // Shortens large numbers for compact display, e.g. 100000 -> "100K", 1200000 -> "1.2M".
@@ -83,16 +105,21 @@ internal static class Common
     // Themed colour when custom is on, ambient no-op when off.
     private static Vector4 T(Vector4 custom, ImGuiCol slot) => Theme.UseCustom ? custom : Amb(slot);
 
+    // Same as T but for structural background slots: also runs the result through the
+    // opacity knob so backgrounds (window, scrollbar track, table header) turn
+    // translucent alongside the window body instead of staying solid on top of it.
+    private static Vector4 FadeT(Vector4 custom, ImGuiCol slot) => Theme.Fade(Theme.UseCustom ? custom : Amb(slot));
+
     // Full themed window: WindowBg, Text, TitleBar, FrameBg, Scrollbar, ResizeGrip (13 colors)
     internal static void PushWindowTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.WindowBg,             Theme.Fade(Theme.UseCustom ? Theme.ColSecondary : Amb(ImGuiCol.WindowBg)));
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,             FadeT(Theme.ColSecondary, ImGuiCol.WindowBg));
         ImGui.PushStyleColor(ImGuiCol.Text,                 T(Theme.ColWhite,     ImGuiCol.Text));
         ImGui.PushStyleColor(ImGuiCol.TitleBg,              T(Theme.ColHighlight, ImGuiCol.TitleBg));
         ImGui.PushStyleColor(ImGuiCol.TitleBgActive,        T(Theme.ColHighlight, ImGuiCol.TitleBgActive));
         ImGui.PushStyleColor(ImGuiCol.FrameBg,              T(Theme.ColPrimary,   ImGuiCol.FrameBg));
         ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,       T(Theme.ColHighlight, ImGuiCol.FrameBgHovered));
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          T(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          FadeT(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        T(Theme.ColGoldSub,   ImGuiCol.ScrollbarGrab));
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, T(Theme.ColGoldMid,   ImGuiCol.ScrollbarGrabHovered));
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  T(Theme.ColGold,      ImGuiCol.ScrollbarGrabActive));
@@ -105,7 +132,7 @@ internal static class Common
     // Scrollbar sub-theme (4 colors) use standalone or as part of a manual push block
     internal static void PushScrollbarTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          T(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
+        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          FadeT(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        T(Theme.ColGoldSub,   ImGuiCol.ScrollbarGrab));
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, T(Theme.ColGoldMid,   ImGuiCol.ScrollbarGrabHovered));
         ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  T(Theme.ColGold,      ImGuiCol.ScrollbarGrabActive));
@@ -168,7 +195,7 @@ internal static class Common
     // Table header theme (2 colors: TableHeaderBg + Text)
     internal static void PushTableHeader()
     {
-        ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, T(Theme.ColPrimary, ImGuiCol.TableHeaderBg));
+        ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, FadeT(Theme.ColPrimary, ImGuiCol.TableHeaderBg));
         ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColGold,    ImGuiCol.Text));
     }
     internal static void PopTableHeader() => ImGui.PopStyleColor(2);

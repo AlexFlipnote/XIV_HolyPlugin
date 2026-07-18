@@ -49,4 +49,10 @@ internal static class Theme
     // Status
     internal static readonly Vector4 ColGreen = new( 80/255f, 200/255f,  80/255f, 1f); // #50C850
     internal static readonly Vector4 ColRed   = new(220/255f,  80/255f,  80/255f, 1f); // #DC5050
+
+    // Job-role colours (nearby players "colour job names" option)
+    internal static readonly Vector4 ColRoleTank   = new( 64/255f, 158/255f, 255/255f, 1f); // #409EFF
+    internal static readonly Vector4 ColRoleHealer = new(127/255f, 247/255f,  94/255f, 1f); // #7FF75E
+    internal static readonly Vector4 ColRoleDps    = new(255/255f, 125/255f, 125/255f, 1f); // #FF7D7D
+    internal static readonly Vector4 ColRoleOther  = new(204/255f, 204/255f, 204/255f, 1f); // #CCCCCC
 }

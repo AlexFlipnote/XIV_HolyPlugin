@@ -38,6 +38,8 @@ public sealed class NearbyHandler : IDisposable
 
     public event Action<Targeter>? NewTargeter;
 
+    public Func<bool>? ShouldRun { get; set; }
+
     public List<NearbyPlayer> NearbyPlayers     { get; private set; } = [];
     public List<Targeter>     CurrentTargeters  { get; private set; } = [];
     public List<Targeter>     PreviousTargeters { get; private set; } = [];
@@ -58,7 +60,7 @@ public sealed class NearbyHandler : IDisposable
 
     private void OnUpdate(IFramework fw)
     {
-        if (!config.NearbyEnabled) return;
+        if (ShouldRun?.Invoke() != true) return;
         if (DateTime.Now - lastUpdate < TimeSpan.FromMilliseconds(500)) return;
         lastUpdate = DateTime.Now;
 

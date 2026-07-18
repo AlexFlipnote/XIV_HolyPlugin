@@ -46,7 +46,6 @@ public class Configuration : IPluginConfiguration
     public bool ServerInfoPingEnabled { get; set; } = false;
     public PingDisplay ServerInfoPingDisplay { get; set; } = PingDisplay.Last;
     public bool ServerInfoFpsEnabled { get; set; } = false;
-    public int PingChartScaleMax { get; set; } = 0; // 0 = auto
 
     // Repair section
     public bool RepairLowEnabled { get; set; } = false;
@@ -55,6 +54,8 @@ public class Configuration : IPluginConfiguration
     public float RepairCriticalThreshold { get; set; } = 25f;
 
     // Client section
+    public bool AlwaysYesEnabled { get; set; } = false;
+    public bool AltF4ExitEnabled { get; set; } = false;
     public string ClientTitlePrefix { get; set; } = "";
     public bool ClientAppendNameOnLogin { get; set; } = false;
     public bool ClientFlashOnTell      { get; set; } = false;
@@ -66,6 +67,7 @@ public class Configuration : IPluginConfiguration
     public bool TitleMovieDisabled { get; set; } = false;
     public bool HotbarLockHidden { get; set; } = false;
     public bool FastMouseClickFixEnabled { get; set; } = false;
+    public bool DrawSheatheEmoteEnabled { get; set; } = false;
     // Character picker section
     public bool CharacterPickerOnMainMenu { get; set; } = false;
 
@@ -86,13 +88,20 @@ public class Configuration : IPluginConfiguration
     public bool DutyTimerEnabled       { get; set; } = false;
     public bool CastBarAetheryteEnabled { get; set; } = false;
 
+    // Loot (Indicators)
+    public bool  LootFadeEnabled { get; set; } = false;
+    public float LootFadePercent { get; set; } = 0.5f;
+
+    // Hide MP bars (Indicators)
+    public bool HideMpBarsPartyList   { get; set; } = false;
+    public bool HideMpBarsParamWidget { get; set; } = false;
+
     // Party section
     public bool ReadyCheckShowNames { get; set; } = false;
     public bool ReadyCheckDrawOverlay { get; set; } = false;
     public int ReadyCheckClearAfterSeconds { get; set; } = 10;
 
     // Nearby section
-    public bool    NearbyEnabled             { get; set; } = false;
     public bool    NearbyDtrEnabled          { get; set; } = false;
     public bool    NearbyShowTargeters       { get; set; } = false;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;
@@ -105,6 +114,7 @@ public class Configuration : IPluginConfiguration
     public Vector4 NearbyColParty            { get; set; } = DefaultNearbyColParty;
     public Vector4 NearbyColFriend           { get; set; } = DefaultNearbyColFriend;
     public Vector4 NearbyColLocalFc          { get; set; } = DefaultNearbyColLocalFc;
+    public bool    NearbyColorJobs           { get; set; } = false;
     public bool    NearbyMarkTargeting        { get; set; } = false;
     public Vector4 NearbyMarkTargetingColour { get; set; } = new(235/255f, 130/255f, 80/255f, 1f);
     public int     NearbyMarkTargetingSize   { get; set; } = 5;

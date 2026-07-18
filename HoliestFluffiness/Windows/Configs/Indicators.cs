@@ -12,6 +12,9 @@ public partial class ConfigWindow
     private CombatHitHandler combatHitHandler = null!;
     internal void SetCombatHitHandler(CombatHitHandler handler) => combatHitHandler = handler;
 
+    private HideMpBarsHandler hideMpBarsHandler = null!;
+    internal void SetHideMpBarsHandler(HideMpBarsHandler handler) => hideMpBarsHandler = handler;
+
     private void DrawIndicatorsSection()
     {
         BeginSection("Indicators", "Settings for in-game indicators and HUD additions.");
@@ -38,6 +41,37 @@ public partial class ConfigWindow
             },
             "Hides the padlock icon on the action bar");
 
+        // ── Loot ──────────────────────────────────────────────────────────────
+        SubsectionLabel("Loot");
+
+        ConfigCheckbox(
+            "Fade loot button##lootfade",
+            configuration.LootFadeEnabled,
+            v => configuration.LootFadeEnabled = v,
+            "Fades the loot roll window once you've rolled on everything available.");
+
+        ImGui.BeginDisabled(!configuration.LootFadeEnabled);
+        ConfigSliderFloat("Fade amount##lootfadeamount", configuration.LootFadePercent * 100f, 0f, 95f,
+            v => configuration.LootFadePercent = v / 100f, width: 200, format: "%.0f%%",
+            hint: "(0% = no fade)");
+        ImGui.EndDisabled();
+
+        // ── Hide MP bars ──────────────────────────────────────────────────────
+        SubsectionLabel("Hide MP bars",
+            "Hides the MP bar for jobs that don't use MP (melee, tanks, ranged physical, etc.).");
+
+        ConfigCheckbox(
+            "In party list##hidempparty",
+            configuration.HideMpBarsPartyList,
+            v => { configuration.HideMpBarsPartyList = v; if (!v) hideMpBarsHandler?.ResetPartyList(); },
+            "The MP bar to right right of HP in party list.");
+
+        ConfigCheckbox(
+            "In parameter bar (own HP/MP)##hidempparam",
+            configuration.HideMpBarsParamWidget,
+            v => { configuration.HideMpBarsParamWidget = v; if (!v) hideMpBarsHandler?.ResetParamWidget(); },
+            "The HP/MP block shown near your hotbars.");
+
         // ── Server info ───────────────────────────────────────────────────────
         SubsectionLabel("Server info", "Adds entries to the server info bar (the row of icons at the top right).");
 
@@ -62,9 +96,6 @@ public partial class ConfigWindow
             v => configuration.ServerInfoPingDisplay = (PingDisplay)v, width: 150, padding: false,
             title: "Ping display mode");
         ImGui.EndDisabled();
-
-        ConfigInputInt("Ping chart Y-axis max (ms, 0 = auto)##pingscale", configuration.PingChartScaleMax, 0, int.MaxValue,
-            v => configuration.PingChartScaleMax = v, step: 10, stepFast: 50, width: 150);
 
         // ── Repair ────────────────────────────────────────────────────────────
         SubsectionLabel("Repair",

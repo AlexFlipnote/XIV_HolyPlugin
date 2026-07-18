@@ -27,33 +27,38 @@ public partial class ConfigWindow
             "Replaces the Wanderer / Traveller FC tags on cross-world nameplates with the player's home world.");
 
         // ── Nearby players ────────────────────────────────────────────────────
-        SubsectionLabel("Nearby players");
-        ConfigCheckbox(
-            "Enable nearby players window##nearbyenabled",
-            configuration.NearbyEnabled,
-            v => configuration.NearbyEnabled = v);
-
-        ImGui.BeginDisabled(!configuration.NearbyEnabled);
+        SubsectionLabel("Nearby players",
+            "A window listing every player around you. Open or close it with the /nearby command.");
 
         ConfigCheckbox(
             "Hide while in combat##nearbyhidecombat",
             configuration.NearbyHideInCombat,
-            v => configuration.NearbyHideInCombat = v);
+            v => configuration.NearbyHideInCombat = v,
+            "Hides the window automatically whenever you are in combat, and shows it again once combat ends.");
 
         ConfigCheckbox(
             "Hide while in duty##nearbyhideduty",
             configuration.NearbyHideInDuty,
-            v => configuration.NearbyHideInDuty = v);
+            v => configuration.NearbyHideInDuty = v,
+            "Hides the window while you are inside an instanced duty (dungeon, trial, raid, etc.).");
 
         ConfigCheckbox(
             "Filter AFK players##nearbyafk",
             configuration.NearbyFilterAfk,
-            v => configuration.NearbyFilterAfk = v);
+            v => configuration.NearbyFilterAfk = v,
+            "Leaves players flagged as Away from Keyboard out of the list.");
 
         ConfigCheckbox(
             "Filter low-level players (≤ 3)##nearbylowlevel",
             configuration.NearbyFilterLowLevel,
-            v => configuration.NearbyFilterLowLevel = v);
+            v => configuration.NearbyFilterLowLevel = v,
+            "Hides level 3 and below characters, usually brand new alts or throwaway characters.");
+
+        ConfigCheckbox(
+            "Colour job names by role##nearbycolorjobs",
+            configuration.NearbyColorJobs,
+            v => configuration.NearbyColorJobs = v,
+            "Colours the job column by role: tanks blue, healers green, DPS red, everything else grey.");
 
         ConfigCheckbox(
             "Debug: add yourself to nearby list##nearbydebugself",
@@ -65,8 +70,6 @@ public partial class ConfigWindow
         ConfigCombo("##nearbydebugselfa", configuration.NearbyDebugSelfAs, debugSelfAsModes,
             v => configuration.NearbyDebugSelfAs = v, width: 140, padding: false,
             title: "Nearby: debug self display mode");
-        ImGui.EndDisabled();
-
         ImGui.EndDisabled();
 
         // ── Colours ───────────────────────────────────────────────────────────
@@ -95,19 +98,22 @@ public partial class ConfigWindow
         ConfigCheckbox(
             "Track who's targeting you##nearbytargeters",
             configuration.NearbyShowTargeters,
-            v => configuration.NearbyShowTargeters = v);
+            v => configuration.NearbyShowTargeters = v,
+            "Adds a Target History panel to the window listing players who currently have you targeted, plus a log of who did recently.");
 
         ImGui.BeginDisabled(!configuration.NearbyShowTargeters);
 
         ConfigCheckbox(
             "Debug: Track yourself##nearbytracksself",
             configuration.NearbyTargeterTrackSelf,
-            v => configuration.NearbyTargeterTrackSelf = v);
+            v => configuration.NearbyTargeterTrackSelf = v,
+            "Counts targeting your own character (via focus target on yourself) as a targeter, for previewing the panel.");
 
         ConfigCheckbox(
             "Mark targeting you in-world##nearbymarktargeting",
             configuration.NearbyMarkTargeting,
-            v => configuration.NearbyMarkTargeting = v);
+            v => configuration.NearbyMarkTargeting = v,
+            "Draws a coloured dot over anyone currently targeting you, so you can spot them in the world.");
 
         ImGui.BeginDisabled(!configuration.NearbyMarkTargeting);
         SectionRow();
@@ -123,7 +129,8 @@ public partial class ConfigWindow
         ConfigCheckbox(
             "Play sound when someone targets you##nearbysound",
             configuration.NearbyTargeterSound,
-            v => configuration.NearbyTargeterSound = v);
+            v => configuration.NearbyTargeterSound = v,
+            "Plays the sound below each time a new player starts targeting you.");
 
         ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.NearbyTargeterSound);
@@ -161,7 +168,7 @@ public partial class ConfigWindow
             configuration.DoorbellAlreadyHereSoundVolume, v => { configuration.DoorbellAlreadyHereSoundVolume = v; configuration.Save(); });
 
         DrawDoorbellBlock(
-            "doorbellleave", "Someone left", Path.Combine(doorbellDir, "leave.wav"), () => onTestDoorbell?.Invoke(2),
+            "doorbellleave", "Someone left", Path.Combine(doorbellDir, "leave.mp3"), () => onTestDoorbell?.Invoke(2),
             configuration.DoorbellLeaveChat,    v => configuration.DoorbellLeaveChat = v,
             configuration.DoorbellLeaveText,    v => configuration.DoorbellLeaveText = v, Configuration.DefaultDoorbellLeaveText,
             configuration.DoorbellLeaveSound,   v => configuration.DoorbellLeaveSound = v,

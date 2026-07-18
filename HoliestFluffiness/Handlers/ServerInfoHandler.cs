@@ -42,6 +42,13 @@ public sealed class ServerInfoHandler : IDisposable
     // Updated on Framework.Update, safe to read from Draw
     public float[] PingChartData { get; private set; } = [];
 
+    // FPS history for the FPS chart, sampled on a fixed interval on Framework.Update.
+    private readonly Queue<float> fpsHistory = new();
+    private const int  FpsHistorySize      = 60;
+    private const long FpsSampleIntervalMs = 1000;
+    private long lastFpsSampleTick;
+    public float[] FpsChartData { get; private set; } = [];
+
     private int lastFps;
     private uint lastDcId;
     private IPAddress serverAddress = IPAddress.Loopback;
@@ -74,6 +81,8 @@ public sealed class ServerInfoHandler : IDisposable
 
     public void SetPingClickAction(Action action) => dtrPing.OnClick = _ => action();
 
+    public void SetFpsClickAction(Action action) => dtrFps.OnClick = _ => action();
+
     private unsafe void OnUpdate(IFramework fw)
     {
         if (!clientState.IsLoggedIn)
@@ -92,7 +101,7 @@ public sealed class ServerInfoHandler : IDisposable
 
     private void UpdateNearbyEntry()
     {
-        var shown = config.NearbyDtrEnabled && config.NearbyEnabled;
+        var shown = config.NearbyDtrEnabled;
         if (dtrNearby.Shown != shown) dtrNearby.Shown = shown;
         if (!shown) return;
 
@@ -132,6 +141,17 @@ public sealed class ServerInfoHandler : IDisposable
         if (!shown) return;
 
         var fps = (int)(GameFramework.Instance()->FrameRate + 0.5f);
+
+        // Sample the FPS chart history on a fixed interval, independent of the DTR text update below.
+        var now = Environment.TickCount64;
+        if (now - lastFpsSampleTick >= FpsSampleIntervalMs)
+        {
+            lastFpsSampleTick = now;
+            fpsHistory.Enqueue(fps);
+            if (fpsHistory.Count > FpsHistorySize) fpsHistory.Dequeue();
+            FpsChartData = [.. fpsHistory];
+        }
+
         if (fps == lastFps) return;
         lastFps        = fps;
         dtrFps.Text    = $"{fps} fps";

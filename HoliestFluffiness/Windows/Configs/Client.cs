@@ -21,6 +21,18 @@ public partial class ConfigWindow
             v => configuration.TitleMovieDisabled = v,
             "Prevents the intro video from playing on the title screen");
 
+        ConfigCheckbox(
+            "Always yes##alwaysyes",
+            configuration.AlwaysYesEnabled,
+            v => configuration.AlwaysYesEnabled = v,
+            "Defaults confirmation dialogs to the yes button, so pressing confirm button, accepts right away.");
+
+        ConfigCheckbox(
+            "Alt + F4 exit game##altf4exit",
+            configuration.AltF4ExitEnabled,
+            v => configuration.AltF4ExitEnabled = v,
+            "Pressing Alt + F4 closes the game safely through its normal shutdown.");
+
         ImGui.BeginDisabled(!fastMouseClickFixHandler.IsAvailable);
         ConfigCheckbox(
             "Fast mouse click fix##fastmouseclickfix",
@@ -30,6 +42,12 @@ public partial class ConfigWindow
                 ? "Removes an artificial delay the client imposes between mouse clicks."
                 : "Unavailable: the memory signature for this fix could not be found on your current game version.");
         ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "Better draw/sheathe##drawsheatheemote",
+            configuration.DrawSheatheEmoteEnabled,
+            v => configuration.DrawSheatheEmoteEnabled = v,
+            "Replaces your draw/sheathe weapon keybind with the /draw and /sheathe emotes when possible.");
 
         SubsectionLabel(
             "Window title",

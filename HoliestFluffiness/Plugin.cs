@@ -40,6 +40,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string HwMinCommand     = "/hw-";
     private const string NearbyCommand    = "/nearby";
     private const string FoodCheckCommand = "/foodcheck";
+    private const string FatesCommand     = "/fates";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -62,6 +63,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private ITargetManager TargetManager { get; init; } = null!;
     [PluginService] private IFlyTextGui    FlyTextGui    { get; init; } = null!;
     [PluginService] private INamePlateGui NamePlateGui  { get; init; } = null!;
+    [PluginService] private IFateTable FateTable { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -84,12 +86,17 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ReadyCheckOverlay readyCheckOverlay;
     private readonly NearbyHandler nearbyHandler;
     private readonly NearbyWindow nearbyWindow;
+    private readonly FateListWindow fateListWindow;
     private readonly PingChartWindow pingChartWindow;
+    private readonly FpsChartWindow fpsChartWindow;
     private readonly CommendationHandler commendationHandler;
     private readonly DoorbellHandler doorbellHandler;
     private readonly CombatHitHandler combatHitHandler;
     private readonly DynamicTravelerHandler  dynamicTravelerHandler;
     private readonly ClientTweaksHandler     clientTweaksHandler;
+    private readonly DrawSheatheHandler       drawSheatheHandler;
+    private readonly LootFadeHandler          lootFadeHandler;
+    private readonly HideMpBarsHandler        hideMpBarsHandler;
     private readonly DutyTimerHandler dutyTimerHandler;
     private readonly CastBarHandler castBarHandler;
     private readonly LoginEnhancementHandler loginEnhancementHandler;
@@ -185,7 +192,10 @@ public sealed class Plugin : IDalamudPlugin
         doorbellHandler        = new DoorbellHandler(configuration, ClientState, ObjectTable, Framework);
         combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop, Log);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
-        clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework);
+        clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework, windowHandle);
+        drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
+        lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
+        hideMpBarsHandler       = new HideMpBarsHandler(configuration, AddonLifecycle, ClientState, ObjectTable, DataManager);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
         castBarHandler         = new CastBarHandler(configuration, SigScanner, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
         loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
@@ -198,9 +208,13 @@ public sealed class Plugin : IDalamudPlugin
         readyCheckHandler.ReadyCheckEnded += foodCheckHandler.Invalidate;
         foodCheckHandler.CountdownStarted += OnCountdownStartedFlash;
         nearbyWindow           = new NearbyWindow(configuration, nearbyHandler, ObjectTable, TargetManager, Condition, CommandManager, GameGui);
-        pingChartWindow        = new PingChartWindow(serverInfoHandler, configuration);
+        nearbyHandler.ShouldRun = () => nearbyWindow.IsOpen || configuration.NearbyDtrEnabled;
+        fateListWindow         = new FateListWindow(FateTable, TextureProvider);
+        pingChartWindow        = new PingChartWindow(serverInfoHandler);
+        fpsChartWindow         = new FpsChartWindow(serverInfoHandler);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
+        serverInfoHandler.SetFpsClickAction(() => fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen);
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, fastMouseClickFixHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetTitleFont(titleFont);
         configWindow.SetFoodCheckHandler(foodCheckHandler);
@@ -209,6 +223,7 @@ public sealed class Plugin : IDalamudPlugin
         configWindow.SetDoorbellTest(TestDoorbell);
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
         configWindow.SetLoginEnhancementHandler(loginEnhancementHandler);
+        configWindow.SetHideMpBarsHandler(hideMpBarsHandler);
 
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
@@ -216,7 +231,9 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(charPickerWindow);
         windowSystem.AddWindow(readyCheckOverlay);
         windowSystem.AddWindow(nearbyWindow);
+        windowSystem.AddWindow(fateListWindow);
         windowSystem.AddWindow(pingChartWindow);
+        windowSystem.AddWindow(fpsChartWindow);
         windowSystem.AddWindow(foodCheckOverlay);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -242,6 +259,10 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(FoodCheckCommand, new CommandInfo(OnFoodCheckCommand)
         {
             HelpMessage = "Run a food check on the current party (alias for /hf foodcheck)."
+        });
+        CommandManager.AddHandler(FatesCommand, new CommandInfo(OnFatesCommand)
+        {
+            HelpMessage = "Toggle the Active FATEs window."
         });
 
         // Snapshot the theme flag before anything draws, so a mid-frame toggle of the
@@ -364,17 +385,14 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnFoodCheckCommand(string command, string args) => foodCheckHandler.ForceCheck();
 
+    private void OnFatesCommand(string command, string args) => fateListWindow.IsOpen = !fateListWindow.IsOpen;
+
     private void OnNearbyCommand(string command, string args)
     {
         if (ClientState.IsPvP)
         {
             ChatGui.Print("Nope, you cannot check nearby people while batteling in PvP, no cheating~");
             return;
-        }
-        if (!configuration.NearbyEnabled)
-        {
-            configuration.NearbyEnabled = true;
-            configuration.Save();
         }
         nearbyWindow.IsOpen = !nearbyWindow.IsOpen;
     }
@@ -436,7 +454,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OnDoorbellLeft(string name, string _, uint worldId)
     {
         if (configuration.DoorbellLeaveSound)
-            SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav"), configuration.DoorbellLeaveSoundVolume);
+            SoundEngine.Play(ResolveSound(configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.mp3"), configuration.DoorbellLeaveSoundVolume);
         if (configuration.DoorbellLeaveChat)
             PrintDoorbellChat(name, worldId, configuration.DoorbellLeaveText);
     }
@@ -460,7 +478,7 @@ public sealed class Plugin : IDalamudPlugin
             1 => (configuration.DoorbellAlreadyHereChat, configuration.DoorbellAlreadyHereSound, configuration.DoorbellAlreadyHereText,
                   configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav", configuration.DoorbellAlreadyHereSoundVolume),
             2 => (configuration.DoorbellLeaveChat, configuration.DoorbellLeaveSound, configuration.DoorbellLeaveText,
-                  configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.wav", configuration.DoorbellLeaveSoundVolume),
+                  configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.mp3", configuration.DoorbellLeaveSoundVolume),
             _ => (configuration.DoorbellEnterChat, configuration.DoorbellEnterSound, configuration.DoorbellEnterText,
                   configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav", configuration.DoorbellEnterSoundVolume),
         };
@@ -947,6 +965,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(HwMinCommand);
         CommandManager.RemoveHandler(NearbyCommand);
         CommandManager.RemoveHandler(FoodCheckCommand);
+        CommandManager.RemoveHandler(FatesCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
@@ -975,6 +994,9 @@ public sealed class Plugin : IDalamudPlugin
         combatHitHandler.Dispose();
         dynamicTravelerHandler.Dispose();
         clientTweaksHandler.Dispose();
+        drawSheatheHandler.Dispose();
+        lootFadeHandler.Dispose();
+        hideMpBarsHandler.Dispose();
         dutyTimerHandler.Dispose();
         castBarHandler.Dispose();
         loginEnhancementHandler.Dispose();
