@@ -97,10 +97,13 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
             return hook!.Original(thisPtr, newState, sendPacket, isInstant);
 
         // Anything not driven by the draw/sheathe keybind (combat auto-draw, auto-sheathe, and the
-        // emote's own toggle once the key is released) passes straight through.
+        // emote's own toggle once the key is released) passes straight through. The keyboard keybind
+        // shows up as the SWARD / NOTARGET_SWORD input id; gamepad presses never set those, they use
+        // their own PAD_SWARD family of input ids, checked separately.
         var input = UIInputData.Instance();
-        bool fromKeybind = input != null &&
-                           (input->IsInputIdPressed(InputId.SWARD) || input->IsInputIdPressed(InputId.NOTARGET_SWORD));
+        bool fromKeybind = (input != null &&
+                            (input->IsInputIdPressed(InputId.SWARD) || input->IsInputIdPressed(InputId.NOTARGET_SWORD)))
+                           || IsGamepadDrawSheathePressed();
         if (!fromKeybind)
             return hook!.Original(thisPtr, newState, sendPacket, isInstant);
 
@@ -125,6 +128,18 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
         // Genuine keybind press: swallow the native toggle and let the emote do it instead.
         pendingEmote = drawing ? "/draw" : "/sheathe";
         return 0;
+    }
+
+    // Gamepad draw/sheathe is the L1+R1 combo, and the game has no dedicated input id for it: the two
+    // shoulder buttons come through as their hotbar-cycle bindings (L1 = TAB_BOTH_PREV, R1 =
+    // TAB_BOTH_NEXT). When the toggle fires both are held down, so both being down is the combo's
+    // signature. This keys off the default L1+R1; a remapped hotbar-cycle binding would move it.
+    private bool IsGamepadDrawSheathePressed()
+    {
+        var input = UIInputData.Instance();
+        return input != null &&
+               input->IsInputIdDown(InputId.TAB_BOTH_NEXT) &&
+               input->IsInputIdDown(InputId.TAB_BOTH_PREV);
     }
 
     public void Dispose()
