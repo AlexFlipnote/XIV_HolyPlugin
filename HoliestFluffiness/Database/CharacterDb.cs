@@ -27,6 +27,13 @@ public sealed class CharacterDb : IDisposable
 {
     private readonly SQLiteConnection db;
 
+    // sqlite-net's SQLiteConnection is not thread-safe, and this DB is touched concurrently from the
+    // UI/Draw thread (config tabs), the framework thread (addon/chat events, commands), and the
+    // thread pool (LoginInfoHandler's Task.Run saves and its 2-minute periodic loop). Every db.*
+    // access is serialized behind this lock; the Changed event is always raised outside it so
+    // subscribers can't re-enter and deadlock.
+    private readonly object dbLock = new();
+
     public CharacterDb(string path)
     {
         // SQLite-net caches TableMappings statically by type name; after a Dalamud hot-reload the
@@ -61,11 +68,23 @@ public sealed class CharacterDb : IDisposable
         catch { /* reflection may fail on trimmed/obfuscated builds */ }
     }
 
-    // Single pass over the table rather than ~9 separate full-table reads; called from Draw() every
-    // frame the Database config tab is open.
+    private sealed class StatsCache { public CharacterDbStats Value; }
+    private volatile StatsCache? statsCache;
+
+    // Single pass over the table rather than ~9 separate full-table reads.
     public CharacterDbStats GetStats()
     {
-        var all = db.Table<CharacterRecord>().ToList();
+        var cache = statsCache;
+        if (cache != null) return cache.Value;
+        cache = new StatsCache { Value = ComputeStats() };
+        statsCache = cache;
+        return cache.Value;
+    }
+
+    private CharacterDbStats ComputeStats()
+    {
+        List<CharacterRecord> all;
+        lock (dbLock) all = db.Table<CharacterRecord>().ToList();
 
         var uniqueFc      = new HashSet<string>();
         var uniqueFcHouse = new HashSet<string>();
@@ -114,75 +133,130 @@ public sealed class CharacterDb : IDisposable
 
     public event Action? Changed;
 
-    public void Upsert(CharacterRecord record) { db.InsertOrReplace(record); Changed?.Invoke(); }
+    // Every character-table write goes through here so the cached stats are dropped in lockstep.
+    private void RaiseChanged()
+    {
+        statsCache = null;
+        Changed?.Invoke();
+    }
+
+    public void Upsert(CharacterRecord record)
+    {
+        lock (dbLock) db.InsertOrReplace(record);
+        RaiseChanged();
+    }
 
     public void UpsertPreservingSlot(CharacterRecord record)
     {
-        if (record.Slot == 0)
-            record.Slot = db.Find<CharacterRecord>(record.Key)?.Slot ?? 0;
-        db.InsertOrReplace(record);
-        Changed?.Invoke();
+        lock (dbLock)
+        {
+            if (record.Slot == 0)
+                record.Slot = db.Find<CharacterRecord>(record.Key)?.Slot ?? 0;
+            db.InsertOrReplace(record);
+        }
+        RaiseChanged();
     }
 
     public void UpsertSlot(string key, string name, string world, string dc, int slot)
     {
-        var existing = db.Find<CharacterRecord>(key);
-        if (existing != null)
+        lock (dbLock)
         {
-            existing.Slot = slot;
-            if (!string.IsNullOrEmpty(dc)) existing.DataCenter = dc;
-            db.Update(existing);
-        }
-        else
-        {
-            db.Insert(new CharacterRecord
+            var existing = db.Find<CharacterRecord>(key);
+            if (existing != null)
             {
-                Key        = key,
-                Name       = name,
-                World      = world,
-                DataCenter = dc,
-                Slot       = slot,
-                LastSeen   = DateTime.UtcNow,
-            });
+                existing.Slot = slot;
+                if (!string.IsNullOrEmpty(dc)) existing.DataCenter = dc;
+                db.Update(existing);
+            }
+            else
+            {
+                db.Insert(new CharacterRecord
+                {
+                    Key        = key,
+                    Name       = name,
+                    World      = world,
+                    DataCenter = dc,
+                    Slot       = slot,
+                    LastSeen   = DateTime.UtcNow,
+                });
+            }
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
-    public CharacterRecord? GetByKey(string key) => db.Find<CharacterRecord>(key);
+    public CharacterRecord? GetByKey(string key)
+    {
+        lock (dbLock) return db.Find<CharacterRecord>(key);
+    }
 
-    public CharacterRecord? GetByWorldAndSlot(string world, int slot) =>
-        db.Table<CharacterRecord>().ToList()
-          .FirstOrDefault(r => string.Equals(r.World, world, StringComparison.OrdinalIgnoreCase) && r.Slot == slot);
+    public CharacterRecord? GetByWorldAndSlot(string world, int slot)
+    {
+        List<CharacterRecord> all;
+        lock (dbLock) all = db.Table<CharacterRecord>().ToList();
+        return all.FirstOrDefault(r => string.Equals(r.World, world, StringComparison.OrdinalIgnoreCase) && r.Slot == slot);
+    }
 
-    public List<CharacterRecord> GetByWorld(string world) =>
-        [.. db.Table<CharacterRecord>().ToList()
+    public List<CharacterRecord> GetByWorld(string world)
+    {
+        List<CharacterRecord> all;
+        lock (dbLock) all = db.Table<CharacterRecord>().ToList();
+        return [.. all
               .Where(r => string.Equals(r.World, world, StringComparison.OrdinalIgnoreCase))
               .OrderBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)];
+    }
 
-    public List<CharacterRecord> GetAll() => [.. db.Table<CharacterRecord>()];
+    public List<CharacterRecord> GetAll()
+    {
+        lock (dbLock) return [.. db.Table<CharacterRecord>()];
+    }
 
-    public void Delete(string key) { db.Delete<CharacterRecord>(key); Changed?.Invoke(); }
+    public void Delete(string key)
+    {
+        lock (dbLock) db.Delete<CharacterRecord>(key);
+        RaiseChanged();
+    }
 
     public void Reset(string key)
     {
-        var rec = db.Find<CharacterRecord>(key);
-        if (rec == null) return;
-        rec.FreeCompany  = null;
-        rec.SearchInfo   = null;
-        rec.PrivateHouse = null;
-        rec.FcHouse      = null;
-        rec.Gil          = -1;
-        rec.Mgp          = -1;
-        rec.FcPoints     = -1;
-        rec.Inventory    = null;
-        db.Update(rec);
-        Changed?.Invoke();
+        lock (dbLock)
+        {
+            var rec = db.Find<CharacterRecord>(key);
+            if (rec == null) return;
+            rec.FreeCompany  = null;
+            rec.SearchInfo   = null;
+            rec.PrivateHouse = null;
+            rec.FcHouse      = null;
+            rec.Gil          = -1;
+            rec.Mgp          = -1;
+            rec.FcPoints     = -1;
+            rec.Inventory    = null;
+            db.Update(rec);
+        }
+        RaiseChanged();
     }
 
-    public List<HousingBidRecord> GetAllBids()                  => [.. db.Table<HousingBidRecord>()];
-    public List<HousingBidRecord> GetBidsByCharacter(string key) => [.. db.Table<HousingBidRecord>().Where(b => b.CharacterKey == key)];
-    public void AddBid(HousingBidRecord bid)                     => db.Insert(bid);
-    public void DeleteBid(int id)                                => db.Delete<HousingBidRecord>(id);
+    public List<HousingBidRecord> GetAllBids()
+    {
+        lock (dbLock) return [.. db.Table<HousingBidRecord>()];
+    }
 
-    public void Dispose() => db.Close();
+    public List<HousingBidRecord> GetBidsByCharacter(string key)
+    {
+        lock (dbLock) return [.. db.Table<HousingBidRecord>().Where(b => b.CharacterKey == key)];
+    }
+
+    public void AddBid(HousingBidRecord bid)
+    {
+        lock (dbLock) db.Insert(bid);
+    }
+
+    public void DeleteBid(int id)
+    {
+        lock (dbLock) db.Delete<HousingBidRecord>(id);
+    }
+
+    public void Dispose()
+    {
+        lock (dbLock) db.Close();
+    }
 }

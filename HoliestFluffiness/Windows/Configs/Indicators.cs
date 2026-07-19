@@ -161,7 +161,7 @@ public partial class ConfigWindow
 
         ConfigSliderInt("Notify when food below (minutes)##foodcheckthreshold",
             configuration.FoodCheckThreshold, 1, 60,
-            v => configuration.FoodCheckThreshold = v, width: 150, hint: "(default 10)");
+            v => configuration.FoodCheckThreshold = v, width: 150, hint: "(default 15)");
 
         ImGui.Dummy(new Vector2(0, 4));
 
@@ -235,7 +235,6 @@ public partial class ConfigWindow
             v => configuration.ReadyCheckDrawOverlay = v,
             "Shows ready/not-ready icons on the party list");
 
-        ImGui.Dummy(new Vector2(0, 4));
         ImGui.BeginDisabled(!configuration.ReadyCheckDrawOverlay);
 
         ConfigSliderInt("Clear after (s)##rcclear", configuration.ReadyCheckClearAfterSeconds, 1, 60,
@@ -248,7 +247,7 @@ public partial class ConfigWindow
             readyCheckHandler.Simulate();
         PopButton();
         ImGui.SameLine();
-        Common.DimmedText("Simulates a ready check for 1 second (requires a party)");
+        Common.DimmedText("Simulates a ready check for 1 second");
         ImGui.EndDisabled();
 
         // ── Combat hits ───────────────────────────────────────────────────────

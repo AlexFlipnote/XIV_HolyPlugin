@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Immutable;
+using System.Collections.Frozen;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.Gui.FlyText;
 using Dalamud.Game.Text.SeStringHandling;
@@ -18,18 +18,26 @@ public sealed unsafe class CombatHitHandler : IDisposable
     private readonly IObjectTable            objectTable;
     private readonly IPluginLog              log;
 
-    private static readonly ImmutableHashSet<FlyTextKind> DcKinds = ImmutableHashSet.Create(
-        FlyTextKind.AutoAttackOrDotCritDh, FlyTextKind.DamageCritDh);
+    private static readonly FrozenSet<FlyTextKind> DcKinds = FrozenSet.ToFrozenSet(
+    [
+        FlyTextKind.AutoAttackOrDotCritDh, FlyTextKind.DamageCritDh,
+    ]);
 
-    private static readonly ImmutableHashSet<FlyTextKind> DKinds = ImmutableHashSet.Create(
-        FlyTextKind.AutoAttackOrDotDh, FlyTextKind.DamageDh);
+    private static readonly FrozenSet<FlyTextKind> DKinds = FrozenSet.ToFrozenSet(
+    [
+        FlyTextKind.AutoAttackOrDotDh, FlyTextKind.DamageDh,
+    ]);
 
-    private static readonly ImmutableHashSet<FlyTextKind> CKinds = ImmutableHashSet.Create(
+    private static readonly FrozenSet<FlyTextKind> CKinds = FrozenSet.ToFrozenSet(
+    [
         FlyTextKind.AutoAttackOrDotCrit, FlyTextKind.CriticalHit4,
-        FlyTextKind.DamageCrit, FlyTextKind.NamedCriticalHitWithMp, FlyTextKind.NamedCriticalHitWithTp);
+        FlyTextKind.DamageCrit, FlyTextKind.NamedCriticalHitWithMp, FlyTextKind.NamedCriticalHitWithTp,
+    ]);
 
-    private static readonly ImmutableHashSet<FlyTextKind> HealKinds = ImmutableHashSet.Create(
-        FlyTextKind.HealingCrit);
+    private static readonly FrozenSet<FlyTextKind> HealKinds = FrozenSet.ToFrozenSet(
+    [
+        FlyTextKind.HealingCrit,
+    ]);
 
     private bool lastHealWasOwn;
     private bool lastHealTargetedMe;

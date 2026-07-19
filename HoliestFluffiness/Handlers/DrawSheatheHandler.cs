@@ -75,6 +75,13 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
     // that triggered the toggle.
     private void OnFrameworkUpdate(IFramework fw)
     {
+        // The hook no-ops when the feature is off, so there's nothing to track then.
+        if (!config.DrawSheatheEmoteEnabled)
+        {
+            lastPosition = null;
+            return;
+        }
+
         var pos = objectTable.LocalPlayer?.Position;
         isMoving = pos.HasValue && lastPosition.HasValue &&
                    Vector3.DistanceSquared(pos.Value, lastPosition.Value) > MoveThresholdSq;

@@ -28,6 +28,8 @@ public class ReadyCheckHandler : IDisposable
     private bool active;
     private long nextProcessMs;   // throttles the per-frame ProcessData rebuild while a check is live
     private const long ProcessIntervalMs = 200;
+    private long nextPartyCheckMs; // throttles the party-change scan while the overlay lingers
+    private const long PartyCheckIntervalMs = 500;
     private CancellationTokenSource? clearCts;
     private HashSet<ulong> savedPartyIds = [];
 
@@ -137,7 +139,13 @@ public class ReadyCheckHandler : IDisposable
             nextProcessMs = nowMs + ProcessIntervalMs;
             ProcessData();
         }
-        else if (IsValid && !active) CheckPartyChanged();
+        else if (IsValid && !active)
+        {
+            var nowMs = Environment.TickCount64;
+            if (nowMs < nextPartyCheckMs) return;
+            nextPartyCheckMs = nowMs + PartyCheckIntervalMs;
+            CheckPartyChanged();
+        }
     }
 
     private unsafe void ProcessData()

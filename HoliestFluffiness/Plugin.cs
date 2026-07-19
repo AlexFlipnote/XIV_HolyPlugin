@@ -18,6 +18,7 @@ using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ManagedFontAtlas;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -104,6 +105,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly FoodCheckOverlay foodCheckOverlay;
     private readonly IFontHandle titleFont;
     private IReadOnlyTitleScreenMenuEntry? titleMenuEntry;
+    private ISharedImmediateTexture? titleMenuIcon;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string lpString);
@@ -170,7 +172,8 @@ public sealed class Plugin : IDalamudPlugin
         characterDb = new CharacterDb(dbPath);
 
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
-        loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); });
+        loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); },
+                                                  () => configuration.CharactersDbEnabled);
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
@@ -273,8 +276,8 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
-        var icon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.Images.menu_icon.png");
-        titleMenuEntry = TitleScreenMenu.AddEntry("Change Character", icon, OpenMainUi);
+        titleMenuIcon = TextureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "HoliestFluffiness.Images.menu_icon.png");
+        SyncTitleMenuEntry();
 
         ClientState.Login  += OnLogin;
         ClientState.Logout += OnLogout;
@@ -310,6 +313,22 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
     private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); }
+
+    // The title-screen "Change Character" entry only opens the character database, so keep it
+    // in sync with the setting: add it when enabled, remove it when disabled (toggled live).
+    private void SyncTitleMenuEntry()
+    {
+        bool shouldShow = configuration.CharactersDbEnabled;
+        if (shouldShow && titleMenuEntry == null && titleMenuIcon != null)
+        {
+            titleMenuEntry = TitleScreenMenu.AddEntry("Change Character", titleMenuIcon, OpenMainUi);
+        }
+        else if (!shouldShow && titleMenuEntry != null)
+        {
+            TitleScreenMenu.RemoveEntry(titleMenuEntry);
+            titleMenuEntry = null;
+        }
+    }
 
     private void OnCommand(string command, string args)
     {
@@ -924,6 +943,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnClientTitleFrameworkUpdate(IFramework fw)
     {
+        SyncTitleMenuEntry();
+
         if (!configuration.ClientAppendNameOnLogin) return;
         var player  = ObjectTable[0] as IPlayerCharacter;
         var worldId = player?.CurrentWorld.IsValid == true ? (uint?)player.CurrentWorld.RowId : null;

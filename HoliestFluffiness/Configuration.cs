@@ -171,7 +171,7 @@ public class Configuration : IPluginConfiguration
     public bool   FoodCheckSound        { get; set; } = false;
     public string FoodCheckSoundPath    { get; set; } = "";
     public float  FoodCheckSoundVolume  { get; set; } = 0.5f;
-    public int    FoodCheckThreshold    { get; set; } = 10;
+    public int    FoodCheckThreshold    { get; set; } = 15;
     public bool FoodCheckScopeHighEnd  { get; set; } = false;
     public bool FoodCheckScopeSavage   { get; set; } = false;
     public bool FoodCheckScopeExtreme  { get; set; } = false;

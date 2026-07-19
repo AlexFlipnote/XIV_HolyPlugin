@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -97,13 +96,13 @@ public class FoodCheckHandler : IDisposable
         return countdownHook!.Original(value);
     }
 
-    private void OnFrameworkUpdate(IFramework fw)
+    private unsafe void OnFrameworkUpdate(IFramework fw)
     {
         if (countdownParam == 0) return;
         try
         {
-            var active  = Marshal.PtrToStructure<byte>((nint)countdownParam + 0x38) == 1;
-            var current = Marshal.PtrToStructure<float>((nint)countdownParam + 0x2c);
+            var active  = *(byte*)(countdownParam + 0x38) == 1;
+            var current = *(float*)(countdownParam + 0x2c);
             var counting = active && current > 0f;
 
             if (counting && !wasCountingDown)

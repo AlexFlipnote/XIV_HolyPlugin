@@ -18,13 +18,15 @@ public class LoginInfoWindow : Window
     private string changingToText = "Changing character...";
 
     private readonly Action? onOpenCharList;
+    private readonly Func<bool>? canChangeCharacter;
 
-    public LoginInfoWindow(Action? onOpenCharList = null)
+    public LoginInfoWindow(Action? onOpenCharList = null, Func<bool>? canChangeCharacter = null)
         : base("Character info##LoginInfoPopup",
                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoCollapse)
     {
-        this.onOpenCharList  = onOpenCharList;
-        RespectCloseHotkey   = true;
+        this.onOpenCharList     = onOpenCharList;
+        this.canChangeCharacter = canChangeCharacter;
+        RespectCloseHotkey      = true;
     }
 
     public void SetChangingState(string name, string world)
@@ -117,21 +119,26 @@ public class LoginInfoWindow : Window
 
         ImGui.Dummy(new Vector2(0, 2));
 
+        bool showChange = canChangeCharacter?.Invoke() ?? true;
+
         const float okWidth     = 60f;
         const float changeWidth = 136f;
         const float gap         = 8f;
-        Common.CenterCursorForWidth(okWidth + changeWidth + gap);
+        Common.CenterCursorForWidth(showChange ? okWidth + changeWidth + gap : okWidth);
 
         Common.PushGoldButton();
         if (ImGui.Button("OK", new Vector2(okWidth, 0)))
             IsOpen = false;
         Common.PopGoldButton();
 
-        ImGui.SameLine(0, gap);
+        if (showChange)
+        {
+            ImGui.SameLine(0, gap);
 
-        Common.PushGreyButton();
-        if (ImGui.Button("Change character", new Vector2(changeWidth, 0)))
-            onOpenCharList?.Invoke();
-        Common.PopGreyButton();
+            Common.PushGreyButton();
+            if (ImGui.Button("Change character", new Vector2(changeWidth, 0)))
+                onOpenCharList?.Invoke();
+            Common.PopGreyButton();
+        }
     }
 }

@@ -15,6 +15,9 @@ public sealed class CommendationHandler : IDisposable
     private int   currentPartySize;
     private int   largestPartySize;
     private int   lastAreaPartySize;
+    private long  nextPartyPollMs;
+
+    private const long PartyPollIntervalMs = 1000;
 
     public event Action<int, int>? OnCommendation; // commendCount, matchmadePlayers
 
@@ -50,6 +53,11 @@ public sealed class CommendationHandler : IDisposable
     private void OnUpdate(IFramework fw)
     {
         if (!clientState.IsLoggedIn) return;
+        // Party size only matters at the next territory change, so polling once a second
+        // is plenty; no need to read it on every frame.
+        var nowMs = Environment.TickCount64;
+        if (nowMs < nextPartyPollMs) return;
+        nextPartyPollMs = nowMs + PartyPollIntervalMs;
         currentPartySize = Math.Max(partyList.Length, 1);
         if (currentPartySize > largestPartySize) largestPartySize = currentPartySize;
     }
