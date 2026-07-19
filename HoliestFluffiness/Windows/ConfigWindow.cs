@@ -42,6 +42,7 @@ public partial class ConfigWindow : Window
     private bool searchModeActive;
     private string cachedSearchQuery = "\0"; // sentinel, never a real trimmed query, forces first compute
     private int cachedSearchVersion = -1;
+    private bool cachedSearchDbEnabled;
     private List<SettingEntry> cachedSearchMatches = [];
     private int searchBoxGeneration;
     private string? pendingJumpKey;
@@ -96,11 +97,12 @@ public partial class ConfigWindow : Window
         if (section == ConfigSection.Bids) LoadBids();
     }
 
-    private void JumpTo(ConfigSection section, string key)
+    // key null means "just open the section", used by whole-section search results.
+    private void JumpTo(ConfigSection section, string? key)
     {
         NavigateTo(section);
         pendingJumpKey = key;
-        pendingJumpFramesLeft = 3;
+        pendingJumpFramesLeft = key != null ? 3 : 0;
         flashKey = key;
         flashEndTime = ImGui.GetTime() + 1.2;
         ExitSearchMode();
@@ -269,6 +271,8 @@ public partial class ConfigWindow : Window
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 6f);
         PushInput();
         ImGui.InputTextWithHint($"##settingssearch{searchBoxGeneration}", "Search settings...", ref searchQuery, 64);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Searches section names, group headers, and individual settings.");
         // Only ever latches search mode ON here; it's turned off exclusively by ExitSearchMode().
         if (ImGui.IsItemActive() || ImGui.IsItemFocused())
             searchModeActive = true;
@@ -366,38 +370,61 @@ public partial class ConfigWindow : Window
     {
         var query   = searchQuery.Trim();
         var showAll = query.Length == 0;
+        var dbOn    = configuration.CharactersDbEnabled;
 
-        if (query != cachedSearchQuery || SearchIndex.Version != cachedSearchVersion)
+        if (query != cachedSearchQuery || SearchIndex.Version != cachedSearchVersion || dbOn != cachedSearchDbEnabled)
         {
-            cachedSearchQuery   = query;
-            cachedSearchVersion = SearchIndex.Version;
+            cachedSearchQuery     = query;
+            cachedSearchVersion   = SearchIndex.Version;
+            cachedSearchDbEnabled = dbOn;
 
-            var filtered = showAll
-                ? SearchIndex.Entries
-                : SearchIndex.Entries.Where(e =>
-                    e.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    (e.Desc?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
-            cachedSearchMatches = filtered.OrderBy(e => e.Section).ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase).ToList();
+            // Hidden sidebar entries stay out of the results, otherwise clicking one would
+            // bounce to Database (see NavigateTo).
+            var visible = SearchIndex.Entries.Where(e =>
+                dbOn || (e.Section != ConfigSection.Characters && e.Section != ConfigSection.Bids));
+
+            var filtered = showAll ? visible : visible.Where(e => Matches(e, query));
+
+            // Kind first so a query like "database" leads with the section itself, then its
+            // groups, then the individual settings inside it.
+            cachedSearchMatches = filtered
+                .OrderBy(e => e.Kind)
+                .ThenBy(e => e.Section)
+                .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
         var matches = cachedSearchMatches;
+
 
         ImGui.Dummy(new Vector2(0, 6));
         if (Theme.UseCustom) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         using (titleFont?.Push())
-            ImGui.TextUnformatted(showAll ? $"All settings ({matches.Count})" : $"Search results ({matches.Count})");
+            ImGui.TextUnformatted(showAll ? $"Everything ({matches.Count})" : $"Search results ({matches.Count})");
         if (Theme.UseCustom) ImGui.PopStyleColor();
         ImGui.Dummy(new Vector2(0, 4));
 
         if (matches.Count == 0)
         {
             SectionRow();
-            Common.DimmedText("No settings match your search.");
+            Common.DimmedText("Nothing matches your search.");
             return;
         }
 
         foreach (var entry in matches)
             DrawSearchResultRow(entry);
+    }
+
+    // Every whitespace-separated term must appear somewhere in the entry, so word order does not
+    // matter ("taskbar flash" finds "Flash taskbar on..."). The section name is part of the
+    // haystack, which makes a bare section name list that section and everything under it.
+    private static bool Matches(SettingEntry entry, string query)
+    {
+        var haystack = $"{entry.Title}\n{entry.Desc}\n{entry.Keywords}\n{SearchIndex.DisplayName(entry.Section)}";
+        foreach (var term in query.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            if (!haystack.Contains(term, StringComparison.OrdinalIgnoreCase))
+                return false;
+        return true;
     }
 
     private void DrawSearchResultRow(SettingEntry entry)
@@ -425,7 +452,12 @@ public partial class ConfigWindow : Window
         ImGui.TextUnformatted(entry.Title);
         if (Theme.UseCustom) ImGui.PopStyleColor();
         ImGui.SameLine();
-        Common.DimmedText($"[ {entry.Section} ]");
+        Common.DimmedText(entry.Kind switch
+        {
+            SearchEntryKind.Section    => "[ Section ]",
+            SearchEntryKind.Subsection => $"[ {SearchIndex.DisplayName(entry.Section)} / group ]",
+            _                          => $"[ {SearchIndex.DisplayName(entry.Section)} ]",
+        });
 
         if (entry.Desc != null)
         {
@@ -440,7 +472,7 @@ public partial class ConfigWindow : Window
         ImGui.Dummy(new Vector2(0, 2));
 
         if (clicked)
-            JumpTo(entry.Section, entry.Key);
+            JumpTo(entry.Section, entry.Kind == SearchEntryKind.Section ? null : entry.Key);
     }
 
     // ── Resize grip ───────────────────────────────────────────────────────────
@@ -521,12 +553,13 @@ public partial class ConfigWindow : Window
         return title.Length > 0 ? title : null;
     }
 
-    private void Anchor(string? key, string? title = null, string? desc = null)
+    private void Anchor(string? key, string? title = null, string? desc = null,
+        SearchEntryKind kind = SearchEntryKind.Setting)
     {
         if (key == null) return;
 
         if (title != null)
-            SearchIndex.Register(currentDrawSection, key, title, desc);
+            SearchIndex.Register(currentDrawSection, key, title, desc, kind);
 
         var min = ImGui.GetItemRectMin();
         var max = ImGui.GetItemRectMax();
@@ -595,14 +628,18 @@ public partial class ConfigWindow : Window
     {
         ImGui.Dummy(new Vector2(0, 8));
         SectionRow();
+        ImGui.BeginGroup();
         if (Theme.UseCustom) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
         ImGui.TextUnformatted(label);
         if (Theme.UseCustom) ImGui.PopStyleColor();
         if (desc != null)
         {
-            SectionRow();
             Common.DimmedTextWrapped(desc);
         }
+        ImGui.EndGroup();
+        // Group headers are searchable too, keyed off their own text so no call site has to
+        // invent an anchor id for them.
+        Anchor(SearchIndex.SubsectionKeyPrefix + label, label, desc, SearchEntryKind.Subsection);
         ImGui.Dummy(new Vector2(0, 1));
     }
 

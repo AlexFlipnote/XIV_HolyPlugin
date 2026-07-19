@@ -1,7 +1,9 @@
 import json
 import os
 import re
+import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from time import time
 
 REPO_OWNER = "AlexFlipnote"
@@ -27,31 +29,57 @@ def get_dalamud_api_level():
     return int(match.group(1)) if match else 15
 
 
-def get_download_count(version):
+def get_release(tag):
     token = os.environ.get("GITHUB_TOKEN", "")
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/v{version}"
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}"
     req = urllib.request.Request(url)
+    req.add_header("Accept", "application/vnd.github+json")
     if token:
         req.add_header("Authorization", f"token {token}")
     try:
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
-            return sum(asset["download_count"] for asset in data.get("assets", []))
-    except urllib.error.HTTPError:
-        return 0
+            return json.loads(resp.read())
+    except (urllib.error.URLError, json.JSONDecodeError) as e:
+        print(f"Could not fetch release {tag}: {e}")
+        return {}
 
 
-def get_last_update(assembly_version):
+def get_download_count(release):
+    return sum(asset.get("download_count", 0) for asset in release.get("assets", []))
+
+
+def get_changelog(release):
+    body = (release.get("body") or "").strip()
+    if not body:
+        return None
+
+    # Drop the auto-generated compare link, the plugin installer has no use for it
+    body = re.sub(r"\n*\*\*Full Changelog\*\*:.*$", "", body).strip()
+    return body or None
+
+
+def get_published_at(release):
+    published = release.get("published_at") or release.get("created_at")
+    if not published:
+        return None
+    try:
+        stamp = datetime.strptime(published, "%Y-%m-%dT%H:%M:%SZ")
+        return int(stamp.replace(tzinfo=timezone.utc).timestamp())
+    except ValueError:
+        return None
+
+
+def get_last_update(assembly_version, fallback=None):
     try:
         with open("repo.json", "r") as f:
             previous = json.load(f)
         if isinstance(previous, list) and previous:
             prev = previous[0]
             if prev.get("AssemblyVersion") == assembly_version:
-                return prev["LastUpdate"]
-    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+                return int(prev["LastUpdate"])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError):
         pass
-    return str(int(time()))
+    return fallback if fallback is not None else int(time())
 
 
 def main():
@@ -78,8 +106,13 @@ def main():
     manifest["DownloadLinkTesting"] = download_url
     manifest["DownloadLinkUpdate"] = download_url
 
-    manifest["DownloadCount"] = get_download_count(version)
-    manifest["LastUpdate"] = get_last_update(version)
+    release = get_release(tag)
+    changelog = get_changelog(release)
+    if changelog:
+        manifest["Changelog"] = changelog
+
+    manifest["DownloadCount"] = get_download_count(release)
+    manifest["LastUpdate"] = get_last_update(version, get_published_at(release))
 
     with open("repo.json", "w") as f:
         json.dump([manifest], f, indent=4)
@@ -90,6 +123,7 @@ def main():
             json.dump(manifest, f, indent=4)
 
     print(f"Generated repo.json for {PLUGIN_NAME} v{version}")
+    print(f"Changelog: {len(changelog)} chars" if changelog else "Changelog: none found on the release")
 
 
 if __name__ == "__main__":

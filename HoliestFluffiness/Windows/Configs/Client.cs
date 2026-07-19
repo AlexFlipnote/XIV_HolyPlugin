@@ -95,11 +95,6 @@ public partial class ConfigWindow
             configuration.ClientFlashOnCombat,
             v => configuration.ClientFlashOnCombat = v);
 
-        ConfigCheckbox(
-            "Synthesis complete##clientflashsynthesis",
-            configuration.ClientFlashOnSynthesis,
-            v => configuration.ClientFlashOnSynthesis = v);
-
         SubsectionLabel("No-kill",
             "Intercepts lobby errors and converts them to a reconnect attempt instead of closing the game.");
 

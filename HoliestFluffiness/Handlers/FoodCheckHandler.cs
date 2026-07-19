@@ -15,8 +15,7 @@ namespace HoliestFluffiness.Handlers;
 
 public class FoodCheckHandler : IDisposable
 {
-    private const uint   WellFedStatusId = 48;
-    private const string CountdownSig    = "40 53 48 83 EC 40 80 79 38 00";
+    private const uint WellFedStatusId = 48;
 
     private readonly Configuration config;
     private readonly IPartyList partyList;
@@ -60,7 +59,7 @@ public class FoodCheckHandler : IDisposable
 
         try
         {
-            countdownHook = gameInterop.HookFromSignature<CountdownTimerDelegate>(CountdownSig, OnCountdownTimer);
+            countdownHook = gameInterop.HookFromSignature<CountdownTimerDelegate>(Sigs.CountdownTimer, OnCountdownTimer);
             countdownHook.Enable();
         }
         catch (Exception ex)

@@ -22,6 +22,9 @@ scan-custom:  ## Scan a custom exe path (make scan-custom EXE=path)
 scan-alex:  ## I am lazy, I added my own path...
 	@uv run index.py scan --exe "D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game\ffxiv_dx11.exe"
 
+check:  ## Fail if any sig literal lives outside Sigs.cs
+	@uv run index.py check
+
 list:  ## List all tracked sigs
 	@uv run index.py list
 

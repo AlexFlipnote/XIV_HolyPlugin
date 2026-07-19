@@ -63,7 +63,7 @@ public sealed unsafe class CombatHitHandler : IDisposable
 
         try
         {
-            var address = sigScanner.ScanText("E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39");
+            var address = sigScanner.ScanText(Sigs.AddToScreenLog);
             screenLogHook = gameInterop.HookFromAddress<AddToScreenLogDelegate>(address, OnScreenLog);
             screenLogHook.Enable();
         }

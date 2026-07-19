@@ -47,7 +47,7 @@ public sealed class NoKillHandler : IDisposable
         this.log    = log;
         try
         {
-            var addr = sigScanner.ScanText("40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0");
+            var addr = sigScanner.ScanText(Sigs.LobbyError);
             hook = gameInterop.HookFromAddress<LobbyErrorDelegate>(addr, Detour);
             if (config.NoKillEnabled)
                 hook.Enable();

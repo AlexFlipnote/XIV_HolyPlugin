@@ -9,7 +9,6 @@ namespace HoliestFluffiness.Handlers;
 // short +0x3F"), so we can restore them directly on disable without reading back memory.
 public sealed class FastMouseClickFixHandler : IDisposable
 {
-    private const string Sig = "EB 3F B8 ?? ?? ?? ?? 48 8B D7";
     private static readonly byte[] OriginalBytes = [0xEB, 0x3F];
     private static readonly byte[] PatchedBytes  = [0x90, 0x90];
 
@@ -34,7 +33,7 @@ public sealed class FastMouseClickFixHandler : IDisposable
 
         try
         {
-            address = sigScanner.ScanText(Sig);
+            address = sigScanner.ScanText(Sigs.MouseClickDelay);
             if (config.FastMouseClickFixEnabled)
                 EnableInternal();
         }

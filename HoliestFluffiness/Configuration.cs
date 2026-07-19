@@ -62,7 +62,6 @@ public class Configuration : IPluginConfiguration
     public bool ClientFlashOnReadyCheck { get; set; } = false;
     public bool ClientFlashOnAlarm     { get; set; } = false;
     public bool ClientFlashOnCombat    { get; set; } = false;
-    public bool ClientFlashOnSynthesis { get; set; } = false;
     public bool ClientFlashOnCountdown { get; set; } = false;
     public bool TitleMovieDisabled { get; set; } = false;
     public bool HotbarLockHidden { get; set; } = false;

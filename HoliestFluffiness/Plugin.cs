@@ -28,7 +28,6 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using HoliestFluffiness.Windows;
 using System.Reflection;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
-using FFXIVClientStructs.FFXIV.Component.GUI;
 using Rx = System.Text.RegularExpressions.Regex;
 
 namespace HoliestFluffiness;
@@ -133,10 +132,6 @@ public sealed class Plugin : IDalamudPlugin
     private unsafe delegate void InitiateReadyCheckDelegate(AgentReadyCheck* self);
     private Hook<InitiateReadyCheckDelegate>? readyCheckHook;
 
-    private const string NormalCraftSig = "48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC ?? 49 8B F0 48 8B FA 4C 8B F1 45 85 C9";
-    private unsafe delegate AtkValue* NormalCraftCallbackDelegate(AtkModuleInterface.AtkEventInterface* thisPtr, AtkValue* returnValue, AtkValue* values, uint valueCount, ulong eventKind);
-    private Hook<NormalCraftCallbackDelegate>? normalCraftHook;
-
     private readonly IntPtr windowHandle;
     private readonly string originalTitle;
     private uint? lastTitleWorldId;
@@ -176,7 +171,7 @@ public sealed class Plugin : IDalamudPlugin
                                                   () => configuration.CharactersDbEnabled);
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
         noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
-        physicsHandler         = new PhysicsHandler(configuration, SigScanner, Framework, GameInterop, Log);
+        physicsHandler         = new PhysicsHandler(configuration, Framework, GameInterop, Log);
         antiAfkHandler         = new AntiAfkHandler(configuration, Framework, ObjectTable, Log, windowHandle);
         fastMouseClickFixHandler = new FastMouseClickFixHandler(configuration, SigScanner, Log);
         readyCheckHandler      = new ReadyCheckHandler(configuration, GameInterop, ClientState, ChatGui, Framework, ObjectTable, Log);
@@ -298,17 +293,6 @@ public sealed class Plugin : IDalamudPlugin
         Condition.ConditionChange += OnConditionChange;
         ChatGui.LogMessage += OnLogMessageFlash;
 
-        try
-        {
-            unsafe
-            {
-                normalCraftHook = GameInterop.HookFromSignature<NormalCraftCallbackDelegate>(NormalCraftSig, OnNormalCraftCallback);
-            }
-            normalCraftHook.Enable();
-        }
-        catch (Exception ex) { Log.Warning(ex, "[HF] Plugin: NormalCraft hook failed."); }
-
-        AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "SynthesisSimple", OnSynthesisSimpleRefresh);
     }
 
     private void OpenConfigUi() => configWindow.IsOpen = true;
@@ -898,23 +882,6 @@ public sealed class Plugin : IDalamudPlugin
             FlashTaskbar();
     }
 
-    private unsafe AtkValue* OnNormalCraftCallback(AtkModuleInterface.AtkEventInterface* thisPtr, AtkValue* returnValue, AtkValue* values, uint valueCount, ulong eventKind)
-    {
-        if (configuration.ClientFlashOnSynthesis && valueCount > 0 && values[0].Int == -2)
-            FlashTaskbar();
-        return normalCraftHook!.Original(thisPtr, returnValue, values, valueCount, eventKind);
-    }
-
-    private unsafe void OnSynthesisSimpleRefresh(AddonEvent type, AddonArgs args)
-    {
-        if (!configuration.ClientFlashOnSynthesis) return;
-        if (args is not AddonRefreshArgs refreshArgs) return;
-        if (refreshArgs.AtkValueCount < 5) return;
-        var values = (AtkValue*)refreshArgs.AtkValues;
-        if (values[3].UInt == 0 || values[3].UInt != values[4].UInt) return;
-        FlashTaskbar();
-    }
-
     private unsafe void OnReadyCheckInitiated(AgentReadyCheck* self)
     {
         readyCheckHook!.Original(self);
@@ -966,8 +933,6 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.LogMessage -= OnLogMessageFlash;
         Condition.ConditionChange -= OnConditionChange;
         readyCheckHook?.Dispose();
-        normalCraftHook?.Dispose();
-        AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "SynthesisSimple", OnSynthesisSimpleRefresh);
         lock (ctsLock)
         {
             loginCts?.Cancel();

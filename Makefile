@@ -4,7 +4,7 @@ OUT_DEBUG  := $(PLUGIN)/bin/x64/Debug
 OUT_REL    := $(PLUGIN)/bin/x64/Release
 DIST       := dist/$(PLUGIN)
 
-.PHONY: all build lint release pack clean scan
+.PHONY: all build lint release pack clean scan check
 
 # Default target: a lint-enforced build. `make` alone fails on style violations (unused usings, etc.),
 # so the standard stays green without anyone remembering to run a separate step.
@@ -34,3 +34,6 @@ clean:
 
 scan:
 	cd SigTracker && make scan-alex
+
+check:
+	cd SigTracker && make check

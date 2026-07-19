@@ -50,7 +50,7 @@ public sealed unsafe class RepairHandler : IDisposable
 
         try
         {
-            var fnAddr = sigScanner.ScanText("E8 ?? ?? ?? ?? 41 8D 45 3E");
+            var fnAddr = sigScanner.ScanText(Sigs.LoadIconByID);
             loadIcon = Marshal.GetDelegateForFunctionPointer<LoadIconByIdDelegate>(fnAddr);
             log.Debug($"[HF] Repair: LoadIconByID at 0x{fnAddr:X16}");
         }
@@ -58,7 +58,7 @@ public sealed unsafe class RepairHandler : IDisposable
 
         try
         {
-            var hookAddr = sigScanner.ScanText("44 0F B7 C2 4D 8B D1");
+            var hookAddr = sigScanner.ScanText(Sigs.ReceiveEvent);
             receiveEventHook = gameInterop.HookFromAddress<ReceiveEventDelegate>(hookAddr, OnReceiveEvent);
             receiveEventHook.Enable();
         }
