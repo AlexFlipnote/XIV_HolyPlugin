@@ -10,28 +10,16 @@ namespace HoliestFluffiness.Handlers;
 
 // Replaces the native "Draw/Sheathe Weapon" keybind with the /draw and /sheathe emotes.
 //
-// The game toggles weapon state through WeaponState.SetUnsheathed. The native keybind and the
-// emotes both call it, so we hook it and only intervene on the genuine keybind press, detected
-// via the SWARD / NOTARGET_SWORD input id being pressed. When we intervene we swallow the native
-// toggle and queue the matching emote instead; the emote then performs its own SetUnsheathed to
-// actually move the weapon.
-//
-// The catch: the emote's own call happens while the key is often still held, so it also reads as
-// "from keybind". We must NOT swallow that one, or the weapon never really toggles and the game
-// reconciles it back. Right before running the emote we arm a one-shot flag; the very next
-// keybind-flagged call is the emote's own toggle and goes to the game untouched. Using a one-shot
-// flag rather than a time window means a rapid second keypress still emotes instead of falling
-// back to the native toggle.
-//
-// We fall back to the native toggle when the feature is off, the matching emote isn't unlocked on
-// this character, or the player is moving (emotes can't play while moving).
+// Both the keybind and the emotes toggle weapon state via WeaponState.SetUnsheathed, so we hook it
+// and swallow only the genuine keybind press, queueing the emote instead. The emote's own call also
+// reads as "from keybind" (the key is usually still held), so a one-shot flag lets exactly that one
+// through; a time window instead would make a rapid second press fall back to the native toggle.
 public sealed unsafe class DrawSheatheHandler : IDisposable
 {
-    // Emote row ids and their text commands (verified against the Emote sheet).
     private const ushort DrawEmoteId    = 238;   // "/draw"
     private const ushort SheatheEmoteId = 237;   // "/sheathe"
 
-    // Squared distance the player must move between frames to count as "moving".
+    // Squared distance moved between frames to count as "moving"
     private const float MoveThresholdSq = 0.0001f;
 
     private delegate byte SetUnsheathedDelegate(WeaponState* thisPtr, byte newState, byte sendPacket, byte isInstant);
@@ -56,26 +44,16 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
         this.objectTable = objectTable;
         this.log         = log;
 
-        try
-        {
-            hook = gameInterop.HookFromAddress<SetUnsheathedDelegate>(
-                WeaponState.MemberFunctionPointers.SetUnsheathed, OnSetUnsheathed);
-            hook.Enable();
-        }
-        catch (Exception ex)
-        {
-            log.Warning(ex, "[HF] DrawSheathe: failed to hook SetUnsheathed, feature disabled.");
-        }
+        hook = Common.TryCreateHook<SetUnsheathedDelegate>(
+            (nint)WeaponState.MemberFunctionPointers.SetUnsheathed, OnSetUnsheathed, gameInterop, log,
+            "[HF] DrawSheathe: failed to hook SetUnsheathed, feature disabled.");
 
         framework.Update += OnFrameworkUpdate;
     }
 
-    // Tracks whether the player is moving (read by the hook, which runs on this same thread) and
-    // fires any emote queued by the hook. Running the emote here keeps it off the input code path
-    // that triggered the toggle.
+    // Running the queued emote here keeps it off the input code path that triggered the toggle.
     private void OnFrameworkUpdate(IFramework fw)
     {
-        // The hook no-ops when the feature is off, so there's nothing to track then.
         if (!config.DrawSheatheEmoteEnabled)
         {
             lastPosition = null;
@@ -91,8 +69,7 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
         if (emote != null)
         {
             pendingEmote = null;
-            // Arm before executing, since the emote's own SetUnsheathed can fire synchronously from
-            // inside ExecuteCommand.
+            // Arm first: the emote's SetUnsheathed can fire synchronously from inside ExecuteCommand
             passThroughEmoteToggle = true;
             Common.ExecuteCommand(emote);
         }
@@ -103,10 +80,8 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
         if (!config.DrawSheatheEmoteEnabled)
             return hook!.Original(thisPtr, newState, sendPacket, isInstant);
 
-        // Anything not driven by the draw/sheathe keybind (combat auto-draw, auto-sheathe, and the
-        // emote's own toggle once the key is released) passes straight through. The keyboard keybind
-        // shows up as the SWARD / NOTARGET_SWORD input id; gamepad presses never set those, they use
-        // their own PAD_SWARD family of input ids, checked separately.
+        // Combat auto-draw/sheathe passes straight through. Keyboard shows up as SWARD /
+        // NOTARGET_SWORD; gamepad never sets those and is checked separately.
         var input = UIInputData.Instance();
         bool fromKeybind = (input != null &&
                             (input->IsInputIdPressed(InputId.SWARD) || input->IsInputIdPressed(InputId.NOTARGET_SWORD)))
@@ -114,8 +89,6 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
         if (!fromKeybind)
             return hook!.Original(thisPtr, newState, sendPacket, isInstant);
 
-        // The emote we just triggered performs its own toggle while the key may still be held; let
-        // that single call through so the weapon state actually changes.
         if (passThroughEmoteToggle)
         {
             passThroughEmoteToggle = false;
@@ -125,24 +98,19 @@ public sealed unsafe class DrawSheatheHandler : IDisposable
         bool   drawing = newState != 0;
         ushort emoteId = drawing ? DrawEmoteId : SheatheEmoteId;
 
-        // Fall back to the normal toggle while moving or when the emote isn't unlocked, so the key
-        // still works everywhere.
+        // Fall back to the native toggle while moving or when the emote isn't unlocked
         var ui = UIState.Instance();
         bool unlocked = ui != null && ui->IsEmoteUnlocked(emoteId);
         if (isMoving || !unlocked)
             return hook!.Original(thisPtr, newState, sendPacket, isInstant);
 
-        // Genuine keybind press: swallow the native toggle and let the emote do it instead.
-        // The "motion" modifier suppresses the emote's chat log message (regardless of the
-        // "Display emote log messages" setting) while still playing the weapon animation.
+        // "motion" suppresses the emote's chat log line while still playing the animation
         pendingEmote = drawing ? "/draw motion" : "/sheathe motion";
         return 0;
     }
 
-    // Gamepad draw/sheathe is the L1+R1 combo, and the game has no dedicated input id for it: the two
-    // shoulder buttons come through as their hotbar-cycle bindings (L1 = TAB_BOTH_PREV, R1 =
-    // TAB_BOTH_NEXT). When the toggle fires both are held down, so both being down is the combo's
-    // signature. This keys off the default L1+R1; a remapped hotbar-cycle binding would move it.
+    // Gamepad draw/sheathe is L1+R1 with no dedicated input id; the shoulders come through as their
+    // hotbar-cycle bindings, so both being down is the combo. A remapped cycle binding would move it.
     private bool IsGamepadDrawSheathePressed()
     {
         var input = UIInputData.Instance();

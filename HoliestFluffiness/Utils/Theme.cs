@@ -7,24 +7,17 @@ internal static class Theme
 {
     internal static Configuration? Config;
 
-    // Window-background opacity (0.30-1.00). Applied only to background colours so
-    // panels turn translucent while text, widgets and accents stay fully solid.
+    // Applied only to background colours, so text and accents stay solid
     internal static float Opacity => Math.Clamp(Config?.ThemeOpacity ?? 1f, 0.1f, 1f);
     internal static Vector4 Fade(Vector4 c) => c with { W = c.W * Opacity };
 
-    // When false the plugin pushes no colours at all and Dalamud's own theme shows
-    // through. Every Push* helper and inline colour push is gated on this flag, so
-    // toggling it off leaves the windows looking exactly like stock Dalamud.
-    //
-    // The value is snapshotted once per frame via Sync(): the "Disable custom theme"
-    // checkbox writes the config mid-frame, and if the flag flipped between a
-    // PushStyleColor and its matching PopStyleColor the ImGui colour stack would
-    // leak (PushStyleColor/PopStyleColor mismatch). Reading the cached snapshot keeps
-    // every push balanced with its pop within the frame; the change lands next frame.
+    // False means push nothing and let Dalamud's own theme show through. Snapshotted per frame:
+    // the config checkbox writes mid-frame, and a flip between a PushStyleColor and its PopStyleColor
+    // would leak the ImGui colour stack. The change lands next frame instead.
     private static bool cachedUseCustom = true;
     internal static bool UseCustom => cachedUseCustom;
 
-    // Called once at the very start of each frame, before any window draws.
+    // Call at the very start of each frame, before any window draws
     internal static void Sync() => cachedUseCustom = !(Config?.ThemeDisableCustom ?? false);
 
     // Three-shade hierarchy, all structural backgrounds derive from these

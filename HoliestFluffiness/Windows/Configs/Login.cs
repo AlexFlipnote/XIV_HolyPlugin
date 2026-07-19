@@ -215,7 +215,7 @@ public partial class ConfigWindow
         PushButton();
         if (ImGui.Button("+ Add current character"))
         {
-            var key = $"{player!.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}";
+            var key = Common.CharacterKey(player!);
             if (!configuration.AccessoryWhitelist.Contains(key))
             {
                 configuration.AccessoryWhitelist.Add(key);

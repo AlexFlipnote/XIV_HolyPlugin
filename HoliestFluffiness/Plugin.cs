@@ -170,7 +170,7 @@ public sealed class Plugin : IDalamudPlugin
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); },
                                                   () => configuration.CharactersDbEnabled);
         loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
-        noKillHandler          = new NoKillHandler(configuration, SigScanner, GameInterop, Log);
+        noKillHandler          = new NoKillHandler(configuration, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, Framework, GameInterop, Log);
         antiAfkHandler         = new AntiAfkHandler(configuration, Framework, ObjectTable, Log, windowHandle);
         fastMouseClickFixHandler = new FastMouseClickFixHandler(configuration, SigScanner, Log);
@@ -179,7 +179,7 @@ public sealed class Plugin : IDalamudPlugin
         noKillWindow           = new NoKillWindow();
         charPickerWindow       = new CharacterPickerWindow(SwitchToCharacter);
         noKillHandler.OnLobbyError += OnNoKillLobbyError;
-        charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, noKillHandler, SwitchToCharacter);
+        charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, Log, noKillHandler, SwitchToCharacter);
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
@@ -189,14 +189,14 @@ public sealed class Plugin : IDalamudPlugin
         commendationHandler    = new CommendationHandler(configuration, ClientState, Framework, PartyList);
         commendationHandler.OnCommendation += OnCommendationReceived;
         doorbellHandler        = new DoorbellHandler(ClientState, ObjectTable, Framework);
-        combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, SigScanner, GameInterop, Log);
+        combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, GameInterop, Log);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework, windowHandle);
         drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
         hideMpBarsHandler       = new HideMpBarsHandler(configuration, AddonLifecycle, ClientState, ObjectTable, DataManager);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
-        castBarHandler         = new CastBarHandler(configuration, SigScanner, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
+        castBarHandler         = new CastBarHandler(configuration, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
         loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
         foodCheckHandler       = new FoodCheckHandler(configuration, PartyList, ObjectTable, ClientState, ChatGui, DataManager, Framework, GameInterop, Log, PluginInterface.AssemblyLocation.DirectoryName!);
         foodCheckOverlay       = new FoodCheckOverlay(configuration, foodCheckHandler, GameGui);
@@ -262,12 +262,11 @@ public sealed class Plugin : IDalamudPlugin
             HelpMessage = "Toggle the Active FATEs window."
         });
 
-        // Snapshot the theme flag before anything draws, so a mid-frame toggle of the
-        // "Disable custom theme" checkbox can't desync PushStyleColor/PopStyleColor.
+        // Snapshot before anything draws, so a mid-frame toggle cannot desync the colour stack
         PluginInterface.UiBuilder.Draw += Theme.Sync;
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.Draw += nearbyWindow.DrawMarkers;
-        PluginInterface.UiBuilder.Draw += () => Common.DrawToasts(configuration);
+        PluginInterface.UiBuilder.Draw += () => Common.DrawToasts();
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
 
@@ -284,11 +283,11 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.ChatMessage += OnChatMessageZone;
         unsafe
         {
-            readyCheckHook = GameInterop.HookFromAddress<InitiateReadyCheckDelegate>(
-                AgentReadyCheck.MemberFunctionPointers.InitiateReadyCheck,
-                OnReadyCheckInitiated);
+            readyCheckHook = Common.TryCreateHook<InitiateReadyCheckDelegate>(
+                (nint)AgentReadyCheck.MemberFunctionPointers.InitiateReadyCheck,
+                OnReadyCheckInitiated, GameInterop, Log,
+                "[HF] ReadyCheck: InitiateReadyCheck hook failed, ready-check overlay disabled.");
         }
-        readyCheckHook.Enable();
 
         Condition.ConditionChange += OnConditionChange;
         ChatGui.LogMessage += OnLogMessageFlash;
@@ -298,8 +297,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OpenConfigUi() => configWindow.IsOpen = true;
     private void OpenMainUi()   { configWindow.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); }
 
-    // The title-screen "Change Character" entry only opens the character database, so keep it
-    // in sync with the setting: add it when enabled, remove it when disabled (toggled live).
+    // Toggled live, so the title-screen entry is added and removed to match the setting
     private void SyncTitleMenuEntry()
     {
         bool shouldShow = configuration.CharactersDbEnabled;
@@ -470,9 +468,7 @@ public sealed class Plugin : IDalamudPlugin
                 PrintDoorbellChat(p.Name, p.WorldId, configuration.DoorbellAlreadyHereText);
     }
 
-    // Previews a doorbell event from the config UI Test button: plays the sound and prints the chat
-    // line for whichever parts are enabled, using the local player as the sample name. which: 0=enter,
-    // 1=already-here, 2=leave.
+    // Config UI Test button; which: 0=enter, 1=already-here, 2=leave
     private void TestDoorbell(int which)
     {
         var (chat, sound, text, soundPath, defaultRel, vol) = which switch
@@ -496,8 +492,7 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    // Builds the doorbell chat line from a user template, replacing every "<player>" token with a
-    // clickable player link. The "[Doorbell]" tag is always prepended so the line stays identifiable.
+    // Every "<player>" token in the user template becomes a clickable player link
     private void PrintDoorbellChat(string name, uint worldId, string template)
     {
         var builder = new SeStringBuilder().AddText("[Doorbell] ");
@@ -517,7 +512,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (ObjectTable[0] is not IPlayerCharacter player) { ChatGui.PrintError("[HF] Not logged in."); return; }
 
-        var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
+        var world = Common.WorldName(player);
         if (string.IsNullOrEmpty(world)) { ChatGui.PrintError("[HF] Could not determine home world."); return; }
 
         var slotted = characterDb.GetByWorld(world).Where(r => r.Slot > 0).ToList();
@@ -537,7 +532,7 @@ public sealed class Plugin : IDalamudPlugin
         var args = $"{rec.World}, {bid.District}, ward {bid.Ward}, plot {bid.Plot}";
 
         var currentKey = ObjectTable[0] is IPlayerCharacter player
-            ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
+            ? Common.CharacterKey(player)
             : null;
 
         if (currentKey == rec.Key)
@@ -557,15 +552,12 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    // Switches to the given character (if not already active) and hands a raw
-    // Lifestream destination to /li once logged in. Lifestream parses everything
-    // itself: property shortcuts (fc/gc/apt/home/ws/shared/inn/auto), plot
-    // addresses ("mist 5 30"), aethernet names, etc. Plot addresses are retried
-    // with the current world prepended, so no world token is needed here.
+    // Hands the raw destination to /li once logged in; Lifestream parses it itself, and retries plot
+    // addresses with the current world prepended, so no world token is needed here.
     private void GoToDestination(CharacterRecord rec, string destination)
     {
         var currentKey = ObjectTable[0] is IPlayerCharacter player
-            ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
+            ? Common.CharacterKey(player)
             : null;
 
         if (currentKey == rec.Key)
@@ -579,9 +571,7 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    // Turns a raw /li destination into a friendly label for the swap toast, or
-    // null when there is no follow-up destination. Plot addresses and aethernet
-    // names are already readable, so they pass through unchanged.
+    // Friendly label for the swap toast, or null when there is no follow-up destination
     private static string? DescribeLifestreamDestination(string? raw)
     {
         var d = raw?.Trim();
@@ -620,10 +610,8 @@ public sealed class Plugin : IDalamudPlugin
         ("mist",              "Mist"),
     };
 
-    // Formats a raw /li housing address ("mist 5 30", "shiro, ward 7, plot 30",
-    // "Ragnarok, Shirogane, ward 7, plot 30") into "Shirogane, Ward 7, Plot 30".
-    // Returns null when the string isn't a recognisable housing address so the
-    // caller can fall back to showing it verbatim.
+    // "mist 5 30" or "Ragnarok, Shirogane, ward 7, plot 30" become "Shirogane, Ward 7, Plot 30".
+    // Null when the string is not a recognisable housing address.
     private static string? FormatHousingAddress(string raw)
     {
         var s = Rx.Replace(raw.ToLowerInvariant(), @"[,\.\(\)\t]", " ");
@@ -692,8 +680,7 @@ public sealed class Plugin : IDalamudPlugin
     private async void SwitchToCharacter(string name, string world)
     {
         switchingCharacter = true;
-        // Set by GoToDestination/GoToBid before switching; surfaces the follow-up
-        // destination on the toast so the user sees the full journey at a glance.
+        // Set by GoToDestination/GoToBid before switching, so the toast shows the full journey
         var destLabel = DescribeLifestreamDestination(pendingLifestreamArgs);
         try
         {
@@ -741,7 +728,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCharaSelectListOpened(AddonEvent type, AddonArgs args)
     {
-        // User navigated to the character select screen manually, dismiss the picker
+        // Manual navigation to character select dismisses the picker
         charPickerWindow.IsOpen = false;
     }
 
@@ -777,7 +764,7 @@ public sealed class Plugin : IDalamudPlugin
         if (ObjectTable[0] is IPlayerCharacter player)
         {
             lastKnownName  = player.Name.TextValue;
-            lastKnownWorld = player.HomeWorld.ValueNullable?.Name.ExtractText();
+            lastKnownWorld = Common.WorldName(player);
         }
         noKillHandler.ClearReconnecting();
         UpdateClientTitle();
@@ -884,7 +871,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe void OnReadyCheckInitiated(AgentReadyCheck* self)
     {
-        readyCheckHook!.Original(self);
+        readyCheckHook?.Original(self);
         if (configuration.ClientFlashOnReadyCheck)
             FlashTaskbar();
         readyCheckHandler.OnBegin();
@@ -932,6 +919,7 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.ChatMessage -= OnChatMessageZone;
         ChatGui.LogMessage -= OnLogMessageFlash;
         Condition.ConditionChange -= OnConditionChange;
+        readyCheckHandler.ReadyCheckEnded -= foodCheckHandler.Invalidate;
         readyCheckHook?.Dispose();
         lock (ctsLock)
         {
@@ -957,7 +945,7 @@ public sealed class Plugin : IDalamudPlugin
             titleMenuEntry = null;
         }
         windowSystem.RemoveAllWindows();
-        // RemoveAllWindows only unregisters from the draw loop; IDisposable windows must be disposed explicitly.
+        // RemoveAllWindows only unregisters from the draw loop, it does not dispose
         fateListWindow.Dispose();
         nearbyWindow.Dispose();
         pingChartWindow.Dispose();

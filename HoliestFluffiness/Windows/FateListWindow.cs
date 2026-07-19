@@ -9,9 +9,8 @@ using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace HoliestFluffiness.Windows;
 
-// A themed list of the active FATEs in the current zone. Command driven via /fates. Rendered with
-// the plugin's own ImGui theme (like the Nearby window) rather than a native addon. Inspired by
-// VanillaPlus' Fate List Window (MidoriKami); clicking a row flags the FATE on the map.
+// Active FATEs in the current zone, opened with /fates. Clicking a row flags the FATE on the map.
+// Inspired by VanillaPlus' Fate List Window (MidoriKami).
 public sealed class FateListWindow : Window, IDisposable
 {
     private readonly IFateTable       fateTable;
@@ -26,7 +25,7 @@ public sealed class FateListWindow : Window, IDisposable
     // Column indices, shared by header setup and the sort comparer.
     private const int ColIcon = 0, ColName = 1, ColLevel = 2, ColProgress = 3, ColTime = 4;
 
-    // Reused each frame; FATE handles wrap native pointers so they are re-fetched, not cached across frames.
+    // FATE handles wrap native pointers, so they are re-fetched each frame rather than cached
     private readonly List<IFate> fatesBuf = [];
     private int sortCol = ColTime;
     private bool sortAsc = true;
@@ -115,9 +114,8 @@ public sealed class FateListWindow : Window, IDisposable
         var labelRightX = -1f;
         var padX        = ImGui.GetStyle().CellPadding.X;
 
-        // Each cell is addressed by its logical index and skipped when hidden. Sequential
-        // TableNextColumn() would run past the last visible column when columns are hidden, and the
-        // vertical-centering offset would then pile into the row and grow its height.
+        // Cells are addressed by logical index, not sequential TableNextColumn(): with columns
+        // hidden that would run past the last visible one and pile the centering offset into the row.
 
         // Icon (part of the clickable label span)
         if (ImGui.TableSetColumnIndex(ColIcon))
@@ -151,9 +149,8 @@ public sealed class FateListWindow : Window, IDisposable
             Common.DimmedText(LevelLabel(fate));
         }
 
-        // Progress: the cell background fills like a bar in proportion to completion, tinted by
-        // threshold (branding gold from 50%, red from 90% since it's about to finish). A translucent
-        // fill keeps the percentage text readable on top.
+        // The cell background fills like a bar in proportion to completion, gold from 50% and red
+        // from 90%. The fill stays translucent so the percentage text reads on top.
         if (ImGui.TableSetColumnIndex(ColProgress))
         {
             var start = ImGui.GetCursorScreenPos();
@@ -181,14 +178,13 @@ public sealed class FateListWindow : Window, IDisposable
             DrawTime(fate);
         }
 
-        // Hover highlight + click, scoped to the icon+name label span. CellBg fills those cells
-        // behind their content regardless of draw order.
+        // Scoped to the icon+name span. CellBg fills behind cell content regardless of draw order.
         if (rowY >= 0 && labelRightX >= 0)
         {
             var min = new Vector2(labelLeftX, rowY);
             var max = new Vector2(labelRightX, rowY + RowHeight);
-            // clip: false, otherwise the test is clipped to the last cell's rect (the right-hand Time
-            // column), which never overlaps this left-side icon+name span.
+            // clip: false, or the test is clipped to the last cell's rect (the right-hand Time
+            // column), which never overlaps this left-side span.
             if (ImGui.IsMouseHoveringRect(min, max, false))
             {
                 var col = ImGui.GetColorU32(Theme.ColGoldSub);
@@ -260,7 +256,7 @@ public sealed class FateListWindow : Window, IDisposable
     {
         var agent = AgentMap.Instance();
         if (agent == null) return;
-        // Flag the FATE location using the default map flag (leaves the map's own FATE icon intact).
+        // The default map flag leaves the map's own FATE icon intact
         agent->SetFlagMapMarker(agent->CurrentTerritoryId, agent->CurrentMapId, fate.Position);
         agent->OpenMap(agent->CurrentMapId, agent->CurrentTerritoryId);
     }

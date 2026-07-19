@@ -20,27 +20,24 @@ public readonly record struct SettingEntry(
 
 public partial class ConfigWindow
 {
-    // Populated at draw time by Anchor(key, title, desc), see ConfigWindow.cs, so every
-    // Config*/Anchor call site is the single source of truth for its own search entry. A
-    // section only appears here once it has actually been drawn at least once this session,
-    // except for the sidebar sections themselves, which are seeded below.
+    // Populated at draw time by Anchor(), so every call site is the source of truth for its own
+    // entry. A section only lands here once it has been drawn at least once this session.
     private static class SearchIndex
     {
         // Sentinel key for a whole-section entry; clicking one just opens the section.
         public const string SectionKey = "__section";
 
-        // Prefix for subsection (SubsectionLabel) entries, keeps them out of the setting key space.
+        // Prefix that keeps subsection entries out of the setting key space
         public const string SubsectionKeyPrefix = "__sub_";
 
         private static readonly Dictionary<(ConfigSection Section, string Key), SettingEntry> Registry = new();
 
         public static IEnumerable<SettingEntry> Entries => Registry.Values;
 
-        // Bumped on every registration so callers can cheaply detect whether the (lazily
-        // growing) registry changed since they last computed something derived from it.
+        // Bumped on every registration so callers can cheaply detect a changed registry
         public static int Version { get; private set; }
 
-        // Sidebar label per section; the enum name is not always what the user sees.
+        // The enum name is not always what the user sees
         public static string DisplayName(ConfigSection section) => section switch
         {
             ConfigSection.Client     => "Client",
@@ -54,9 +51,8 @@ public partial class ConfigWindow
             _                        => section.ToString(),
         };
 
-        // Seeded up front rather than at draw time: Characters/Bids/About are never drawn by the
-        // search warm-up pass, so their sections would otherwise be unfindable until first opened.
-        // Keywords carry the words a user is likely to type that aren't in the title or description.
+        // Characters/Bids/About are never drawn by the search warm-up pass, so seeding them up front
+        // is the only way they are findable before first opening them.
         static SearchIndex()
         {
             Seed(ConfigSection.Client, "Settings that change client/application behaviour.",

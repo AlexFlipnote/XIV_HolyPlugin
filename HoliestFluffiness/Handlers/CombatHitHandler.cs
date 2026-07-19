@@ -51,7 +51,7 @@ public sealed unsafe class CombatHitHandler : IDisposable
 
     public CombatHitHandler(Configuration config, IFlyTextGui flyTextGui,
                             IDalamudPluginInterface pluginInterface, IObjectTable objectTable,
-                            ISigScanner sigScanner, IGameInteropProvider gameInterop, IPluginLog log)
+                            IGameInteropProvider gameInterop, IPluginLog log)
     {
         this.config          = config;
         this.flyTextGui      = flyTextGui;
@@ -61,16 +61,9 @@ public sealed unsafe class CombatHitHandler : IDisposable
 
         flyTextGui.FlyTextCreated += OnFlyText;
 
-        try
-        {
-            var address = sigScanner.ScanText(Sigs.AddToScreenLog);
-            screenLogHook = gameInterop.HookFromAddress<AddToScreenLogDelegate>(address, OnScreenLog);
-            screenLogHook.Enable();
-        }
-        catch (Exception ex)
-        {
-            log.Warning(ex, "[HF] CombatHit: screen-log sig scan failed, damage crits still work but heal-crit ownership will not");
-        }
+        screenLogHook = Common.TryCreateHookFromSignature<AddToScreenLogDelegate>(
+            Sigs.AddToScreenLog, OnScreenLog, gameInterop, log,
+            "[HF] CombatHit: screen-log sig scan failed, damage crits still work but heal-crit ownership will not");
     }
 
     private void OnScreenLog(Character* target, Character* source, FlyTextKind kind,
@@ -120,9 +113,8 @@ public sealed unsafe class CombatHitHandler : IDisposable
         SoundEngine.Play(Resolve(soundPath, defaultRelative), volume);
     }
 
-    // Called by the Test button in the config UI. defaultAbsolute is the full path to the bundled default sound.
-    // Each half is previewed only when its toggle is on: the fly text when custom text is enabled, the
-    // sound when sound is enabled, so the test reflects exactly what the current settings would produce.
+    // Config UI Test button. Each half previews only when its own toggle is on, so the test matches
+    // exactly what the current settings would produce.
     public void TestHit(FlyTextKind kind, bool showText, string text, bool soundEnabled,
                         string soundPath, string defaultAbsolute, float volume)
     {

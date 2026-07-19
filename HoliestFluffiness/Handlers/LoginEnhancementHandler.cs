@@ -50,21 +50,13 @@ public sealed unsafe class LoginEnhancementHandler : IDisposable
 
         addonLifecycle.RegisterListener(AddonEvent.PostSetup, "Logo", OnLogoSetup);
 
-        try
-        {
-            charaSelectHook = gameInterop.HookFromAddress<UpdateCharaSelectDelegate>(
-                (nint)AgentLobby.MemberFunctionPointers.UpdateCharaSelectDisplay, CharaSelectDetour);
-            charaSelectHook.Enable();
-        }
-        catch (Exception ex) { log.Warning(ex, "[HF] LoginEnhancement: UpdateCharaSelectDisplay hook failed."); }
+        charaSelectHook = Common.TryCreateHook<UpdateCharaSelectDelegate>(
+            (nint)AgentLobby.MemberFunctionPointers.UpdateCharaSelectDisplay, CharaSelectDetour, gameInterop, log,
+            "[HF] LoginEnhancement: UpdateCharaSelectDisplay hook failed.");
 
-        try
-        {
-            loginWaitHook = gameInterop.HookFromAddress<OpenLoginWaitDelegate>(
-                (nint)AgentLobby.MemberFunctionPointers.OpenLoginWaitDialog, LoginWaitDetour);
-            loginWaitHook.Enable();
-        }
-        catch (Exception ex) { log.Warning(ex, "[HF] LoginEnhancement: OpenLoginWaitDialog hook failed."); }
+        loginWaitHook = Common.TryCreateHook<OpenLoginWaitDelegate>(
+            (nint)AgentLobby.MemberFunctionPointers.OpenLoginWaitDialog, LoginWaitDetour, gameInterop, log,
+            "[HF] LoginEnhancement: OpenLoginWaitDialog hook failed.");
     }
 
     // ── Skip logo ─────────────────────────────────────────────────────────────

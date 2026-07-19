@@ -42,8 +42,8 @@ public sealed class CommendationHandler : IDisposable
         currentPartySize = largestPartySize = lastAreaPartySize = Math.Max(partyList.Length, 1);
     }
 
-    // Reset the baseline on logout so a previous character's commendation count can't
-    // survive into the next character and falsely trigger on their first zone change.
+    // Without this the previous character's count survives and falsely triggers on the next
+    // character's first zone change.
     private void OnLogout(int type, int code)
     {
         lastCommendationCount = -1;
@@ -53,8 +53,7 @@ public sealed class CommendationHandler : IDisposable
     private void OnUpdate(IFramework fw)
     {
         if (!clientState.IsLoggedIn) return;
-        // Party size only matters at the next territory change, so polling once a second
-        // is plenty; no need to read it on every frame.
+        // Party size only matters at the next territory change, so once a second is plenty
         var nowMs = Environment.TickCount64;
         if (nowMs < nextPartyPollMs) return;
         nextPartyPollMs = nowMs + PartyPollIntervalMs;

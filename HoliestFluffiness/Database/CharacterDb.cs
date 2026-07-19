@@ -27,17 +27,15 @@ public sealed class CharacterDb : IDisposable
 {
     private readonly SQLiteConnection db;
 
-    // sqlite-net's SQLiteConnection is not thread-safe, and this DB is touched concurrently from the
-    // UI/Draw thread (config tabs), the framework thread (addon/chat events, commands), and the
-    // thread pool (LoginInfoHandler's Task.Run saves and its 2-minute periodic loop). Every db.*
-    // access is serialized behind this lock; the Changed event is always raised outside it so
-    // subscribers can't re-enter and deadlock.
+    // SQLiteConnection is not thread-safe and this DB is touched from the draw thread, the framework
+    // thread and the thread pool, so every db.* access is serialized behind this lock. The Changed
+    // event is always raised outside it so subscribers cannot re-enter and deadlock.
     private readonly object dbLock = new();
 
     public CharacterDb(string path)
     {
-        // SQLite-net caches TableMappings statically by type name; after a Dalamud hot-reload the
-        // stale entry points to the old load context's type (InvalidCastException). Clear it first.
+        // SQLite-net caches TableMappings statically by type name, so after a hot-reload the stale
+        // entry points at the old load context's type and throws InvalidCastException.
         ClearStaleMapping<CharacterRecord>();
         ClearStaleMapping<HousingBidRecord>();
         db = new SQLiteConnection(path);
@@ -71,7 +69,7 @@ public sealed class CharacterDb : IDisposable
     private sealed class StatsCache { public CharacterDbStats Value; }
     private volatile StatsCache? statsCache;
 
-    // Single pass over the table rather than ~9 separate full-table reads.
+    // One pass over the table rather than ~9 separate full-table reads
     public CharacterDbStats GetStats()
     {
         var cache = statsCache;
@@ -110,8 +108,7 @@ public sealed class CharacterDb : IDisposable
             }
             if (r.Mgp >= 0) mgpSum += r.Mgp;
 
-            // FC points are company-wide, not per-character; keep only the most recently
-            // seen reading per unique FC so members of the same company aren't summed twice.
+            // FC points are company-wide, so keep one reading per FC or members get summed twice
             if (!string.IsNullOrEmpty(r.FreeCompany) && r.FcPoints >= 0 &&
                 (!fcPointsByFc.TryGetValue(r.FreeCompany, out var seen) || r.LastSeen > seen.LastSeen))
                 fcPointsByFc[r.FreeCompany] = (r.FcPoints, r.LastSeen);
@@ -133,7 +130,7 @@ public sealed class CharacterDb : IDisposable
 
     public event Action? Changed;
 
-    // Every character-table write goes through here so the cached stats are dropped in lockstep.
+    // Every character-table write goes through here so the cached stats drop in lockstep
     private void RaiseChanged()
     {
         statsCache = null;

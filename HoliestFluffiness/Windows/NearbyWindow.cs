@@ -137,8 +137,8 @@ public sealed class NearbyWindow : Window, IDisposable
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
-        // The leftmost visible column needs an extra nudge (no left divider for margin); find it
-        // fresh each frame since reordering can change which column that is.
+        // The leftmost visible column has no left divider for margin, and reordering can change
+        // which one that is, so find it fresh each frame.
         int leftmostIdx = 0;
         float leftmostX = float.MaxValue;
         for (int i = 0; i < 5; i++)
@@ -166,8 +166,7 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.TableHeader("FC");
         Common.PopTableHeader();
 
-        // Handler swaps these list references on update (~2x/sec), so reference equality tells us
-        // whether the data changed since last frame.
+        // The handler swaps these list references on update, so reference equality detects changes
         if (!ReferenceEquals(cachedNearbySource, handler.NearbyPlayers) ||
             !ReferenceEquals(cachedTargetersSource, handler.CurrentTargeters) ||
             cachedSearchText != searchText)
@@ -185,7 +184,7 @@ public sealed class NearbyWindow : Window, IDisposable
                     p.CompanyTag.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                     p.JobAbbr.Contains(searchText,    StringComparison.OrdinalIgnoreCase));
 
-            // Targeters float to top; stable so existing sort order is preserved within each group
+            // Targeters float to top; stable, so sort order is preserved within each group
             cachedSorted = source.OrderByDescending(p => cachedTargeterIds.Contains(p.GameObjectId)).ToList();
         }
 
@@ -477,17 +476,33 @@ if (ImGui.MenuItem("Send Tell"))
     }
 
     private static unsafe void OpenExamine(uint entityId)
-        => AgentInspect.Instance()->ExamineCharacter(entityId);
+    {
+        var agent = AgentInspect.Instance();
+        if (agent == null) return;
+        agent->ExamineCharacter(entityId);
+    }
 
     private static unsafe void OpenAdventurePlate(Dalamud.Game.ClientState.Objects.Types.IGameObject obj)
-        => AgentCharaCard.Instance()->OpenCharaCard((GameObject*)obj.Address);
+    {
+        var agent = AgentCharaCard.Instance();
+        if (agent == null) return;
+        agent->OpenCharaCard((GameObject*)obj.Address);
+    }
 
     private static unsafe void SendTell(string name, string world)
-        => UIModule.Instance()->ProcessChatBoxEntry(Utf8String.FromString($"/tell {name}@{world} "));
+    {
+        var uiModule = UIModule.Instance();
+        if (uiModule == null) return;
+        // Native string, ours to free once the game has copied it into the chat box.
+        var str = Utf8String.FromString($"/tell {name}@{world} ");
+        uiModule->ProcessChatBoxEntry(str);
+        str->Dtor(true);
+    }
 
     private static unsafe void OpenOnMap(Vector3 position)
     {
         var agent = AgentMap.Instance();
+        if (agent == null) return;
         agent->SetFlagMapMarker(agent->CurrentTerritoryId, agent->CurrentMapId, position);
         agent->OpenMap(agent->CurrentMapId, agent->CurrentTerritoryId);
     }

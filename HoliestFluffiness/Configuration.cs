@@ -13,14 +13,14 @@ public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
-    // Named so Social.cs's "Set to default" button can reuse the same values
+    // Exposed so Social.cs's "Set to default" button can reuse them
     public static readonly Vector4 DefaultNearbyColParty   = new(100/255f, 180/255f, 255/255f, 1f);
     public static readonly Vector4 DefaultNearbyColFriend  = new(1f, 127/255f, 0f, 1f);
     public static readonly Vector4 DefaultNearbyColLocalFc = new(220/255f, 200/255f, 80/255f, 1f);
 
     public int Version { get; set; } = 1;
 
-    // Theme section (unlocked from the About page)
+    // Unlocked from the About page
     public bool  ThemeDisableCustom { get; set; } = false;
     public float ThemeOpacity       { get; set; } = 1f;
 
@@ -42,18 +42,15 @@ public class Configuration : IPluginConfiguration
     public bool FcPointsTrackingEnabled { get; set; } = false;
     public int LastSelectedSection { get; set; } = 0;
 
-    // Server info section
     public bool ServerInfoPingEnabled { get; set; } = false;
     public PingDisplay ServerInfoPingDisplay { get; set; } = PingDisplay.Last;
     public bool ServerInfoFpsEnabled { get; set; } = false;
 
-    // Repair section
     public bool RepairLowEnabled { get; set; } = false;
     public float RepairLowThreshold { get; set; } = 50f;
     public bool RepairCriticalEnabled { get; set; } = false;
     public float RepairCriticalThreshold { get; set; } = 25f;
 
-    // Client section
     public bool AlwaysYesEnabled { get; set; } = false;
     public bool AltF4ExitEnabled { get; set; } = false;
     public string ClientTitlePrefix { get; set; } = "";
@@ -67,40 +64,31 @@ public class Configuration : IPluginConfiguration
     public bool HotbarLockHidden { get; set; } = false;
     public bool FastMouseClickFixEnabled { get; set; } = false;
     public bool DrawSheatheEmoteEnabled { get; set; } = false;
-    // Character picker section
     public bool CharacterPickerOnMainMenu { get; set; } = false;
 
-    // NoKill section
     public bool NoKillEnabled { get; set; } = false;
     public bool NoKillDisablePopup { get; set; } = false;
 
-    // Physics section
     public bool PhysicsEnabled { get; set; } = false;
     public float PhysicsTargetFps { get; set; } = 60f;
 
-    // Anti-AFK section
     public bool AntiAfkEnabled { get; set; } = false;
     public int AntiAfkTimerLimit { get; set; } = 30;
     public bool AntiAfkRespectManualAfk { get; set; } = false;
 
-    // Duty timer + cast bar (Indicators)
     public bool DutyTimerEnabled       { get; set; } = false;
     public bool CastBarAetheryteEnabled { get; set; } = false;
 
-    // Loot (Indicators)
     public bool  LootFadeEnabled { get; set; } = false;
     public float LootFadePercent { get; set; } = 0.5f;
 
-    // Hide MP bars (Indicators)
     public bool HideMpBarsPartyList   { get; set; } = false;
     public bool HideMpBarsParamWidget { get; set; } = false;
 
-    // Party section
     public bool ReadyCheckShowNames { get; set; } = false;
     public bool ReadyCheckDrawOverlay { get; set; } = false;
     public int ReadyCheckClearAfterSeconds { get; set; } = 10;
 
-    // Nearby section
     public bool    NearbyDtrEnabled          { get; set; } = false;
     public bool    NearbyShowTargeters       { get; set; } = false;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;
@@ -121,7 +109,6 @@ public class Configuration : IPluginConfiguration
     public string  NearbyTargeterSoundPath   { get; set; } = "";
     public float   NearbyTargeterSoundVolume { get; set; } = 0.5f;
 
-    // Congratulations section
     public bool   CommendationEnabled           { get; set; } = false;
     public string CommendationOneThirdPath      { get; set; } = "";
     public float  CommendationOneThirdVolume    { get; set; } = 0.5f;
@@ -132,7 +119,6 @@ public class Configuration : IPluginConfiguration
     public string CommendationAllSevenPath      { get; set; } = "";
     public float  CommendationAllSevenVolume    { get; set; } = 0.5f;
 
-    // Doorbell section (fires whenever chat and/or sound is enabled for the event)
     public bool   DoorbellEnterChat          { get; set; } = false;
     public bool   DoorbellEnterSound         { get; set; } = false;
     public string DoorbellEnterSoundPath     { get; set; } = "";
@@ -146,7 +132,7 @@ public class Configuration : IPluginConfiguration
     public string DoorbellAlreadyHereSoundPath   { get; set; } = "";
     public float  DoorbellAlreadyHereSoundVolume { get; set; } = 0.5f;
 
-    // Doorbell chat templates. "<player>" is replaced with a clickable player link when printed.
+    // "<player>" becomes a clickable player link when printed
     public const string DefaultDoorbellEnterText       = "<player> has come inside.";
     public const string DefaultDoorbellLeaveText       = "<player> has left the house.";
     public const string DefaultDoorbellAlreadyHereText = "<player> was here when you arrived.";
@@ -154,17 +140,11 @@ public class Configuration : IPluginConfiguration
     public string DoorbellLeaveText       { get; set; } = DefaultDoorbellLeaveText;
     public string DoorbellAlreadyHereText { get; set; } = DefaultDoorbellAlreadyHereText;
 
-    // Dynamic traveler (Social)
     public bool DynamicTravelerEnabled    { get; set; } = false;
 
-    // Toast notifications
-    public bool ToastAdaptiveWidth { get; set; } = false;
-
-    // Login enhancements (Login)
     public bool LoginSkipLogo    { get; set; } = false;
     public bool PreloadTerritory { get; set; } = false;
 
-    // Food check section
     public bool   FoodCheckEcho         { get; set; } = false;
     public bool   FoodCheckHighlight    { get; set; } = false;
     public bool   FoodCheckSound        { get; set; } = false;
@@ -176,7 +156,6 @@ public class Configuration : IPluginConfiguration
     public bool FoodCheckScopeExtreme  { get; set; } = false;
     public bool FoodCheckScopeAny      { get; set; } = false;
 
-    // Combat section
     // DC - Direct Critical Damage
     public bool   CombatDcEnabled   { get; set; } = false;
     public string CombatDcSound     { get; set; } = "";
@@ -214,7 +193,7 @@ public class Configuration : IPluginConfiguration
     {
         pluginInterface = pi;
 
-        // Ensure order list is valid (covers upgrades from old saves)
+        // Covers upgrades from old saves
         var expected = Enumerable.Range(0, 5).ToList();
         if (LoginInfoOrder.Count != 5 || !expected.All(LoginInfoOrder.Contains))
             LoginInfoOrder = expected;

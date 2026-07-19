@@ -87,7 +87,7 @@ public sealed class DoorbellHandler : IDisposable
             if (!knownPlayers.ContainsKey(id))
             {
                 var worldId = pc.HomeWorld.RowId;
-                var world   = pc.HomeWorld.ValueNullable?.Name.ExtractText() ?? "";
+                var world   = Common.WorldName(pc) ?? "";
                 knownPlayers[id] = new KnownPlayer { Name = pc.Name.TextValue, World = world, WorldId = worldId, LastSeenMs = nowMs };
 
                 if (nowMs > 2000)

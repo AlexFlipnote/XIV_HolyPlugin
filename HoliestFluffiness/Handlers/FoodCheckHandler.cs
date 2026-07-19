@@ -57,15 +57,9 @@ public class FoodCheckHandler : IDisposable
 
         framework.Update += OnFrameworkUpdate;
 
-        try
-        {
-            countdownHook = gameInterop.HookFromSignature<CountdownTimerDelegate>(Sigs.CountdownTimer, OnCountdownTimer);
-            countdownHook.Enable();
-        }
-        catch (Exception ex)
-        {
-            log.Warning(ex, "[HF] FoodCheck: countdown hook failed, countdown trigger will not work.");
-        }
+        countdownHook = Common.TryCreateHookFromSignature<CountdownTimerDelegate>(
+            Sigs.CountdownTimer, OnCountdownTimer, gameInterop, log,
+            "[HF] FoodCheck: countdown hook failed, countdown trigger will not work.");
     }
 
     public void Dispose()
@@ -86,7 +80,7 @@ public class FoodCheckHandler : IDisposable
 
     public void OnReadyCheck() => framework.RunOnTick(() => RunCheck(ignoreDutyFilter: false), delayTicks: 1);
 
-    // Called from the test button, skips the duty scope filter, clears after 5 s
+    // Test button: skips the duty scope filter and clears after 5s
     public void ForceCheck() => RunCheck(ignoreDutyFilter: true, clearDelayMs: 5_000);
 
     private nint OnCountdownTimer(ulong value)
@@ -200,13 +194,11 @@ public class FoodCheckHandler : IDisposable
 
         if (config.FoodCheckScopeHighEnd && cfc.Value.HighEndDuty) return true;
 
-        // ContentType 5 = Raids and 4 = Trials, but those categories include NORMAL
-        // tiers too. Savage/Extreme are distinguished by their permanent name, which
-        // also covers old content whose HighEndDuty flag may have been cleared.
+        // ContentType 5 (Raids) and 4 (Trials) include normal tiers too, so Savage and Extreme are
+        // matched by name; that also covers old content whose HighEndDuty flag was cleared.
         var name = cfc.Value.Name.ExtractText();
         if (config.FoodCheckScopeSavage && name.EndsWith("(Savage)")) return true;
-        // Extremes use two naming schemes: an "(Extreme)" suffix, or a
-        // "the Minstrel's Ballad:" prefix (older trials, no suffix).
+        // Extremes use either an "(Extreme)" suffix or an older "the Minstrel's Ballad:" prefix
         if (config.FoodCheckScopeExtreme
             && (name.EndsWith("(Extreme)")
                 || name.StartsWith("the Minstrel's Ballad", StringComparison.OrdinalIgnoreCase)))

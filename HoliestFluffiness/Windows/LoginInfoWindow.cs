@@ -51,19 +51,7 @@ public class LoginInfoWindow : Window
     public override void PreDraw()
     {
         ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-        if (Theme.UseCustom)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text,              Theme.ColWhite);
-            ImGui.PushStyleColor(ImGuiCol.WindowBg,          Theme.Fade(Theme.ColSecondary));
-            ImGui.PushStyleColor(ImGuiCol.TitleBg,           Theme.ColHighlight);
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     Theme.ColHighlight);
-            ImGui.PushStyleColor(ImGuiCol.TableBorderLight,  Theme.ColGoldMid);
-            ImGui.PushStyleColor(ImGuiCol.TableBorderStrong, Theme.ColGold);
-        }
-        else
-        {
-            ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
-        }
+        Common.PushTablePopupTheme();
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12, 10));
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
         ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,   new Vector2(8, 5));
@@ -71,7 +59,7 @@ public class LoginInfoWindow : Window
 
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(Theme.UseCustom ? 6 : 1);
+        Common.PopTablePopupTheme();
         ImGui.PopStyleVar(3);
     }
 

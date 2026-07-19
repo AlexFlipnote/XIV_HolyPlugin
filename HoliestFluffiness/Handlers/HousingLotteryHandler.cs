@@ -8,7 +8,6 @@ using Dalamud.Game.Chat;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace HoliestFluffiness.Handlers;
@@ -32,7 +31,7 @@ public sealed class HousingLotteryHandler : IDisposable
     private const int IdxBidNum   = 122;
     private const int IdxBidType  = 123;
 
-    // Deduplicate: only process when the key fields change
+    // Deduplication: only process when the key fields change
     private string _lastLocation = string.Empty;
     private string _lastBidNum   = string.Empty;
     private string _lastStatus   = string.Empty;
@@ -102,7 +101,7 @@ public sealed class HousingLotteryHandler : IDisposable
     private void OnResultYesClicked(AddonEventType type, AddonEventData data)
     {
         if (objectTable[0] is not IPlayerCharacter player) return;
-        var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
+        var world = Common.WorldName(player);
         if (string.IsNullOrEmpty(world)) return;
         var charKey = $"{player.Name.TextValue}@{world}";
 
@@ -143,7 +142,6 @@ public sealed class HousingLotteryHandler : IDisposable
 
             if (string.IsNullOrEmpty(location) || string.IsNullOrEmpty(bidNum)) return;
 
-            // Skip if nothing changed since last time
             if (location == _lastLocation && bidNum == _lastBidNum && status == _lastStatus) return;
             _lastLocation = location;
             _lastBidNum   = bidNum;
@@ -158,7 +156,7 @@ public sealed class HousingLotteryHandler : IDisposable
     {
         if (objectTable[0] is not IPlayerCharacter player) return;
 
-        var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
+        var world = Common.WorldName(player);
         if (string.IsNullOrEmpty(world)) return;
         var charKey = $"{player.Name.TextValue}@{world}";
 
@@ -171,7 +169,7 @@ public sealed class HousingLotteryHandler : IDisposable
         var district = HousingDistricts.Normalize(locMatch.Groups[3].Value.Trim());
         int bidNum   = int.Parse(bidNumMatch.Groups[1].Value);
 
-        // Active statuses: bid still exists, keep tracking
+        // Active statuses mean the bid still exists
         bool isActive = status.Contains("Current Entry",             StringComparison.OrdinalIgnoreCase)
                      || status.Contains("Results period in progress", StringComparison.OrdinalIgnoreCase)
                      || status.Contains("Entry period in progress",   StringComparison.OrdinalIgnoreCase);
@@ -190,7 +188,6 @@ public sealed class HousingLotteryHandler : IDisposable
             return;
         }
 
-        // Active: add if not already tracked
         bool exists = characterDb.GetBidsByCharacter(charKey)
             .Exists(b => b.District == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
         if (exists) return;
@@ -218,11 +215,11 @@ public sealed class HousingLotteryHandler : IDisposable
         if (!text.Contains("lottery", StringComparison.OrdinalIgnoreCase)) return;
 
         if (objectTable[0] is not IPlayerCharacter player) return;
-        var world = player.HomeWorld.ValueNullable?.Name.ExtractText();
+        var world = Common.WorldName(player);
         if (string.IsNullOrEmpty(world)) return;
         var charKey = $"{player.Name.TextValue}@{world}";
 
-        // Bid submission message, capture immediately when the player places the bid
+        // Captured immediately when the player places the bid
         var sub = SubmitRx.Match(text);
         if (sub.Success)
         {
@@ -274,65 +271,6 @@ public sealed class HousingLotteryHandler : IDisposable
         return val->String.ToString(); // CStringPointer.ToString() handles null safely
     }
 
-
-    // AgentContentsTimer memory layout (discovered via CE + plugin scanning):
-    //   agent->0x10 points to a data block; within that block:
-    //   [typeMarker:0x27] [ward:u8] [plot0:u8] [??:u8] [??:u8] [district:u8] [lotteryNum:u8] [bidType:u8] [status:u8]
-    //   district: 1=Mist 2=Lavender 3=Goblet 4=Shirogane 5=Empyreum
-    //   status non-zero = active bid; plot0 is 0-indexed (add 1 for display)
-    public unsafe void TryReadFromAgent(string charKey)
-    {
-        var mod = AgentModule.Instance();
-        if (mod == null) return;
-
-        var timer = mod->GetAgentByInternalId(AgentId.ContentsTimer);
-        if (timer == null) return;
-
-        var dataPtr = *(byte**)((byte*)timer + 0x10);
-        if (dataPtr == null) return;
-
-        for (int i = 1; i < 8192 - 9; i++)
-        {
-            if (dataPtr[i - 1] != 0x27) continue;   // housing lottery type marker
-
-            byte ward      = dataPtr[i];
-            byte plotIdx   = dataPtr[i + 1];
-            byte district  = dataPtr[i + 4];
-            byte lotteryNo = dataPtr[i + 5];
-            byte bidTyp    = dataPtr[i + 6];
-            byte status    = dataPtr[i + 7];
-
-            if (ward == 0 || ward > 24)          continue;
-            if (plotIdx > 59)                    continue;
-            if (district == 0 || district > 5)  continue;
-            if (lotteryNo == 0)                  continue;
-            if (status == 0)                     continue;  // no active bid
-
-            var districtName = HousingDistricts.FromAgentIndex(district);
-            int plot    = plotIdx + 1;
-            var bType   = bidTyp == 2 ? BidType.FC : BidType.Private;
-
-            log.Debug("[HousingLottery] Agent proactive read: {D} W{W} P{P} #{N} type={T} status={S}",
-                districtName, ward, plot, lotteryNo, bType, status);
-
-            bool exists = characterDb.GetBidsByCharacter(charKey)
-                .Exists(b => b.District == districtName && b.Ward == ward && b.Plot == plot && b.BidNumber == lotteryNo);
-            if (exists) return;
-
-            characterDb.AddBid(new HousingBidRecord
-            {
-                CharacterKey = charKey,
-                District     = districtName,
-                Ward         = ward,
-                Plot         = plot,
-                BidNumber    = lotteryNo,
-                BidType      = bType,
-                    BidDate      = DateTime.UtcNow,
-            });
-            Notify($"Lottery bid tracked (login): {districtName} W{ward} P{plot} #{lotteryNo}.");
-            return;
-        }
-    }
 
     private static void Notify(string msg) => Common.ShowToast("Lottery tracker", msg);
 

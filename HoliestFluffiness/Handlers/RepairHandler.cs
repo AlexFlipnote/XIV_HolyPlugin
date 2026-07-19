@@ -56,21 +56,16 @@ public sealed unsafe class RepairHandler : IDisposable
         }
         catch (Exception ex) { log.Warning(ex, "[HF] Repair: LoadIconByID sig failed."); }
 
-        try
-        {
-            var hookAddr = sigScanner.ScanText(Sigs.ReceiveEvent);
-            receiveEventHook = gameInterop.HookFromAddress<ReceiveEventDelegate>(hookAddr, OnReceiveEvent);
-            receiveEventHook.Enable();
-        }
-        catch (Exception ex) { log.Warning(ex, "[HF] Repair: ReceiveEvent hook failed; hover tooltip disabled."); }
+        receiveEventHook = Common.TryCreateHookFromSignature<ReceiveEventDelegate>(
+            Sigs.ReceiveEvent, OnReceiveEvent, gameInterop, log,
+            "[HF] Repair: ReceiveEvent hook failed; hover tooltip disabled.");
 
         addonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnRequestedUpdate);
         addonLifecycle.RegisterListener(AddonEvent.PostUpdate,          AddonName, OnPostUpdate);
     }
 
-    // Fires before PostUpdate. Hide our injected node from the previous frame before counting,
-    // but only if it still carries our '%' sentinel; if the game reused the slot for a real
-    // status the sentinel is gone, so we leave it visible and count it as the game's.
+    // Fires before PostUpdate. Hides last frame's injected node before counting, but only while it
+    // still carries our '%' sentinel; without it the game has reused the slot for a real status.
     private void OnRequestedUpdate(AddonEvent _, AddonArgs args)
     {
         var addon = (AtkUnitBase*)args.Addon.Address;
@@ -89,8 +84,7 @@ public sealed unsafe class RepairHandler : IDisposable
         cachedGameCount = CountGameNodes(addon);
     }
 
-    // True if the timer text ends with '%' (how we write our percentage). Game timers use
-    // s/m/h/d suffixes, never '%', so this reliably identifies our slot.
+    // Game timers use s/m/h/d suffixes and never '%', so a trailing '%' identifies our slot
     private static bool SlotIsOurs(AtkResNode* slotNode)
     {
         var compNode = slotNode->GetAsAtkComponentNode();
@@ -215,8 +209,7 @@ public sealed unsafe class RepairHandler : IDisposable
         return count;
     }
 
-    // Shows "45%" on the icon timer text in yellow (low) or red (critical).
-    // The trailing '%' also serves as our ownership marker; game timers use s/m/h/d.
+    // Shows "45%" on the icon timer text, yellow for low and red for critical
     private static void SetTimerText(AtkComponentBase* comp, int idx, float pct, bool critical)
     {
         if (comp->UldManager.NodeListCount <= idx) return;
@@ -227,7 +220,9 @@ public sealed unsafe class RepairHandler : IDisposable
         Span<byte> buf = stackalloc byte[8];
         var len = Encoding.UTF8.GetBytes($"{pct:F0}%", buf);
         buf[len] = 0;
+        // Null when this slot is not actually a text node
         var textNode = node->GetAsAtkTextNode();
+        if (textNode == null) return;
         textNode->SetText(buf[..(len + 1)]);
 
         textNode->TextColor = new ByteColor { R = 0xFF, G = 0xFF, B = 0xFF, A = 0xFF };

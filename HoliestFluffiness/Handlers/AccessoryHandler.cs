@@ -36,7 +36,7 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
             await framework.RunOnFrameworkThread(() =>
             {
                 if (objectTable[0] is not IPlayerCharacter player) return;
-                var key = $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}";
+                var key = Common.CharacterKey(player);
                 whitelisted = configuration.AccessoryWhitelist.Contains(key);
             });
 

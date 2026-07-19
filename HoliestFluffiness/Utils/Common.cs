@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Hooking;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin;
@@ -32,8 +34,7 @@ internal static class Common
     internal static bool IsPluginLoaded(IDalamudPluginInterface pluginInterface, string name) =>
         pluginInterface.InstalledPlugins.Any(p => p.InternalName == name && p.IsLoaded);
 
-    // Role lookup by job abbreviation (base classes included). Anything not listed
-    // (crafters, gatherers, unknown) falls through to the neutral "other" colour.
+    // Base classes included; anything unlisted (crafters, gatherers) falls through to "other"
     private static readonly HashSet<string> TankJobs =
         new(StringComparer.OrdinalIgnoreCase) { "PLD", "WAR", "DRK", "GNB", "GLA", "MRD" };
     private static readonly HashSet<string> HealerJobs =
@@ -46,8 +47,6 @@ internal static class Common
             "BLM", "SMN", "RDM", "PCT", "BLU", "THM", "ACN",                // casters
         };
 
-    // Colour for a job abbreviation grouped by role. Used by the nearby-players
-    // window when "colour job names" is enabled.
     internal static Vector4 JobRoleColor(string jobAbbr) =>
           TankJobs.Contains(jobAbbr)   ? Theme.ColRoleTank
         : HealerJobs.Contains(jobAbbr) ? Theme.ColRoleHealer
@@ -56,8 +55,7 @@ internal static class Common
 
     private static readonly string[] ShortenNumberSuffixes = ["", "K", "M", "B", "T"];
 
-    // Shortens large numbers for compact display, e.g. 100000 -> "100K", 1200000 -> "1.2M".
-    // Rounds to 1 decimal, dropping the decimal entirely when it would show as ".0".
+    // 100000 -> "100K", 1200000 -> "1.2M"; a trailing ".0" is dropped
     internal static string ShortenNumber(long num)
     {
         var sign = num < 0 ? "-" : "";
@@ -83,33 +81,96 @@ internal static class Common
         return $"{sign}{formatted}{ShortenNumberSuffixes[tier]}";
     }
 
-    internal static string? GetCurrentPlayerKey(IObjectTable objectTable)
+    // Non-positive slots are ping timeouts or unfilled entries, and are skipped
+    internal static (int Samples, int Avg, int Min, int Max) ComputeSampleStats(float[] data)
     {
-        return objectTable[0] is IPlayerCharacter player
-            ? $"{player.Name.TextValue}@{player.HomeWorld.ValueNullable?.Name.ExtractText()}"
-            : null;
+        var samples = 0;
+        var sum     = 0f;
+        var min     = float.MaxValue;
+        var max     = float.MinValue;
+
+        foreach (var v in data)
+        {
+            if (v <= 0) continue;
+            samples++;
+            sum += v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+
+        return samples > 0
+            ? (samples, (int)(sum / samples), (int)min, (int)max)
+            : (0, 0, 0, 0);
+    }
+
+    // Null while the world sheet row is unresolvable, which happens briefly during zone/login
+    internal static string? WorldName(IPlayerCharacter player) =>
+        player.HomeWorld.ValueNullable?.Name.ExtractText();
+
+    // Canonical "Name@World" identity used as the key for every per-character store.
+    internal static string CharacterKey(IPlayerCharacter player) =>
+        $"{player.Name.TextValue}@{WorldName(player)}";
+
+    internal static string? GetCurrentPlayerKey(IObjectTable objectTable) =>
+        TryGetLocalPlayer(objectTable, out var player) ? CharacterKey(player) : null;
+
+    // Local player is always slot 0; false means not logged in or mid-transition
+    internal static bool TryGetLocalPlayer(IObjectTable objectTable, [NotNullWhen(true)] out IPlayerCharacter? player)
+    {
+        player = objectTable[0] as IPlayerCharacter;
+        return player != null;
+    }
+
+    // ── Native hook helpers ───────────────────────────────────────────────────
+
+    // Returns null instead of throwing: a patch that moves one signature should disable that
+    // one feature, not take down the whole plugin from Plugin's constructor.
+    internal static Hook<T>? TryCreateHook<T>(nint address, T detour, IGameInteropProvider gameInterop,
+        IPluginLog log, string failureMessage, bool enable = true) where T : Delegate
+    {
+        try
+        {
+            var hook = gameInterop.HookFromAddress(address, detour);
+            if (enable) hook.Enable();
+            return hook;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, failureMessage);
+            return null;
+        }
+    }
+
+    // Same contract as TryCreateHook, for addresses coming from Sigs.cs rather than ClientStructs
+    internal static Hook<T>? TryCreateHookFromSignature<T>(string signature, T detour, IGameInteropProvider gameInterop,
+        IPluginLog log, string failureMessage, bool enable = true) where T : Delegate
+    {
+        try
+        {
+            var hook = gameInterop.HookFromSignature(signature, detour);
+            if (enable) hook.Enable();
+            return hook;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, failureMessage);
+            return null;
+        }
     }
 
     // ── ImGui style helpers ───────────────────────────────────────────────────
     //
-    // Each Push*/Pop* pair ALWAYS pushes and pops the same fixed colour count, so
-    // callers can pop with a raw ImGui.PopStyleColor(N) and never desync the stack.
-    // When the custom theme is off we push the ambient Dalamud colour for each slot,
-    // which is a visual no-op (Dalamud's own theme shows through). The only exception
-    // is the window background, which is faded by the opacity knob in both modes.
+    // Each Push*/Pop* pair ALWAYS moves the same fixed colour count, so callers can pop with a raw
+    // ImGui.PopStyleColor(N) and never desync the stack. With the custom theme off we push the
+    // ambient Dalamud colour, a visual no-op.
 
-    // Current Dalamud/ImGui style colour for a slot (used as the default-theme no-op).
     private static Vector4 Amb(ImGuiCol slot) => ImGui.GetStyle().Colors[(int)slot];
 
-    // Themed colour when custom is on, ambient no-op when off.
     private static Vector4 T(Vector4 custom, ImGuiCol slot) => Theme.UseCustom ? custom : Amb(slot);
 
-    // Same as T but for structural background slots: also runs the result through the
-    // opacity knob so backgrounds (window, scrollbar track, table header) turn
-    // translucent alongside the window body instead of staying solid on top of it.
+    // T plus the opacity knob, so backgrounds fade with the window body instead of sitting on top
     private static Vector4 FadeT(Vector4 custom, ImGuiCol slot) => Theme.Fade(Theme.UseCustom ? custom : Amb(slot));
 
-    // Full themed window: WindowBg, Text, TitleBar, FrameBg, Scrollbar, ResizeGrip (13 colors)
     internal static void PushWindowTheme()
     {
         ImGui.PushStyleColor(ImGuiCol.WindowBg,             FadeT(Theme.ColSecondary, ImGuiCol.WindowBg));
@@ -128,26 +189,37 @@ internal static class Common
     }
     internal static void PopWindowTheme() => ImGui.PopStyleColor(13);
 
-    // Scrollbar sub-theme (4 colors) use standalone or as part of a manual push block
-    internal static void PushScrollbarTheme()
+    internal static void PushPopupTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarBg,          FadeT(Theme.ColHighlight, ImGuiCol.ScrollbarBg));
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab,        T(Theme.ColGoldSub,   ImGuiCol.ScrollbarGrab));
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, T(Theme.ColGoldMid,   ImGuiCol.ScrollbarGrabHovered));
-        ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive,  T(Theme.ColGold,      ImGuiCol.ScrollbarGrabActive));
+        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColWhite,     ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,      FadeT(Theme.ColSecondary, ImGuiCol.WindowBg));
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,       T(Theme.ColHighlight, ImGuiCol.TitleBg));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, T(Theme.ColHighlight, ImGuiCol.TitleBgActive));
     }
-    internal static void PopScrollbarTheme() => ImGui.PopStyleColor(4);
+    internal static void PopPopupTheme() => ImGui.PopStyleColor(4);
 
-    // Resize grip sub-theme (3 colors)
-    internal static void PushResizeGripTheme()
+    internal static void PushTablePopupTheme()
     {
-        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        T(Theme.ColGoldSub, ImGuiCol.ResizeGrip));
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, T(Theme.ColGoldMid, ImGuiCol.ResizeGripHovered));
-        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  T(Theme.ColGold,    ImGuiCol.ResizeGripActive));
+        PushPopupTheme();
+        ImGui.PushStyleColor(ImGuiCol.TableBorderLight,  T(Theme.ColGoldMid, ImGuiCol.TableBorderLight));
+        ImGui.PushStyleColor(ImGuiCol.TableBorderStrong, T(Theme.ColGold,    ImGuiCol.TableBorderStrong));
     }
-    internal static void PopResizeGripTheme() => ImGui.PopStyleColor(3);
+    internal static void PopTablePopupTheme() => ImGui.PopStyleColor(6);
 
-    // Gold button (4 colors: Button + ButtonHovered + ButtonActive + Text)
+    // The idle resize grip is invisible on purpose so it does not sit on top of the plot
+    internal static void PushChartWindowTheme()
+    {
+        ImGui.PushStyleColor(ImGuiCol.WindowBg,          FadeT(Theme.ColSecondary, ImGuiCol.WindowBg));
+        ImGui.PushStyleColor(ImGuiCol.Text,              T(Theme.ColWhite,     ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.TitleBg,           T(Theme.ColHighlight, ImGuiCol.TitleBg));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     T(Theme.ColHighlight, ImGuiCol.TitleBgActive));
+        ImGui.PushStyleColor(ImGuiCol.FrameBg,           T(Theme.ColPrimary,   ImGuiCol.FrameBg));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        T(Vector4.Zero,       ImGuiCol.ResizeGrip));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, T(Theme.ColGoldMid,   ImGuiCol.ResizeGripHovered));
+        ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  T(Theme.ColGold,      ImGuiCol.ResizeGripActive));
+    }
+    internal static void PopChartWindowTheme() => ImGui.PopStyleColor(8);
+
     internal static void PushGoldButton()
     {
         ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGoldSub, ImGuiCol.Button));
@@ -157,7 +229,6 @@ internal static class Common
     }
     internal static void PopGoldButton() => ImGui.PopStyleColor(4);
 
-    // Grey (secondary) button (4 colors: Button + ButtonHovered + ButtonActive + Text)
     internal static void PushGreyButton()
     {
         ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGrey,    ImGuiCol.Button));
@@ -167,7 +238,6 @@ internal static class Common
     }
     internal static void PopGreyButton() => ImGui.PopStyleColor(4);
 
-    // Gold-coloured TextUnformatted (1 color push/pop; ambient text on default theme)
     internal static void GoldText(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, T(Theme.ColGold, ImGuiCol.Text));
@@ -175,7 +245,7 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
-    // Green-coloured TextUnformatted (1 color push/pop; semantic, kept in both themes)
+    // Green and red stay themed in both modes; they are semantic, not decorative
     internal static void GreenText(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
@@ -183,7 +253,6 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
-    // Red-coloured TextUnformatted (1 color push/pop; semantic, kept in both themes)
     internal static void RedText(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColRed);
@@ -191,7 +260,6 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
-    // Table header theme (2 colors: TableHeaderBg + Text)
     internal static void PushTableHeader()
     {
         ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, FadeT(Theme.ColPrimary, ImGuiCol.TableHeaderBg));
@@ -199,7 +267,6 @@ internal static class Common
     }
     internal static void PopTableHeader() => ImGui.PopStyleColor(2);
 
-    // Search/filter InputTextWithHint border theme (1 color + 1 style var)
     internal static void PushSearchInput()
     {
         ImGui.PushStyleColor(ImGuiCol.Border, T(Theme.ColGoldMid, ImGuiCol.Border));
@@ -211,7 +278,6 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
-    // Horizontally centers the next widget by offsetting CursorPosX
     internal static void CenterCursorForWidth(float width) =>
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetContentRegionAvail().X - width) * 0.5f);
 
@@ -255,7 +321,7 @@ internal static class Common
             });
     }
 
-    internal static void DrawToasts(Configuration config)
+    internal static void DrawToasts()
     {
         lock (_toastLock)
         {
@@ -264,7 +330,7 @@ internal static class Common
             for (int i = _toasts.Count - 1; i >= 0; i--)
             {
                 var t = _toasts[i];
-                // Pause timer while hovered by sliding ExpiresAt forward
+                // Hovering pauses the timer by sliding ExpiresAt forward
                 if (t.Hovered && !t.AnimOut)
                     t.ExpiresAt += TimeSpan.FromSeconds(dt);
                 if (!t.AnimOut && DateTime.UtcNow >= t.ExpiresAt) t.AnimOut = true;
@@ -308,7 +374,7 @@ internal static class Common
                 ImGuiWindowFlags.NoScrollbar        |
                 ImGuiWindowFlags.NoInputs;
 
-            // Zero padding on the overlay so cursor pos 0 == screen edge exactly
+            // Zero padding so cursor pos 0 is exactly the screen edge
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
             if (!ImGui.Begin("##hf_toasts", Flags)) { ImGui.PopStyleVar(); ImGui.End(); return; }
             ImGui.PopStyleVar();
@@ -318,7 +384,6 @@ internal static class Common
             {
                 float w = widths[i];
                 float h = heights[i];
-                // Right-align within overlay, child right edge == screen right edge
                 ImGui.SetCursorPos(new Vector2(maxW - w, curY));
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
                 bool ok = ImGui.BeginChild($"##ht{i}", new Vector2(w, h), false,
@@ -335,11 +400,10 @@ internal static class Common
 
     private static float ToastCalcWidth(HfToast t, float s, float padX)
     {
-        // Explicit fixed width, caller knows best (e.g. content with unmeasurable glyphs)
+        // Explicit width wins; the caller may have glyphs ImGui cannot measure
         if (t.Width > 0f) return t.Width * s;
 
-        // Auto-size: measure each line independently so ImGui's per-glyph measurement is
-        // accurate. Toasts with plain-text content (swap character, lottery) shrink to fit.
+        // Measure each line independently so per-glyph measurement stays accurate
         float xArea = (ToastXBtnSize + ToastXBtnPad * 2f) * s;
         float best  = ImGui.CalcTextSize(t.Title).X + padX + xArea;
 
@@ -387,10 +451,10 @@ internal static class Common
         float titleTextH = ImGui.CalcTextSize(t.Title, false, w - padX - xArea).Y;
         float titleBarH  = titlePadY + titleTextH + titlePadY;
 
-        // ── Title bar (ColHighlight) ───────────────────────────────────────────
+        // Title bar
         dl.AddRectFilled(pos, new Vector2(pos.X + w, pos.Y + titleBarH), ToastU32(Theme.ColHighlight, a));
 
-        // ── Content area (ColSecondary) ───────────────────────────────────────
+        // Content area
         float contentTop = titleBarH;
         float progressH  = ToastProgressH * s;
         if (!string.IsNullOrEmpty(t.Message))
@@ -399,7 +463,7 @@ internal static class Common
                 new Vector2(pos.X + w, pos.Y + sz.Y - progressH),
                 ToastU32(Theme.ColSecondary, a));
 
-        // ── X dismiss button (in title bar, vertically centred) ───────────────
+        // X dismiss button, vertically centred in the title bar
         var  xMin     = new Vector2(pos.X + w - xBtnPad - xBtnS, pos.Y + (titleBarH - xBtnS) * 0.5f);
         var  xMax     = new Vector2(xMin.X + xBtnS, xMin.Y + xBtnS);
         var  mouse    = ImGui.GetIO().MousePos;
@@ -413,7 +477,6 @@ internal static class Common
         dl.AddLine(new Vector2(xMin.X + xi, xMin.Y + xi), new Vector2(xMax.X - xi, xMax.Y - xi), xc, 1.5f * s);
         dl.AddLine(new Vector2(xMax.X - xi, xMin.Y + xi), new Vector2(xMin.X + xi, xMax.Y - xi), xc, 1.5f * s);
 
-        // ── Title text ────────────────────────────────────────────────────────
         ImGui.SetCursorPos(new Vector2(padX, titlePadY));
         ImGui.PushTextWrapPos(w - padX - xArea);
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold with { W = a });
@@ -421,7 +484,6 @@ internal static class Common
         ImGui.PopStyleColor();
         ImGui.PopTextWrapPos();
 
-        // ── Message text ──────────────────────────────────────────────────────
         if (!string.IsNullOrEmpty(t.Message))
         {
             ImGui.SetCursorPos(new Vector2(padX, contentTop + contentPadY));
@@ -432,7 +494,7 @@ internal static class Common
             ImGui.PopTextWrapPos();
         }
 
-        // ── Progress bar ──────────────────────────────────────────────────────
+        // Progress bar
         float totalSec = (float)(t.ExpiresAt - t.CreatedAt).TotalSeconds;
         float elapsed  = (float)(DateTime.UtcNow - t.CreatedAt).TotalSeconds;
         float progress = t.AnimOut ? 0f : Math.Clamp(1f - elapsed / totalSec, 0f, 1f);
@@ -444,7 +506,6 @@ internal static class Common
             dl.AddRectFilled(new Vector2(pos.X, barY), new Vector2(pos.X + w * progress, barY + progressH),
                 ToastU32(Theme.ColGold, 0.65f * a));
 
-        // Update hover state for next frame (used to pause the timer)
         t.Hovered = mouse.X >= pos.X && mouse.X <= pos.X + sz.X
                  && mouse.Y >= pos.Y && mouse.Y <= pos.Y + sz.Y;
         if (t.Hovered && ImGui.GetIO().MouseClicked[2] && !t.AnimOut) t.AnimOut = true;

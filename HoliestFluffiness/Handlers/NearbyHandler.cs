@@ -96,7 +96,7 @@ public sealed class NearbyHandler : IDisposable
 
             players.Add(new NearbyPlayer(
                 pc.Name.TextValue,
-                pc.HomeWorld.ValueNullable?.Name.ExtractText() ?? "",
+                Common.WorldName(pc) ?? "",
                 fcTag,
                 pc.ClassJob.ValueNullable?.Abbreviation.ExtractText() ?? "?",
                 pc.Level,
@@ -114,7 +114,7 @@ public sealed class NearbyHandler : IDisposable
             var isParty     = config.NearbyDebugSelfAs == 3;
             players.Add(new NearbyPlayer(
                 local.Name.TextValue,
-                local.HomeWorld.ValueNullable?.Name.ExtractText() ?? "",
+                Common.WorldName(local) ?? "",
                 local.CompanyTag.TextValue,
                 local.ClassJob.ValueNullable?.Abbreviation.ExtractText() ?? "?",
                 local.Level,
@@ -138,7 +138,7 @@ public sealed class NearbyHandler : IDisposable
             var existing = CurrentTargeters.FirstOrDefault(c => c.GameObjectId == local.GameObjectId);
             newCurrent.Add(existing ?? new Targeter(
                 local.Name.TextValue,
-                local.HomeWorld.ValueNullable?.Name.ExtractText() ?? "",
+                Common.WorldName(local) ?? "",
                 local.GameObjectId,
                 DateTime.Now
             ));
@@ -149,7 +149,7 @@ public sealed class NearbyHandler : IDisposable
             var existing = CurrentTargeters.FirstOrDefault(c => c.GameObjectId == local.GameObjectId);
             newCurrent.Add(existing ?? new Targeter(
                 local.Name.TextValue,
-                local.HomeWorld.ValueNullable?.Name.ExtractText() ?? "",
+                Common.WorldName(local) ?? "",
                 local.GameObjectId,
                 DateTime.Now
             ));
@@ -164,7 +164,7 @@ public sealed class NearbyHandler : IDisposable
             var existing = CurrentTargeters.FirstOrDefault(c => c.GameObjectId == pc.GameObjectId);
             newCurrent.Add(existing ?? new Targeter(
                 pc.Name.TextValue,
-                pc.HomeWorld.ValueNullable?.Name.ExtractText() ?? "",
+                Common.WorldName(pc) ?? "",
                 pc.GameObjectId,
                 DateTime.Now
             ));

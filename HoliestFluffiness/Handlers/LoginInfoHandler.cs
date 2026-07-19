@@ -36,11 +36,11 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
     public event Action? OnInfoReady;
 
-    // Fires once per RunAsync call, after the background FC-points task finishes (or immediately if
-    // there was nothing to refresh). Lets callers that switch characters wait out the FC window cycle.
+    // Once per RunAsync, after the background FC-points task finishes. Lets a caller that switches
+    // characters wait out the FC window cycle.
     public event Action? OnFcPointsReady;
 
-    // Called on login, retries every second for up to 10s waiting for data to load.
+    // Retries every second for up to 10s waiting for data to load
     public async Task RunAsync(CancellationToken token, bool instant = false)
     {
         bool characterWanted    = configuration.ShowCharacterInfo;
@@ -52,7 +52,6 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
         if (!characterWanted && !fcWanted && !plateWanted && !privateHouseWanted && !fcHouseWanted && !dbEnabled && !configuration.AccessoryEnabled) return;
 
-        // Cross-world check, bail with a warning if visiting another world
         if (await IsOnDifferentWorldAsync())
         {
             if (characterWanted || fcWanted || plateWanted || privateHouseWanted || fcHouseWanted)
@@ -87,8 +86,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             return;
         }
 
-        // DB enabled: collect everything regardless of display toggles. FC is always fetched
-        // (a reliable signal that the character has fully loaded in).
+        // With the DB on, collect everything regardless of display toggles. FC is always fetched: it
+        // is a reliable signal that the character has fully loaded in.
         bool needCharacter    = characterWanted    || dbEnabled;
         bool needFc           = true;
         bool needPlate        = plateWanted        || dbEnabled;
@@ -106,15 +105,14 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
         if (needFc) fc = await CollectFcAsync(token, instant); // self-contained retry until definitive
 
-        // Load existing record once: used for cached plate display and as fallback for uncertain values.
+        // Loaded once: cached plate display, plus fallback for anything that loads uncertainly
         CharacterRecord? existing = (dbEnabled && charInfo != null)
             ? await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token)
             : null;
 
         if (needPlate && !instant)
         {
-            // If we have a cached value in the DB, show it immediately and verify live in background.
-            // Otherwise fall through to a normal live retry.
+            // A cached value shows immediately and is verified live in the background
             string? cachedPlate = existing?.SearchInfo;
 
             if (cachedPlate != null)
@@ -148,7 +146,6 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             }
             else
             {
-                // No cached value; FC resolution above already took a few seconds, plate likely ready.
                 for (var attempt = 0; attempt < 10; attempt++)
                 {
                     plate = await CollectPlateAsync(token);
@@ -162,7 +159,6 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             plate = await CollectPlateAsync(token);
         }
 
-        // Display (filtered by per-toggle settings)
         string? displayChar = characterWanted    ? charInfo?.Display : null;
         string? displayPH   = privateHouseWanted ? privateHouse      : null;
         string? displayFcH  = fcHouseWanted      ? fcHouse           : null;
@@ -172,7 +168,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         if (displayChar != null || displayFc != null || displayPl != null || displayPH != null || displayFcH != null)
             await ShowData(displayChar, displayFc, displayPl, displayPH, displayFcH);
 
-        // Persist to DB; fall back to existing record values for anything that didn't load confidently
+        // Anything that did not load confidently falls back to the existing record
         if (dbEnabled && charInfo != null)
         {
             var record = new CharacterRecord
@@ -197,9 +193,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
         OnInfoReady?.Invoke();
 
-        // Safe to force the FC window open/closed only now that login has fully settled. Runs in the
-        // background so it doesn't delay RunAsync. Always forced: there's no passive "never requested"
-        // signal (the agent always exists and a stale/zero reading looks like a real one).
+        // Only safe to force the FC window open/closed now that login has settled. Always forced:
+        // there is no passive "never requested" signal to wait on.
         if (dbEnabled && configuration.FcPointsTrackingEnabled && fc != null && charInfo != null)
         {
             var dbKey = charInfo.DbKey;
@@ -308,7 +303,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token);
                 if (existing == null) continue;
 
-                // Only accept confident values; fall back to existing for anything that didn't load
+                // Only accept confident values
                 var newFcDisplay  = newFc?.Display;
                 var newFcLeader   = newFc?.IsLeader ?? false;
                 var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
@@ -426,7 +421,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             if (objectTable[0] is not IPlayerCharacter pc) return;
 
             var name  = pc.Name.TextValue;
-            var world = pc.HomeWorld.ValueNullable?.Name.ExtractText();
+            var world = Common.WorldName(pc);
             var dc    = pc.HomeWorld.ValueNullable?.DataCenter.ValueNullable?.Name.ExtractText() ?? "";
 
             if (name.Length == 0 || world == null) return;
@@ -437,8 +432,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    // Blocks until FC state is known: tag present (has FC) or tag still empty after retries (no FC).
-    // Pass instant=true to skip the wait (single read, used when data is guaranteed loaded).
+    // Blocks until FC state is known: tag present, or still empty after retries. instant=true does a
+    // single read, for when the data is guaranteed loaded.
     private async Task<FcData?> CollectFcAsync(CancellationToken token, bool instant = false)
     {
         token.ThrowIfCancellationRequested();
@@ -472,8 +467,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 }
             });
 
-            // Master ownership can be transferred at any time, so leadership is recomputed from the
-            // live proxy on every collection (never cached); a demoted ex-master flips back to false.
+            // Master can be transferred at any time, so leadership is never cached
             if (tag.Length > 0)
             {
                 var isLeader = master.Length > 0 && playerName.Length > 0 &&
@@ -482,7 +476,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             }
             if (proxyNull)      return null;                  // proxy gone, no FC
 
-            // proxy present but tag still empty: still loading, wait and retry
+            // Proxy present but tag still empty, so it is still loading
             if (i < attempts - 1) await Task.Delay(500, token);
         }
 
@@ -582,9 +576,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     private const string FcWindowAddonName = "FreeCompany";
     private const string FcWindowOpenCommand = "/freecompanycmd";
 
-    // Not exposed by InfoProxyFreeCompany; read straight off the FreeCompanyCreditShop agent. The agent
-    // always exists, and the raw offset reads 0 until the game actually requests credit-shop data, so
-    // "never requested" is indistinguishable from "genuinely zero". allowForceRefresh triggers that request.
+    // Not exposed by InfoProxyFreeCompany, so read straight off the FreeCompanyCreditShop agent. The
+    // offset reads 0 until the game requests credit-shop data, making "never requested"
+    // indistinguishable from a genuine zero; allowForceRefresh triggers that request.
     private async Task<long> CollectFcPointsAsync(CancellationToken token, bool allowForceRefresh = false)
     {
         if (!configuration.CharactersDbEnabled || !configuration.FcPointsTrackingEnabled) return -1;
@@ -615,10 +609,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    // Pops the FC window open (triggering the server request), closes it, then polls the raw value
-    // until it changes from what it read before. The request is an async round trip that can land
-    // after the window closes, so we wait for a real change rather than a fixed delay. If the player
-    // already had the window open, we leave it alone and just wait for a value change.
+    // Opens the FC window to trigger the server request, closes it, then polls until the value
+    // changes. The round trip can land after the window closes, so waiting on a real change beats a
+    // fixed delay. A window the player already had open is left alone.
     private async Task<long> ForceRefreshFcWindowAsync(CancellationToken token)
     {
         var before = await ReadFcPointsRawAsync(token);
@@ -685,8 +678,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         if (!configuration.CharactersDbEnabled) return null;
         token.ThrowIfCancellationRequested();
 
-        // null = inventory manager unavailable (caller preserves existing value). Non-null always includes
-        // every tracked item (0 if not found), so the UI can tell "never scanned" from "scanned, found zero".
+        // null means the inventory manager was unavailable; a non-null result always lists every
+        // tracked item (0 when absent), so the UI can tell "never scanned" from "found zero".
         Dictionary<uint, int>? counts = null;
         await framework.RunOnFrameworkThread(() =>
         {

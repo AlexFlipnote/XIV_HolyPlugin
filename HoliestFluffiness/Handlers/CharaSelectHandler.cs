@@ -17,17 +17,19 @@ public sealed class CharaSelectHandler : IDisposable
     private readonly IAddonLifecycle addonLifecycle;
     private readonly IDataManager dataManager;
     private readonly IFramework framework;
+    private readonly IPluginLog log;
     private readonly NoKillHandler? noKillHandler;
     private readonly Action<string, string>? onAutoLogin;
     private CancellationTokenSource? autoLoginCts;
 
-    public CharaSelectHandler(Configuration configuration, CharacterDb characterDb, IAddonLifecycle addonLifecycle, IDataManager dataManager, IFramework framework, NoKillHandler? noKillHandler = null, Action<string, string>? onAutoLogin = null)
+    public CharaSelectHandler(Configuration configuration, CharacterDb characterDb, IAddonLifecycle addonLifecycle, IDataManager dataManager, IFramework framework, IPluginLog log, NoKillHandler? noKillHandler = null, Action<string, string>? onAutoLogin = null)
     {
         this.configuration  = configuration;
         this.characterDb    = characterDb;
         this.addonLifecycle = addonLifecycle;
         this.dataManager    = dataManager;
         this.framework      = framework;
+        this.log            = log;
         this.noKillHandler  = noKillHandler;
         this.onAutoLogin    = onAutoLogin;
 
@@ -87,7 +89,7 @@ public sealed class CharaSelectHandler : IDisposable
 
         noKillHandler.ClearAutoLogin();
         var addr  = args.Addon.Address;
-        // retry dialogues (lobby 2002 etc) need a longer backoff before re-invoking Lifestream
+        // Retry dialogues (lobby 2002 etc) need a longer backoff before re-invoking Lifestream
         var delay = isRetry ? 5000 : 3000;
 
         autoLoginCts?.Cancel();
@@ -104,6 +106,12 @@ public sealed class CharaSelectHandler : IDisposable
                 await Task.Delay(delay, cts.Token);
             }
             catch (OperationCanceledException) { return; }
+            catch (Exception ex)
+            {
+                // Unobserved task, so without this the auto-login retry fails silently
+                log.Warning(ex, "[HF] CharaSelect: auto-login dismiss failed.");
+                return;
+            }
             onAutoLogin?.Invoke(name, world);
         });
     }
@@ -116,8 +124,12 @@ public sealed class CharaSelectHandler : IDisposable
         var btn = addon->GetComponentButtonById(4);
         if (btn == null) return;
 
-        var btnRes = btn->AtkComponentBase.OwnerNode->AtkResNode;
+        var owner = btn->AtkComponentBase.OwnerNode;
+        if (owner == null) return;
+
+        var btnRes = owner->AtkResNode;
         var evt    = (AtkEvent*)btnRes.AtkEventManager.Event;
+        if (evt == null) return;
         addon->ReceiveEvent(evt->State.EventType, (int)evt->Param, btnRes.AtkEventManager.Event);
     }
 

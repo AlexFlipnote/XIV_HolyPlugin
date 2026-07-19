@@ -32,7 +32,7 @@ public sealed unsafe class CastBarHandler : IDisposable
     private TeleportInfo _teleportInfo;
     private bool         _hasTeleportInfo;
 
-    public CastBarHandler(Configuration config, ISigScanner sigScanner, IGameInteropProvider gameInterop,
+    public CastBarHandler(Configuration config, IGameInteropProvider gameInterop,
         IAddonLifecycle addonLifecycle, IDataManager dataManager, IClientState clientState, IPluginLog log)
     {
         this.config         = config;
@@ -41,21 +41,13 @@ public sealed unsafe class CastBarHandler : IDisposable
         this.clientState    = clientState;
         this.log            = log;
 
-        try
-        {
-            teleportHook = gameInterop.HookFromAddress<TeleportDelegate>(
-                (nint)Telepo.MemberFunctionPointers.Teleport, TeleportDetour);
-            teleportHook.Enable();
-        }
-        catch (Exception ex) { log.Warning(ex, "[HF] CastBar: Teleport hook failed."); }
+        teleportHook = Common.TryCreateHook<TeleportDelegate>(
+            (nint)Telepo.MemberFunctionPointers.Teleport, TeleportDetour, gameInterop, log,
+            "[HF] CastBar: Teleport hook failed.");
 
-        try
-        {
-            castBarOpenHook = gameInterop.HookFromAddress<OpenCastBarDelegate>(
-                (nint)ActionManager.MemberFunctionPointers.OpenCastBar, OpenCastBarDetour);
-            castBarOpenHook.Enable();
-        }
-        catch (Exception ex) { log.Warning(ex, "[HF] CastBar: OpenCastBar hook failed."); }
+        castBarOpenHook = Common.TryCreateHook<OpenCastBarDelegate>(
+            (nint)ActionManager.MemberFunctionPointers.OpenCastBar, OpenCastBarDetour, gameInterop, log,
+            "[HF] CastBar: OpenCastBar hook failed.");
 
         addonLifecycle.RegisterListener(AddonEvent.PreRefresh, "_CastBar", OnCastBarPreRefresh);
         clientState.TerritoryChanged += OnTerritoryChanged;
@@ -63,15 +55,24 @@ public sealed unsafe class CastBarHandler : IDisposable
 
     private bool TeleportDetour(Telepo* self, uint aetheryteId, byte subIndex)
     {
-        _hasTeleportInfo = false;
-        foreach (var info in self->TeleportList)
+        // Never let our bookkeeping throw out of a detour; the game is on the other side.
+        try
         {
-            if (info.AetheryteId == aetheryteId && info.SubIndex == subIndex)
+            _hasTeleportInfo = false;
+            foreach (var info in self->TeleportList)
             {
-                _teleportInfo    = info;
-                _hasTeleportInfo = true;
-                break;
+                if (info.AetheryteId == aetheryteId && info.SubIndex == subIndex)
+                {
+                    _teleportInfo    = info;
+                    _hasTeleportInfo = true;
+                    break;
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            _hasTeleportInfo = false;
+            log.Debug(ex, "[HF] CastBar: teleport detour failed.");
         }
         return teleportHook!.Original(self, aetheryteId, subIndex);
     }
@@ -93,7 +94,11 @@ public sealed unsafe class CastBarHandler : IDisposable
 
         var name = ResolveAetheryteName(_teleportInfo);
         if (!string.IsNullOrEmpty(name))
-            AtkStage.Instance()->GetStringArrayData(StringArrayType.CastBar)->SetValue(0, name, false, true, false);
+        {
+            var castBarText = AtkStage.Instance()->GetStringArrayData(StringArrayType.CastBar);
+            if (castBarText != null)
+                castBarText->SetValue(0, name, false, true, false);
+        }
 
         ClearState();
     }

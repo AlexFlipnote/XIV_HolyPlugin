@@ -42,17 +42,12 @@ public sealed class NoKillHandler : IDisposable
         AutoLoginWorld = null;
     }
 
-    public NoKillHandler(Configuration config, ISigScanner sigScanner, IGameInteropProvider gameInterop, IPluginLog log)
+    public NoKillHandler(Configuration config, IGameInteropProvider gameInterop, IPluginLog log)
     {
-        this.log    = log;
-        try
-        {
-            var addr = sigScanner.ScanText(Sigs.LobbyError);
-            hook = gameInterop.HookFromAddress<LobbyErrorDelegate>(addr, Detour);
-            if (config.NoKillEnabled)
-                hook.Enable();
-        }
-        catch (Exception ex) { log.Warning(ex, "[HF] NoKill: sig scan failed."); }
+        this.log = log;
+        hook = Common.TryCreateHookFromSignature<LobbyErrorDelegate>(
+            Sigs.LobbyError, Detour, gameInterop, log,
+            "[HF] NoKill: sig scan failed.", enable: config.NoKillEnabled);
     }
 
     public void SetEnabled(bool enabled)
@@ -63,6 +58,10 @@ public sealed class NoKillHandler : IDisposable
 
     private char Detour(long a1, long a2, long a3)
     {
+        // Reading through a3 is raw memory access, and an access violation here is uncatchable, so
+        // the null check is the only real guard. Bail to the original if the shape looks wrong.
+        if (a3 == 0) return hook!.Original(a1, a2, a3);
+
         var p3   = new IntPtr(a3);
         var t1   = Marshal.ReadByte(p3);
         var v4   = ((t1 & 0xF) > 0) ? (uint)Marshal.ReadInt32(p3 + 8) : 0;

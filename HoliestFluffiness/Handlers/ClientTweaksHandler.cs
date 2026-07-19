@@ -21,7 +21,6 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
     private static extern int SendMessage(IntPtr hWnd, int wMsg, IntPtr wParam, IntPtr lParam);
     private const int WM_CLOSE = 0x10;
 
-    // Confirmation dialogs whose default cursor/focus "Always Yes" moves onto the yes button.
     private static readonly string[] AlwaysYesAddons =
     {
         "SelectYesno", "ContentsFinderConfirm", "ShopCardDialog", "RetainerTaskAsk",
@@ -50,8 +49,7 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
 
     private void OnFrameworkUpdate(IFramework fw)
     {
-        // Alt + F4 closes the game safely (ported from SimpleTweaks). WM_CLOSE runs the
-        // normal shutdown path rather than killing the process.
+        // WM_CLOSE runs the normal shutdown path rather than killing the process
         if (config.AltF4ExitEnabled)
         {
             var input = UIInputData.Instance();
@@ -66,9 +64,8 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
         }
     }
 
-    // "Always Yes": ported from SimpleTweaks. Moves the default cursor/focus onto the yes
-    // button (or the checkbox, when one exists and yes is disabled) of confirmation dialogs,
-    // so pressing confirm (num 0) accepts without arrowing over first.
+    // Ported from SimpleTweaks. Moves the default focus onto a confirmation dialog's yes button so
+    // confirm (num 0) accepts without arrowing over first.
     private void OnAlwaysYesSetup(AddonEvent type, AddonArgs args)
     {
         if (!config.AlwaysYesEnabled) return;
@@ -128,7 +125,7 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
 
         uint collisionId;
         AtkComponentNode* targetNode;
-        // Default onto the checkbox when the yes button is disabled and the (unticked) checkbox is present.
+        // A disabled yes button means the unticked checkbox has to be focused instead
         if (!isYesButtonEnabled && isCheckBoxVisible && !isCheckBoxTicked)
         {
             collisionId = 5;
@@ -167,7 +164,10 @@ public sealed unsafe class ClientTweaksHandler : IDisposable
         var button = unitBase->UldManager.SearchNodeById(buttonId);
         if (button == null) return;
 
-        var collision = ((AtkComponentNode*)button)->Component->UldManager.SearchNodeById(collisionId);
+        var component = ((AtkComponentNode*)button)->Component;
+        if (component == null) return;
+
+        var collision = component->UldManager.SearchNodeById(collisionId);
         if (collision == null) return;
 
         unitBase->SetFocusNode(collision);

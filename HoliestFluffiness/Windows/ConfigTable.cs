@@ -16,9 +16,8 @@ public readonly record struct TableColumn<T>(
     Func<T, IComparable>? SortKey,
     Action<T> DrawCell);
 
-// Standalone so any window can draw a table with the same behaviour: native Hideable/Reorderable
-// columns get show/hide, drag-reorder, and reset from ImGui's right-click header menu, persisted via
-// its table-settings ini keyed on tableId. Used by Characters/Bids and CharacterPickerWindow.
+// Hideable/Reorderable columns get show/hide, drag-reorder and reset from ImGui's right-click header
+// menu, persisted via its table-settings ini keyed on tableId.
 internal static class ConfigTable
 {
     private const ImGuiTableFlags DefaultFlags = ImGuiTableFlags.Sortable
@@ -46,8 +45,7 @@ internal static class ConfigTable
         ImGui.TableSetupScrollFreeze(0, 1);
         foreach (var col in columns)
         {
-            // Header-less columns have no entry in the right-click menu, so keep them non-hideable
-            // (the user would have no way to bring them back).
+            // Header-less columns have no menu entry, so hiding one would be irreversible
             var flags = col.Label.StartsWith("##", StringComparison.Ordinal) ? col.Flags | ImGuiTableColumnFlags.NoHide : col.Flags;
             ImGui.TableSetupColumn(col.Label, flags, col.WidthOrWeight, col.UserId);
         }
@@ -55,8 +53,8 @@ internal static class ConfigTable
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
-        // The leftmost visible column needs an extra nudge (no left divider to give it margin).
-        // Reordering can change which column that is, so find it fresh each frame by screen X.
+        // The leftmost visible column has no left divider for margin, so it needs a nudge.
+        // Reordering can change which one that is, so find it fresh each frame by screen X.
         int leftmostIdx = 0;
         float leftmostX = float.MaxValue;
         for (int i = 0; i < columns.Count; i++)
@@ -114,7 +112,7 @@ internal static class ConfigTable
 
 public partial class ConfigWindow
 {
-    // Filter InputText + Refresh button row shared by every table section.
+    // Filter + Refresh row, shared by every table section
     private void DrawTableToolbar(ref string filter, string filterId, Action onRefresh, string refreshId)
     {
         SectionRow();

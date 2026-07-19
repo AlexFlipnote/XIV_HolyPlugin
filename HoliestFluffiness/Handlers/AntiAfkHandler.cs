@@ -91,7 +91,6 @@ public sealed class AntiAfkHandler : IDisposable
                     Thread.Sleep(50);
                     SendMessage(windowHandle, WM_KEYUP, (IntPtr)LControl, IntPtr.Zero);
 
-                    // Reset wait to standard interval after action
                     token.WaitHandle.WaitOne(5000);
                 }
                 else

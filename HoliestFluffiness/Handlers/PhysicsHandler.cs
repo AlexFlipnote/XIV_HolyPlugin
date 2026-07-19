@@ -26,10 +26,9 @@ public sealed unsafe class PhysicsHandler : IDisposable
         this.framework = framework;
         try
         {
-            // ClientStructs resolves this one for us (BoneSimulator::Update), so it needs no sig of
-            // our own; its address tracks their updates instead of rotting in Sigs.cs every patch.
-            // Unlike ScanText, an address ClientStructs fails to resolve is a silent null rather
-            // than a throw, so the catch below would never see it. Check before handing it over.
+            // ClientStructs resolves BoneSimulator::Update for us, so this needs no sig of our own.
+            // Unlike ScanText it returns a silent null on failure, which the catch below would never
+            // see, so check before handing it over.
             var addr = (nint)BoneSimulator.MemberFunctionPointers.Update;
             if (addr == 0)
             {
@@ -73,7 +72,9 @@ public sealed unsafe class PhysicsHandler : IDisposable
 
     public void Recalculate()
     {
-        expectedFrameTime = (long)(TimeSpan.TicksPerSecond / config.PhysicsTargetFps);
+        // The slider clamps this, but a hand-edited config.json must not divide by zero here
+        var targetFps = Math.Clamp(config.PhysicsTargetFps, 1f, 240f);
+        expectedFrameTime = (long)(TimeSpan.TicksPerSecond / targetFps);
         sliceStart = DateTime.UtcNow.Ticks;
         sliceEnd   = sliceStart + expectedFrameTime;
         sliceRan   = false;

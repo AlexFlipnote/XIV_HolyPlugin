@@ -10,8 +10,8 @@ public sealed class PingChartWindow : Window, IDisposable
 {
     private readonly ServerInfoHandler handler;
 
-    // ServerInfoHandler replaces PingChartData's reference whenever new data lands, so
-    // reference equality tells us whether these stats need recomputing this frame.
+    // ServerInfoHandler swaps the PingChartData reference on new data, so reference equality
+    // tells us whether these stats need recomputing.
     private float[]? cachedData;
     private int      cachedTimeouts;
     private int      cachedAvg, cachedMin, cachedMax;
@@ -26,29 +26,9 @@ public sealed class PingChartWindow : Window, IDisposable
 
     public void Dispose() { }
 
-    public override void PreDraw()
-    {
-        if (Theme.UseCustom)
-        {
-            ImGui.PushStyleColor(ImGuiCol.WindowBg,          Theme.Fade(Theme.ColSecondary));
-            ImGui.PushStyleColor(ImGuiCol.Text,              Theme.ColWhite);
-            ImGui.PushStyleColor(ImGuiCol.TitleBg,           Theme.ColHighlight);
-            ImGui.PushStyleColor(ImGuiCol.TitleBgActive,     Theme.ColHighlight);
-            ImGui.PushStyleColor(ImGuiCol.FrameBg,           Theme.ColPrimary);
-            ImGui.PushStyleColor(ImGuiCol.ResizeGrip,        Vector4.Zero);
-            ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, Theme.ColGoldMid);
-            ImGui.PushStyleColor(ImGuiCol.ResizeGripActive,  Theme.ColGold);
-        }
-        else
-        {
-            ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
-        }
-    }
+    public override void PreDraw() => Common.PushChartWindowTheme();
 
-    public override void PostDraw()
-    {
-        ImGui.PopStyleColor(Theme.UseCustom ? 8 : 1);
-    }
+    public override void PostDraw() => Common.PopChartWindowTheme();
 
     public override void Draw()
     {
@@ -62,22 +42,11 @@ public sealed class PingChartWindow : Window, IDisposable
         if (!ReferenceEquals(cachedData, data))
         {
             cachedData = data;
-            var successCount = 0;
-            var sum = 0f;
-            var sampleMin = float.MaxValue;
-            var sampleMax = float.MinValue;
-            foreach (var v in data)
-            {
-                if (v <= 0) continue;
-                successCount++;
-                sum += v;
-                if (v < sampleMin) sampleMin = v;
-                if (v > sampleMax) sampleMax = v;
-            }
-            cachedTimeouts = data.Length - successCount;
-            cachedAvg      = successCount > 0 ? (int)(sum / successCount) : 0;
-            cachedMin      = successCount > 0 ? (int)sampleMin : 0;
-            cachedMax      = successCount > 0 ? (int)sampleMax : 0;
+            var (samples, sAvg, sMin, sMax) = Common.ComputeSampleStats(data);
+            cachedTimeouts = data.Length - samples;
+            cachedAvg      = sAvg;
+            cachedMin      = sMin;
+            cachedMax      = sMax;
         }
         var avg      = cachedAvg;
         var min      = cachedMin;

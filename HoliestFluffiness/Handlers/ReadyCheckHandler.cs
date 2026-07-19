@@ -20,7 +20,7 @@ public class ReadyCheckHandler : IDisposable
     private readonly IPluginLog log;
 
     private unsafe delegate void EndReadyCheckDelegate(AgentReadyCheck* self);
-    private readonly Hook<EndReadyCheckDelegate> endHook;
+    private readonly Hook<EndReadyCheckDelegate>? endHook;
 
     private const int SafetyClearMs = 45_000;
 
@@ -41,15 +41,19 @@ public class ReadyCheckHandler : IDisposable
         this.config = config; this.clientState = clientState; this.chatGui = chatGui;
         this.framework = framework; this.objectTable = objectTable; this.log = log;
 
-        unsafe { endHook = gameInterop.HookFromAddress<EndReadyCheckDelegate>(AgentReadyCheck.MemberFunctionPointers.EndReadyCheck, OnEnd); }
-        endHook.Enable();
+        unsafe
+        {
+            endHook = Common.TryCreateHook<EndReadyCheckDelegate>(
+                (nint)AgentReadyCheck.MemberFunctionPointers.EndReadyCheck, OnEnd, gameInterop, log,
+                "[HF] ReadyCheck: EndReadyCheck hook failed, overlay will not clear on its own.");
+        }
         framework.Update += OnUpdate;
     }
 
     public void Dispose()
     {
         framework.Update -= OnUpdate;
-        endHook.Dispose();
+        endHook?.Dispose();
         clearCts?.Cancel();
         clearCts?.Dispose();
     }
@@ -100,7 +104,7 @@ public class ReadyCheckHandler : IDisposable
 
     private unsafe void OnEnd(AgentReadyCheck* ptr)
     {
-        endHook.Original(ptr);
+        endHook?.Original(ptr);
         if (!clientState.IsLoggedIn) return;
         active = false;
         ProcessData();

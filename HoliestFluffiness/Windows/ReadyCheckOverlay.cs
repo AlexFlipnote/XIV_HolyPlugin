@@ -24,8 +24,8 @@ public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
     {
         this.config = config; this.handler = handler; this.gameGui = gameGui;
         readyCheckTex = textureProvider.CreateFromTexFile(dataManager.GetFile<TexFile>("ui/uld/ReadyCheck_hr1.tex")!);
-        // Shared textures are cache-owned; GetWrapOrEmpty() is cheap to call every draw and
-        // avoids blocking construction on RentAsync().Result (sync-over-async deadlock risk).
+        // Shared textures are cache-owned, and GetWrapOrEmpty is cheap enough to call every draw;
+        // RentAsync().Result would risk a sync-over-async deadlock in the constructor.
         notPresentTex = textureProvider.GetFromGameIcon(61504);
     }
 
@@ -74,8 +74,12 @@ public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
     {
         if (idx is < 0 or > 7 || (nint)pList == nint.Zero || !Common.IsAddonVisible(&pList->AtkUnitBase)) return;
         var m    = pList->PartyMembers[idx];
+        // All 8 slots exist even in a smaller party, and sub-nodes are built lazily, so an empty
+        // or mid-transition slot hands back nulls.
+        if (m.PartyMemberComponent == null || m.ClassJobIcon == null) return;
         var node = m.PartyMemberComponent->OwnerNode;
         var icon = m.ClassJobIcon;
+        if (node == null || pList->PartyListAtkResNode == null) return;
         var size = new Vector2(icon->Width / 1.5f, icon->Height / 1.5f) * pList->Scale;
         var pos  = new Vector2(
             pList->X + node->AtkResNode.X * pList->Scale + icon->X * pList->Scale + icon->Width  * pList->Scale / 2,
@@ -87,9 +91,13 @@ public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
     private unsafe void DrawAlliance(int idx, ReadyCheckStatus state, AddonAllianceListX* pList, ImDrawListPtr drawList)
     {
         if (idx is < 0 or > 7 || (nint)pList == nint.Zero || !Common.IsAddonVisible(&pList->AtkUnitBase)) return;
-        var m    = pList->AllianceMembers[idx];
-        var node = m.ComponentBase->OwnerNode;
-        var icon = m.ComponentBase->GetImageNodeById(9)->GetAsAtkImageNode();
+        var m = pList->AllianceMembers[idx];
+        if (m.ComponentBase == null) return;
+        var node     = m.ComponentBase->OwnerNode;
+        var iconNode = m.ComponentBase->GetImageNodeById(9);
+        if (node == null || iconNode == null) return;
+        var icon = iconNode->GetAsAtkImageNode();
+        if (icon == null) return;
         var size = new Vector2(icon->Width / 3.0f, icon->Height / 3.0f) * pList->Scale;
         var pos  = new Vector2(
             pList->X + node->AtkResNode.X * pList->Scale + icon->X * pList->Scale + icon->Width  * pList->Scale / 2,
@@ -101,10 +109,15 @@ public class ReadyCheckOverlay : HfOverlayWindow, IDisposable
     {
         if (groupIdx is < 1 or > 5 || memberIdx is < 0 or > 7 || (nint)pList == nint.Zero || !Common.IsAddonVisible(&pList->AtkUnitBase)) return;
         var alliance = pList->Alliances[groupIdx - 1];
-        var aNode    = alliance.ComponentBase->OwnerNode;
-        var member   = alliance.Members[memberIdx];
+        if (alliance.ComponentBase == null) return;
+        var aNode  = alliance.ComponentBase->OwnerNode;
+        var member = alliance.Members[memberIdx];
+        if (aNode == null || member.AtkComponentBase == null) return;
         var mNode    = member.AtkComponentBase->OwnerNode;
-        var icon     = member.AtkComponentBase->GetImageNodeById(2)->GetAsAtkImageNode();
+        var iconNode = member.AtkComponentBase->GetImageNodeById(2);
+        if (mNode == null || iconNode == null) return;
+        var icon = iconNode->GetAsAtkImageNode();
+        if (icon == null) return;
         var size = new Vector2(icon->Width / 2.0f, icon->Height / 2.0f) * pList->Scale;
         var pos  = new Vector2(
             pList->X + aNode->AtkResNode.X * pList->Scale + mNode->AtkResNode.X * pList->Scale + icon->X * pList->Scale + icon->Width  * pList->Scale / 2,

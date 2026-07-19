@@ -97,7 +97,7 @@ public partial class ConfigWindow : Window
         if (section == ConfigSection.Bids) LoadBids();
     }
 
-    // key null means "just open the section", used by whole-section search results.
+    // A null key just opens the section, which is what whole-section search results do
     private void JumpTo(ConfigSection section, string? key)
     {
         NavigateTo(section);
@@ -108,8 +108,8 @@ public partial class ConfigWindow : Window
         ExitSearchMode();
     }
 
-    // Sticky: search mode is only cleared here, never by focus loss (a result-row click drops the
-    // input's focus on the same frame). Bumping searchBoxGeneration makes ImGui drop keyboard focus too.
+    // Search mode is only cleared here, never by focus loss: a result-row click drops the input's
+    // focus on the same frame. Bumping searchBoxGeneration makes ImGui drop keyboard focus too.
     private void ExitSearchMode()
     {
         searchQuery = "";
@@ -152,8 +152,8 @@ public partial class ConfigWindow : Window
         fileDialogManager.Draw();
     }
 
-    // Draws every section once into a hidden, input-blocked child so every Config*/Anchor call
-    // registers into SearchIndex before the user opens a tab. Runs once per session on first draw.
+    // Draws every section once into a hidden child so every Anchor call registers into SearchIndex
+    // before the user opens a tab. Runs once per session.
     private static bool searchIndexWarmed;
 
     private void WarmSearchIndex()
@@ -162,8 +162,7 @@ public partial class ConfigWindow : Window
 
         ImGui.SetCursorPos(Vector2.Zero);
         ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 0f);
-        // Must use a real size: a zero-area child gets SkipItems'd, so nothing inside registers.
-        // Alpha 0 + NoInputs already make it invisible and unclickable.
+        // Needs a real size: a zero-area child gets SkipItems'd and nothing inside registers
         ImGui.BeginChild("##searchwarmup", ImGui.GetContentRegionAvail(), false,
             ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoNav);
 
@@ -199,7 +198,7 @@ public partial class ConfigWindow : Window
         foodCheckHandler?.Invalidate();
     }
 
-    // Refresh table data when reopening on a persisted data-table section (NavigateTo isn't called).
+    // Reopening on a persisted data-table section never calls NavigateTo, so refresh here
     public override void OnOpen()
     {
         if (selectedSection == ConfigSection.Characters) LoadCharacters();
@@ -240,7 +239,7 @@ public partial class ConfigWindow : Window
                 LoadBids();
         } else
         {
-            // DB disabled: no separator, just the toggle
+            // With the DB off there is no separator, just the toggle
             SidebarItem("Database", ConfigSection.Database);
         }
 
@@ -273,7 +272,7 @@ public partial class ConfigWindow : Window
         ImGui.InputTextWithHint($"##settingssearch{searchBoxGeneration}", "Search settings...", ref searchQuery, 64);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Searches section names, group headers, and individual settings.");
-        // Only ever latches search mode ON here; it's turned off exclusively by ExitSearchMode().
+        // Only latches search mode on; ExitSearchMode is the only thing that turns it off
         if (ImGui.IsItemActive() || ImGui.IsItemFocused())
             searchModeActive = true;
         PopInput();
@@ -285,8 +284,7 @@ public partial class ConfigWindow : Window
 
         if (!Theme.UseCustom)
         {
-            // Default theme: mark the selected row with the user's own Header accent (never gold),
-            // leave the rest as plain transparent buttons with default text.
+            // Default theme marks the selected row with the user's own Header accent, never gold
             var styleCols = ImGui.GetStyle().Colors;
             ImGui.PushStyleColor(ImGuiCol.Button,        active ? styleCols[(int)ImGuiCol.Header] : Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, styleCols[(int)ImGuiCol.HeaderHovered]);
@@ -378,15 +376,13 @@ public partial class ConfigWindow : Window
             cachedSearchVersion   = SearchIndex.Version;
             cachedSearchDbEnabled = dbOn;
 
-            // Hidden sidebar entries stay out of the results, otherwise clicking one would
-            // bounce to Database (see NavigateTo).
+            // Hidden sidebar entries stay out of the results, or clicking one bounces to Database
             var visible = SearchIndex.Entries.Where(e =>
                 dbOn || (e.Section != ConfigSection.Characters && e.Section != ConfigSection.Bids));
 
             var filtered = showAll ? visible : visible.Where(e => Matches(e, query));
 
-            // Kind first so a query like "database" leads with the section itself, then its
-            // groups, then the individual settings inside it.
+            // Kind first, so "database" leads with the section, then its groups, then its settings
             cachedSearchMatches = filtered
                 .OrderBy(e => e.Kind)
                 .ThenBy(e => e.Section)
@@ -415,9 +411,9 @@ public partial class ConfigWindow : Window
             DrawSearchResultRow(entry);
     }
 
-    // Every whitespace-separated term must appear somewhere in the entry, so word order does not
-    // matter ("taskbar flash" finds "Flash taskbar on..."). The section name is part of the
-    // haystack, which makes a bare section name list that section and everything under it.
+    // Every term must appear somewhere in the entry, so word order does not matter ("taskbar flash"
+    // finds "Flash taskbar on..."). The section name is part of the haystack, so a bare section name
+    // lists everything under it.
     private static bool Matches(SettingEntry entry, string query)
     {
         var haystack = $"{entry.Title}\n{entry.Desc}\n{entry.Keywords}\n{SearchIndex.DisplayName(entry.Section)}";
@@ -465,8 +461,7 @@ public partial class ConfigWindow : Window
             Common.DimmedTextWrapped(entry.Desc);
         }
 
-        // Pin the cursor back to the row's bottom; the SetCursorScreenPos calls above otherwise
-        // leave it mid-row, causing subsequent rows to creep up and overlap.
+        // The SetCursorScreenPos calls above leave the cursor mid-row, so later rows would overlap
         ImGui.SetCursorScreenPos(new Vector2(min.X, max.Y));
 
         ImGui.Dummy(new Vector2(0, 2));
@@ -536,8 +531,8 @@ public partial class ConfigWindow : Window
     }
 
     // ── Search anchoring ──────────────────────────────────────────────────────
-    // Every searchable control calls Anchor(key, title, desc) after drawing itself: it self-registers
-    // into SearchIndex and, after a result click, scrolls to the key and flashes a highlight rect.
+    // Every searchable control calls Anchor(key, title, desc) after drawing itself: it registers into
+    // SearchIndex and, after a result click, scrolls to the key and flashes a highlight rect.
 
     private static string? ExtractKey(string label)
     {
@@ -545,7 +540,7 @@ public partial class ConfigWindow : Window
         return idx >= 0 ? label[(idx + 2)..] : null;
     }
 
-    // Null when the label has no visible text before "##" (not a standalone search result).
+    // Null when the label has no visible text before "##", so it is not a standalone result
     private static string? ExtractTitle(string label)
     {
         var idx = label.IndexOf("##", StringComparison.Ordinal);
@@ -566,8 +561,7 @@ public partial class ConfigWindow : Window
 
         if (pendingJumpKey == key)
         {
-            // Retried over a few frames: SetScrollHereY no-ops until ImGui has a settled scroll
-            // range, which a section's child lacks on its very first frame.
+            // SetScrollHereY no-ops until the scroll range settles, which takes a frame or two
             ImGui.SetScrollHereY(0.3f);
             if (--pendingJumpFramesLeft <= 0)
                 pendingJumpKey = null;
@@ -637,8 +631,7 @@ public partial class ConfigWindow : Window
             Common.DimmedTextWrapped(desc);
         }
         ImGui.EndGroup();
-        // Group headers are searchable too, keyed off their own text so no call site has to
-        // invent an anchor id for them.
+        // Keyed off their own text, so no call site has to invent an anchor id
         Anchor(SearchIndex.SubsectionKeyPrefix + label, label, desc, SearchEntryKind.Subsection);
         ImGui.Dummy(new Vector2(0, 1));
     }
@@ -650,10 +643,8 @@ public partial class ConfigWindow : Window
         if (Theme.UseCustom)
         {
             ImGui.PushStyleColor(ImGuiCol.Text,                Theme.ColWhite);
-            // The sidebar and main children fully cover the window and each paint their own
-            // faded ChildBg, so a faded WindowBg here would stack a second translucent layer
-            // (making the config window read as more opaque than the opacity knob asks for).
-            // Keep the window bg fully transparent and let the children carry the single layer.
+            // The children cover the window and paint their own faded ChildBg, so a faded WindowBg
+            // here would stack a second translucent layer and read as more opaque than asked for.
             ImGui.PushStyleColor(ImGuiCol.WindowBg,            Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.FrameBg,             Theme.ColPrimary);
             ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,      Theme.ColHighlight);
@@ -668,8 +659,7 @@ public partial class ConfigWindow : Window
         }
         else
         {
-            // Default theme: still honour the opacity knob by fading only the window
-            // background (the content children are transparent, so this is the bg).
+            // Default theme: the content children are transparent, so this is the only layer to fade
             ImGui.PushStyleColor(ImGuiCol.WindowBg, Theme.Fade(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg]));
         }
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
@@ -751,7 +741,7 @@ public partial class ConfigWindow : Window
         }
         else
         {
-            // Split display text from ImGui ID so they can be positioned independently
+            // Display text is split from the ImGui id so the two can be positioned independently
             var sep  = label.IndexOf("##", StringComparison.Ordinal);
             var text = sep >= 0 ? label[..sep] : label;
             var id   = sep >= 0 ? label[sep..] : "##" + label;
@@ -779,8 +769,8 @@ public partial class ConfigWindow : Window
         Anchor(ExtractKey(label), ExtractTitle(label), desc);
     }
 
-    // ── New Config* helpers (combo/color/text/int) ───────────────────────────
-    // Same convention as above: label is "Display text##anchorkey", auto-registered via Anchor().
+    // ── Config* helpers (combo/color/text/int) ───────────────────────────────
+    // Same convention as above: label is "Display text##anchorkey", auto-registered via Anchor()
 
     private void ConfigCombo(string label, int currentIndex, string[] items, Action<int> setter,
         float width = 180, string? hint = null, bool padding = true, string? desc = null, string? title = null)
