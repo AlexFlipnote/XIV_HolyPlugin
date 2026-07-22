@@ -36,6 +36,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
     private readonly record struct CharacterSnapshot(
         FcData?   Fc,
+        bool      FcConfirmed,
         string?   PrivateHouse,
         string?   FcHouse,
         long      Gil,
@@ -43,6 +44,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         long      FcPoints,
         SeString? Plate,
         string?   Inventory);
+
+    // Confirmed is false when the player object never resolved this read - inconclusive, not "no FC".
+    private readonly record struct FcRead(FcData? Fc, bool Confirmed);
 
     public event Action? OnInfoReady;
 
@@ -110,10 +114,16 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         long      gil          = dbEnabled         ? await CollectGilAsync(token)          : 0;
         long      mgp          = dbEnabled         ? await CollectMgpAsync(token)          : -1;
         string?   inventory    = dbEnabled         ? await CollectInventoryAsync(token)    : null;
-        FcData?   fc    = null;
-        SeString? plate = null;
+        FcData?   fc          = null;
+        bool      fcConfirmed = false;
+        SeString? plate       = null;
 
-        if (needFc) fc = await CollectFcAsync(token, instant); // self-contained retry until definitive
+        if (needFc)
+        {
+            var fcRead  = await CollectFcAsync(token, instant); // self-contained retry until definitive
+            fc          = fcRead.Fc;
+            fcConfirmed = fcRead.Confirmed;
+        }
 
         // Loaded once: cached plate display, plus fallback for anything that loads uncertainly
         CharacterRecord? existing = (dbEnabled && charInfo != null)
@@ -190,7 +200,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             };
             // Fc points are not collected here; the -1 sentinel keeps the existing value (refreshed
             // by the background task below). Gil falls back to 0, not -1, when there is no record yet.
-            var snapshot = new CharacterSnapshot(fc, privateHouse, fcHouse, gil, mgp, -1, plate, inventory);
+            var snapshot = new CharacterSnapshot(fc, fcConfirmed, privateHouse, fcHouse, gil, mgp, -1, plate, inventory);
             var fallback = existing ?? new CharacterRecord { Gil = 0, Mgp = -1, FcPoints = -1 };
             Merge(record, fallback, snapshot);
             record.LastSeen = DateTime.UtcNow;
@@ -302,7 +312,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     // its own way (display toggles, cached-plate verification) and only reuses Merge.
     private async Task<CharacterSnapshot> CollectSnapshotAsync(CancellationToken token)
     {
-        var fc           = await CollectFcAsync(token, instant: true);
+        var fcRead       = await CollectFcAsync(token, instant: true);
         var privateHouse = await CollectPrivateHouseAsync(token);
         var fcHouse      = await CollectFcHouseAsync(token);
         var gil          = await CollectGilAsync(token);
@@ -310,23 +320,36 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var fcPoints     = await CollectFcPointsAsync(token);
         var plate        = await CollectPlateAsync(token);
         var inventory    = await CollectInventoryAsync(token);
-        return new CharacterSnapshot(fc, privateHouse, fcHouse, gil, mgp, fcPoints, plate, inventory);
+        return new CharacterSnapshot(fcRead.Fc, fcRead.Confirmed, privateHouse, fcHouse, gil, mgp, fcPoints, plate, inventory);
     }
 
     // Applies the "only accept confident values" rules field by field, writing into target and using
     // fallback for anything the snapshot did not load confidently. target and fallback are the same
     // record for in-place updates; RunAsync passes a fresh target with a separate fallback source.
     // Returns whether any merged field differs from target's prior value (used to skip no-op writes).
+    // True if cachedDisplay is a "«Tag» Name" for the same tag, meaning a tag-only read is the name
+    // proxy lagging rather than an actual FC change.
+    private static bool SameFcTag(string? cachedDisplay, string tag) =>
+        !string.IsNullOrEmpty(cachedDisplay) && cachedDisplay.StartsWith($"«{tag}»", StringComparison.Ordinal);
+
     private static bool Merge(CharacterRecord target, CharacterRecord fallback, CharacterSnapshot snap)
     {
-        var freeCompany  = snap.Fc?.Display;
-        var fcLeader     = snap.Fc?.IsLeader ?? false;
+        // Unconfirmed reads and tag-only reads of an already-known FC fall back to the cached value
+        // instead of wiping or truncating it; see CollectFcAsync/FcRead.
+        bool tagOnly = snap.FcConfirmed && snap.Fc is { Name.Length: 0 };
+
+        var freeCompany = !snap.FcConfirmed ? fallback.FreeCompany
+            : tagOnly && SameFcTag(fallback.FreeCompany, snap.Fc!.Tag) ? fallback.FreeCompany
+            : snap.Fc?.Display;
+        var fcLeader = !snap.FcConfirmed ? fallback.FcLeader
+            : tagOnly && SameFcTag(fallback.FreeCompany, snap.Fc!.Tag) ? fallback.FcLeader
+            : snap.Fc?.IsLeader ?? false;
         var gil          = snap.Gil >= 0 ? snap.Gil : fallback.Gil;
         var mgp          = snap.Mgp >= 0 ? snap.Mgp : fallback.Mgp;
-        var fcPoints     = snap.Fc == null ? -1 : (snap.FcPoints >= 0 ? snap.FcPoints : fallback.FcPoints);
+        var fcPoints     = !snap.FcConfirmed ? fallback.FcPoints : (snap.Fc == null ? -1 : (snap.FcPoints >= 0 ? snap.FcPoints : fallback.FcPoints));
         var searchInfo   = snap.Plate?.TextValue ?? fallback.SearchInfo;
         var privateHouse = snap.PrivateHouse      ?? fallback.PrivateHouse;
-        var fcHouse      = snap.Fc == null ? null : (snap.FcHouse ?? fallback.FcHouse);
+        var fcHouse      = !snap.FcConfirmed ? fallback.FcHouse : (snap.Fc == null ? null : (snap.FcHouse ?? fallback.FcHouse));
         var inventory    = snap.Inventory         ?? fallback.Inventory;
 
         var changed =
@@ -451,12 +474,13 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     // treating an FC read as definitive. Tag empty is only a confirmed "not in FC" once the player
     // object itself has resolved; before that (or while the proxy has not initialized) there is no
     // signal yet, so it keeps retrying rather than concluding "no FC" from an absence of data.
-    private async Task<FcData?> CollectFcAsync(CancellationToken token, bool instant = false)
+    private async Task<FcRead> CollectFcAsync(CancellationToken token, bool instant = false)
     {
         token.ThrowIfCancellationRequested();
 
         var attempts = instant ? 1 : 10;
         string tag = string.Empty, name = string.Empty;
+        var everHadPc = false;
 
         for (var i = 0; i < attempts; i++)
         {
@@ -484,15 +508,17 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 }
             });
 
+            if (havePc) everHadPc = true;
+
             // Player object resolved and tag empty: authoritative "not in an FC", nothing left to wait for
-            if (havePc && tag.Length == 0) return null;
+            if (havePc && tag.Length == 0) return new FcRead(null, Confirmed: true);
 
             // Master can be transferred at any time, so leadership is never cached
             if (tag.Length > 0 && name.Length > 0)
             {
                 var isLeader = master.Length > 0 && playerName.Length > 0 &&
                                string.Equals(master, playerName, StringComparison.Ordinal);
-                return new FcData(tag, name, isLeader); // tag and name both confirmed
+                return new FcRead(new FcData(tag, name, isLeader), Confirmed: true);
             }
 
             // Either the player object has not resolved yet, or the tag is confirmed but the name
@@ -500,8 +526,9 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             if (i < attempts - 1) await Task.Delay(500, token);
         }
 
-        // Retries exhausted with a tag but no name: report what we have rather than losing the tag
-        return tag.Length > 0 ? new FcData(tag, name, false) : null;
+        // Tag but no name: report it anyway. No tag and pc never resolved: inconclusive, not "no FC".
+        if (tag.Length > 0) return new FcRead(new FcData(tag, name, false), Confirmed: true);
+        return new FcRead(null, Confirmed: everHadPc);
     }
 
     private async Task<SeString?> CollectPlateAsync(CancellationToken token, bool retry = false)
