@@ -146,7 +146,7 @@ public partial class ConfigWindow
         var doorbellDir = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, "Sounds", "Doorbell");
 
         DrawDoorbellBlock(
-            "doorbellenter", "Someone entered", Path.Combine(doorbellDir, "doorbell.wav"), () => onTestDoorbell?.Invoke(0),
+            "doorbellenter", "Someone entered", Path.Combine(doorbellDir, "doorbell.mp3"), () => onTestDoorbell?.Invoke(0),
             configuration.DoorbellEnterChat,    v => configuration.DoorbellEnterChat = v,
             configuration.DoorbellEnterText,    v => configuration.DoorbellEnterText = v, Configuration.DefaultDoorbellEnterText,
             configuration.DoorbellEnterSound,   v => configuration.DoorbellEnterSound = v,
@@ -155,7 +155,7 @@ public partial class ConfigWindow
             firstSet: true);
 
         DrawDoorbellBlock(
-            "doorbellalready", "Already inside when you arrive", Path.Combine(doorbellDir, "doorbell.wav"), () => onTestDoorbell?.Invoke(1),
+            "doorbellalready", "Already inside when you arrive", Path.Combine(doorbellDir, "doorbell.mp3"), () => onTestDoorbell?.Invoke(1),
             configuration.DoorbellAlreadyHereChat,    v => configuration.DoorbellAlreadyHereChat = v,
             configuration.DoorbellAlreadyHereText,    v => configuration.DoorbellAlreadyHereText = v, Configuration.DefaultDoorbellAlreadyHereText,
             configuration.DoorbellAlreadyHereSound,   v => configuration.DoorbellAlreadyHereSound = v,

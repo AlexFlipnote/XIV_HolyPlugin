@@ -178,7 +178,7 @@ public sealed class HousingLotteryHandler : IDisposable
         if (isOver)
         {
             var match = characterDb.GetBidsByCharacter(charKey)
-                .Find(b => b.District == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
+                .Find(b => HousingDistricts.Normalize(b.District) == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
             if (match != null)
             {
                 characterDb.DeleteBid(match.Id);
@@ -189,7 +189,7 @@ public sealed class HousingLotteryHandler : IDisposable
         }
 
         bool exists = characterDb.GetBidsByCharacter(charKey)
-            .Exists(b => b.District == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
+            .Exists(b => HousingDistricts.Normalize(b.District) == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
         if (exists) return;
 
         var bType = bidTypeStr.Contains("Free Company", StringComparison.OrdinalIgnoreCase)
@@ -229,7 +229,7 @@ public sealed class HousingLotteryHandler : IDisposable
             int bidNum   = int.Parse(sub.Groups[4].Value);
 
             bool exists = characterDb.GetBidsByCharacter(charKey)
-                .Exists(b => b.District == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
+                .Exists(b => HousingDistricts.Normalize(b.District) == district && b.Ward == ward && b.Plot == plot && b.BidNumber == bidNum);
             if (!exists)
             {
                 characterDb.AddBid(new HousingBidRecord

@@ -490,13 +490,28 @@ public partial class ConfigWindow : Window
         var p2 = corner with { X = corner.X - gripSize };
         var p3 = corner with { Y = corner.Y - gripSize };
 
-        ImGui.GetForegroundDrawList().AddTriangleFilled(p1, p2, p3, col);
+        // Drawing straight onto this window's own draw list would render *underneath* the
+        // sidebar/main child panes (children always paint after, i.e. on top of, their parent's
+        // draw list, regardless of call order here). A tiny overlay child added after they close
+        // is the last thing this frame, so it paints on top of both while staying scoped to this
+        // window, unlike the foreground draw list this used to leak onto every other window.
+        ImGui.SetCursorScreenPos(corner - new Vector2(gripSize, gripSize));
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
+        ImGui.BeginChild("##resizegrip", new Vector2(gripSize, gripSize), false,
+            ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoNav);
+        ImGui.GetWindowDrawList().AddTriangleFilled(p1, p2, p3, col);
+        ImGui.EndChild();
+        ImGui.PopStyleColor();
     }
 
     // ── Section helpers ───────────────────────────────────────────────────────
 
     private void BeginSection(string title, string? desc = null, Action? afterTitle = null)
     {
+        // This child exists only to give each section its own scroll position; ##main already
+        // paints the single faded ChildBg layer, so this one must stay transparent or the two
+        // stack into a visibly more opaque background.
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
         ImGui.BeginChild(title + "##sec", new Vector2(0, 0), false);
 
         ImGui.Dummy(new Vector2(0, 6));
@@ -519,6 +534,7 @@ public partial class ConfigWindow : Window
         if (bottomPadding > 0)
             ImGui.Dummy(new Vector2(0, bottomPadding));
         ImGui.EndChild();
+        ImGui.PopStyleColor();
     }
 
     private static void SectionRow() =>

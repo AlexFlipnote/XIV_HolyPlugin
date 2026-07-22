@@ -440,25 +440,35 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    // Blocks until FC state is known: tag present, or still empty after retries. instant=true does a
-    // single read, for when the data is guaranteed loaded.
+    // Blocks until FC state is known and complete, or still incomplete after retries. instant=true does
+    // a single read, for when the data is guaranteed loaded.
+    //
+    // Tag and name come from two independent sources that load on different schedules: the tag is read
+    // straight off the local player's own game object (populated as soon as that object exists), while
+    // the name comes from InfoProxyFreeCompany, a separate module the client fills in only after it gets
+    // a server round trip for the local player's FC. Right after login/character-switch the tag can be
+    // valid for several hundred ms while the name is still empty, so both must be present before
+    // treating an FC read as definitive. Tag empty is only a confirmed "not in FC" once the player
+    // object itself has resolved; before that (or while the proxy has not initialized) there is no
+    // signal yet, so it keeps retrying rather than concluding "no FC" from an absence of data.
     private async Task<FcData?> CollectFcAsync(CancellationToken token, bool instant = false)
     {
         token.ThrowIfCancellationRequested();
 
         var attempts = instant ? 1 : 10;
+        string tag = string.Empty, name = string.Empty;
+
         for (var i = 0; i < attempts; i++)
         {
-            string tag        = string.Empty;
-            string name       = string.Empty;
-            string master     = string.Empty;
-            string playerName = string.Empty;
-            bool   proxyNull  = false;
+            bool havePc = false;
+            string master = string.Empty, playerName = string.Empty;
+            tag = name = string.Empty;
 
             await framework.RunOnFrameworkThread(() =>
             {
                 if (objectTable[0] is IPlayerCharacter pc)
                 {
+                    havePc     = true;
                     tag        = pc.CompanyTag.ToString();
                     playerName = pc.Name.TextValue;
                 }
@@ -466,7 +476,6 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 unsafe
                 {
                     var fc = InfoProxyFreeCompany.Instance();
-                    proxyNull = fc == null;
                     if (fc != null)
                     {
                         name   = fc->NameString;
@@ -475,20 +484,24 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 }
             });
 
+            // Player object resolved and tag empty: authoritative "not in an FC", nothing left to wait for
+            if (havePc && tag.Length == 0) return null;
+
             // Master can be transferred at any time, so leadership is never cached
-            if (tag.Length > 0)
+            if (tag.Length > 0 && name.Length > 0)
             {
                 var isLeader = master.Length > 0 && playerName.Length > 0 &&
                                string.Equals(master, playerName, StringComparison.Ordinal);
-                return new FcData(tag, name, isLeader); // has FC
+                return new FcData(tag, name, isLeader); // tag and name both confirmed
             }
-            if (proxyNull)      return null;                  // proxy gone, no FC
 
-            // Proxy present but tag still empty, so it is still loading
+            // Either the player object has not resolved yet, or the tag is confirmed but the name
+            // proxy has not caught up yet; keep waiting either way
             if (i < attempts - 1) await Task.Delay(500, token);
         }
 
-        return null; // tag still empty after retries, not in FC
+        // Retries exhausted with a tag but no name: report what we have rather than losing the tag
+        return tag.Length > 0 ? new FcData(tag, name, false) : null;
     }
 
     private async Task<SeString?> CollectPlateAsync(CancellationToken token, bool retry = false)

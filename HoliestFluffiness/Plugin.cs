@@ -446,7 +446,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OnDoorbellEntered(string name, string _, uint worldId)
     {
         if (configuration.DoorbellEnterSound)
-            SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellEnterSoundVolume);
+            SoundEngine.Play(ResolveSound(configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.mp3"), configuration.DoorbellEnterSoundVolume);
         if (configuration.DoorbellEnterChat)
             PrintDoorbellChat(name, worldId, configuration.DoorbellEnterText);
     }
@@ -462,7 +462,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OnDoorbellAlreadyHere(List<(string Name, string World, uint WorldId)> players)
     {
         if (configuration.DoorbellAlreadyHereSound)
-            SoundEngine.Play(ResolveSound(configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav"), configuration.DoorbellAlreadyHereSoundVolume);
+            SoundEngine.Play(ResolveSound(configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.mp3"), configuration.DoorbellAlreadyHereSoundVolume);
         if (configuration.DoorbellAlreadyHereChat)
             foreach (var p in players)
                 PrintDoorbellChat(p.Name, p.WorldId, configuration.DoorbellAlreadyHereText);
@@ -474,11 +474,11 @@ public sealed class Plugin : IDalamudPlugin
         var (chat, sound, text, soundPath, defaultRel, vol) = which switch
         {
             1 => (configuration.DoorbellAlreadyHereChat, configuration.DoorbellAlreadyHereSound, configuration.DoorbellAlreadyHereText,
-                  configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.wav", configuration.DoorbellAlreadyHereSoundVolume),
+                  configuration.DoorbellAlreadyHereSoundPath, "Sounds/Doorbell/doorbell.mp3", configuration.DoorbellAlreadyHereSoundVolume),
             2 => (configuration.DoorbellLeaveChat, configuration.DoorbellLeaveSound, configuration.DoorbellLeaveText,
                   configuration.DoorbellLeaveSoundPath, "Sounds/Doorbell/leave.mp3", configuration.DoorbellLeaveSoundVolume),
             _ => (configuration.DoorbellEnterChat, configuration.DoorbellEnterSound, configuration.DoorbellEnterText,
-                  configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.wav", configuration.DoorbellEnterSoundVolume),
+                  configuration.DoorbellEnterSoundPath, "Sounds/Doorbell/doorbell.mp3", configuration.DoorbellEnterSoundVolume),
         };
 
         if (sound)
@@ -597,10 +597,10 @@ public sealed class Plugin : IDalamudPlugin
 
     private static readonly (string Alias, string Name)[] DistrictAliases =
     {
-        ("the lavender beds", "Lavender Beds"),
-        ("lavender beds",     "Lavender Beds"),
-        ("lavender",          "Lavender Beds"),
-        ("lb",                "Lavender Beds"),
+        ("the lavender beds", "The Lavender Beds"),
+        ("lavender beds",     "The Lavender Beds"),
+        ("lavender",          "The Lavender Beds"),
+        ("lb",                "The Lavender Beds"),
         ("the goblet",        "The Goblet"),
         ("goblet",            "The Goblet"),
         ("empyreum",          "Empyreum"),
@@ -660,8 +660,9 @@ public sealed class Plugin : IDalamudPlugin
         return m.Success ? int.Parse(m.Groups[1].Value) : null;
     }
 
+    // Normalize bid.District first: legacy records predate the "The Lavender Beds" prefix fix.
     private bool IsAlreadyInBidLocation(HousingBidRecord bid) =>
-        HousingDistricts.TerritoryIds.TryGetValue(bid.District, out var expected) &&
+        HousingDistricts.TerritoryIds.TryGetValue(HousingDistricts.Normalize(bid.District), out var expected) &&
         ClientState.TerritoryType == expected;
 
     private void InvokeLifestreamTeleport(string args)
@@ -813,7 +814,7 @@ public sealed class Plugin : IDalamudPlugin
                 }
 
                 var zone = _loginZone;
-                if (bid != null && zone.HasValue && HousingDistricts.Normalize(zone.Value.district) == bid.District && zone.Value.ward == bid.Ward)
+                if (bid != null && zone.HasValue && HousingDistricts.Normalize(zone.Value.district) == HousingDistricts.Normalize(bid.District) && zone.Value.ward == bid.Ward)
                     Log.Debug("[GoToBid] Already in {D} W{W} after login, skipping teleport.", bid.District, bid.Ward);
                 else
                     await Framework.RunOnFrameworkThread(() => InvokeLifestreamTeleport(tp));

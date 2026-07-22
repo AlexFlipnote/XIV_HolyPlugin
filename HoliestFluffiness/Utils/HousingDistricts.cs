@@ -7,11 +7,11 @@ internal static class HousingDistricts
 {
     internal static readonly Dictionary<string, ushort> TerritoryIds = new()
     {
-        ["Mist"]          = 339,
-        ["Lavender Beds"] = 340,
-        ["The Goblet"]    = 341,
-        ["Shirogane"]     = 641,
-        ["Empyreum"]      = 979,
+        ["Mist"]              = 339,
+        ["The Lavender Beds"] = 340,
+        ["The Goblet"]        = 341,
+        ["Shirogane"]         = 641,
+        ["Empyreum"]          = 979,
     };
 
     // Housing interior territory types mapped to their outdoor district territory, for zone preload.
@@ -45,7 +45,7 @@ internal static class HousingDistricts
     internal static string? FromTerritoryId(ushort id) => id switch
     {
         339 => "Mist",
-        340 => "Lavender Beds",
+        340 => "The Lavender Beds",
         341 => "The Goblet",
         641 => "Shirogane",
         979 => "Empyreum",
@@ -56,18 +56,19 @@ internal static class HousingDistricts
     internal static string FromAgentIndex(byte index) => index switch
     {
         1 => "Mist",
-        2 => "Lavender Beds",
+        2 => "The Lavender Beds",
         3 => "The Goblet",
         4 => "Shirogane",
         5 => "Empyreum",
         _ => $"District{index}",
     };
 
-    // Fuzzy match from in-game location strings (e.g. "Lavender Beds (Ward 3)")
+    // Fuzzy match from in-game location strings (e.g. "The Lavender Beds (Ward 3)"), and also used to
+    // normalize legacy stored districts (pre-fix "Lavender Beds" records lacked the "The" prefix).
     internal static string Normalize(string raw) => raw switch
     {
         var s when s.Contains("Mist",      StringComparison.OrdinalIgnoreCase) => "Mist",
-        var s when s.Contains("Lavender",  StringComparison.OrdinalIgnoreCase) => "Lavender Beds",
+        var s when s.Contains("Lavender",  StringComparison.OrdinalIgnoreCase) => "The Lavender Beds",
         var s when s.Contains("Goblet",    StringComparison.OrdinalIgnoreCase) => "The Goblet",
         var s when s.Contains("Shirogane", StringComparison.OrdinalIgnoreCase) => "Shirogane",
         var s when s.Contains("Empyreum",  StringComparison.OrdinalIgnoreCase) => "Empyreum",

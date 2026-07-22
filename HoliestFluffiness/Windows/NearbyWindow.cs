@@ -122,6 +122,12 @@ public sealed class NearbyWindow : Window, IDisposable
         var footerH = ImGui.GetStyle().ItemSpacing.Y + ImGui.GetFrameHeightWithSpacing() + 4f;
         var tableH  = ImGui.GetContentRegionAvail().Y - footerH;
 
+        if (handler.NearbyPlayers.Count == 0)
+        {
+            DrawEmptyState(tableH);
+            return;
+        }
+
         var tableFlags = ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH |
                          ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Hideable |
                          ImGuiTableFlags.Reorderable;
@@ -264,6 +270,21 @@ public sealed class NearbyWindow : Window, IDisposable
             ApplyPinnedOrClearFocus(prevHoveredNearby);
 
         ImGui.EndTable();
+    }
+
+    // Reserves the same height the table would have used, so the footer never shifts, then
+    // centers the empty-state message in it like the game's own "No active FATEs" panel.
+    private static void DrawEmptyState(float height)
+    {
+        ImGui.BeginChild("##nearbyempty", new Vector2(0, height));
+
+        const string text = "No one nearby.";
+        var avail = ImGui.GetContentRegionAvail();
+        var size  = ImGui.CalcTextSize(text);
+        ImGui.SetCursorPos(new Vector2(Math.Max(0, (avail.X - size.X) / 2f), Math.Max(0, (avail.Y - size.Y) / 2f)));
+        Common.DimmedText(text);
+
+        ImGui.EndChild();
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
