@@ -28,6 +28,23 @@ internal static class ConfigTable
         | ImGuiTableFlags.RowBg
         | ImGuiTableFlags.SizingStretchProp;
 
+    // The leftmost visible column has no left divider for margin, so it needs a nudge.
+    // Reordering can change which one that is, so find it fresh each frame by screen X.
+    // Must be called inside a table, on the row whose columns are being measured.
+    internal static int LeftmostVisibleColumn(int columnCount)
+    {
+        int leftmostIdx = 0;
+        float leftmostX = float.MaxValue;
+        for (int i = 0; i < columnCount; i++)
+        {
+            ImGui.TableSetColumnIndex(i);
+            if (!ImGui.TableGetColumnFlags(i).HasFlag(ImGuiTableColumnFlags.IsVisible)) continue;
+            var x = ImGui.GetCursorScreenPos().X;
+            if (x < leftmostX) { leftmostX = x; leftmostIdx = i; }
+        }
+        return leftmostIdx;
+    }
+
     public static bool DrawDataTable<T>(
         string tableId,
         IReadOnlyList<TableColumn<T>> columns,
@@ -53,17 +70,7 @@ internal static class ConfigTable
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
-        // The leftmost visible column has no left divider for margin, so it needs a nudge.
-        // Reordering can change which one that is, so find it fresh each frame by screen X.
-        int leftmostIdx = 0;
-        float leftmostX = float.MaxValue;
-        for (int i = 0; i < columns.Count; i++)
-        {
-            ImGui.TableSetColumnIndex(i);
-            if (!ImGui.TableGetColumnFlags(i).HasFlag(ImGuiTableColumnFlags.IsVisible)) continue;
-            var x = ImGui.GetCursorScreenPos().X;
-            if (x < leftmostX) { leftmostX = x; leftmostIdx = i; }
-        }
+        var leftmostIdx = LeftmostVisibleColumn(columns.Count);
 
         for (int i = 0; i < columns.Count; i++)
         {

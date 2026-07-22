@@ -56,6 +56,8 @@ public class FoodCheckHandler : IDisposable
         this.assemblyDir  = assemblyDir;
 
         framework.Update += OnFrameworkUpdate;
+        clientState.Logout += OnLogout;
+        clientState.TerritoryChanged += OnTerritoryChanged;
 
         countdownHook = Common.TryCreateHookFromSignature<CountdownTimerDelegate>(
             Sigs.CountdownTimer, OnCountdownTimer, gameInterop, log,
@@ -65,9 +67,23 @@ public class FoodCheckHandler : IDisposable
     public void Dispose()
     {
         framework.Update -= OnFrameworkUpdate;
+        clientState.Logout -= OnLogout;
+        clientState.TerritoryChanged -= OnTerritoryChanged;
         countdownHook?.Dispose();
         clearCts?.Cancel();
         clearCts?.Dispose();
+    }
+
+    // The countdown pointer belongs to the previous session/zone once these fire; clearing it stops
+    // OnFrameworkUpdate dereferencing a stale address until the hook hands us a fresh one.
+    private void OnLogout(int type, int code) => ResetCountdown();
+    private void OnTerritoryChanged(uint territory) => ResetCountdown();
+
+    private void ResetCountdown()
+    {
+        countdownParam = 0;
+        wasCountingDown = false;
+        Invalidate();
     }
 
     public List<FoodCheckEntry> GetEntries() => lowFoodEntries;

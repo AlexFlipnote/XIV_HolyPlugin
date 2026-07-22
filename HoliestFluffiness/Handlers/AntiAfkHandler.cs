@@ -60,10 +60,12 @@ public sealed class AntiAfkHandler : IDisposable
 
     private unsafe void Work(CancellationToken token)
     {
-        while (!token.IsCancellationRequested)
+        while (true)
         {
             try
             {
+                if (token.IsCancellationRequested) return;
+
                 float maxTimer = 0f;
                 bool  manualAfk = false;
                 float jitter = (float)rng.NextDouble() * 5f;
@@ -102,10 +104,13 @@ public sealed class AntiAfkHandler : IDisposable
                     token.WaitHandle.WaitOne(sleepMs);
                 }
             }
+            catch (ObjectDisposedException) { return; }
+            catch (OperationCanceledException) { return; }
             catch (Exception ex)
             {
                 log.Error(ex, "[HF] AntiAfk error");
-                token.WaitHandle.WaitOne(5000); // Safety wait on error
+                try { token.WaitHandle.WaitOne(5000); } // Safety wait on error
+                catch (ObjectDisposedException) { return; }
             }
         }
     }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Hooking;
@@ -25,20 +24,6 @@ public sealed unsafe class LoginEnhancementHandler : IDisposable
     private readonly IPluginLog      log;
 
     private ushort _currentTerritoryType;
-
-    private static readonly Dictionary<uint, uint> HousingInteriorToOutdoor = new()
-    {
-        // Mist
-        [282] = 339, [283] = 339, [284] = 339, [384] = 339, [423] = 339, [573] = 339, [608] = 339,
-        // Lavender Beds
-        [342] = 340, [343] = 340, [344] = 340, [385] = 340, [425] = 340, [574] = 340, [609] = 340,
-        // The Goblet
-        [345] = 341, [346] = 341, [347] = 341, [386] = 341, [424] = 341, [575] = 341, [610] = 341,
-        // Shirogane
-        [649] = 641, [650] = 641, [651] = 641, [652] = 641, [653] = 641, [654] = 641, [655] = 641,
-        // Empyreum
-        [980] = 979, [981] = 979, [982] = 979, [983] = 979, [984] = 979, [985] = 979, [999] = 979,
-    };
 
     public LoginEnhancementHandler(Configuration config, IGameInteropProvider gameInterop,
         IAddonLifecycle addonLifecycle, IDataManager dataManager, IPluginLog log)
@@ -108,7 +93,7 @@ public sealed unsafe class LoginEnhancementHandler : IDisposable
         if (_currentTerritoryType == 0) return;
 
         var territoryId = (uint)_currentTerritoryType;
-        if (HousingInteriorToOutdoor.TryGetValue(territoryId, out var outdoor))
+        if (HousingDistricts.InteriorToOutdoor.TryGetValue(territoryId, out var outdoor))
             territoryId = outdoor;
 
         var ttRow = dataManager.GetExcelSheet<TerritoryType>()?.GetRowOrDefault(territoryId);

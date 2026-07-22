@@ -137,17 +137,7 @@ public sealed class NearbyWindow : Window, IDisposable
         Common.PushTableHeader();
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
-        // The leftmost visible column has no left divider for margin, and reordering can change
-        // which one that is, so find it fresh each frame.
-        int leftmostIdx = 0;
-        float leftmostX = float.MaxValue;
-        for (int i = 0; i < 5; i++)
-        {
-            ImGui.TableSetColumnIndex(i);
-            if (!ImGui.TableGetColumnFlags(i).HasFlag(ImGuiTableColumnFlags.IsVisible)) continue;
-            var x = ImGui.GetCursorScreenPos().X;
-            if (x < leftmostX) { leftmostX = x; leftmostIdx = i; }
-        }
+        var leftmostIdx = ConfigTable.LeftmostVisibleColumn(5);
 
         ImGui.TableSetColumnIndex(0);
         if (leftmostIdx == 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
@@ -454,7 +444,7 @@ public sealed class NearbyWindow : Window, IDisposable
         if (ImGui.MenuItem("Target") && obj != null)
             targetManager.Target = obj;
 
-if (ImGui.MenuItem("Send Tell"))
+        if (ImGui.MenuItem("Send Tell"))
             SendTell(name, world);
 
         if (!forTargeter)
@@ -470,7 +460,7 @@ if (ImGui.MenuItem("Send Tell"))
         }
 
         if (ImGui.MenuItem("Search on Lodestone"))
-            Util.OpenLink($"https://eu.finalfantasyxiv.com/lodestone/character/?q={Uri.EscapeDataString(name)}&worldname={Uri.EscapeDataString(world)}");
+            Util.OpenLink($"https://na.finalfantasyxiv.com/lodestone/character/?q={Uri.EscapeDataString(name)}&worldname={Uri.EscapeDataString(world)}");
 
         ImGui.EndPopup();
     }

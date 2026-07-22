@@ -13,7 +13,7 @@ public sealed unsafe class PhysicsHandler : IDisposable
     private readonly Configuration config;
 
     private volatile bool disposed;
-    private bool executePhysics;
+    private volatile bool executePhysics;
     private long expectedFrameTime;
     private long sliceStart, sliceEnd;
     private bool sliceRan;

@@ -191,7 +191,7 @@ public partial class ConfigWindow
             configuration.FoodCheckSoundPath,
             configuration.FoodCheckSoundVolume,
             p => { configuration.FoodCheckSoundPath   = p; configuration.Save(); },
-            v => { configuration.FoodCheckSoundVolume = v; configuration.Save(); });
+            v => configuration.FoodCheckSoundVolume = v);
         ImGui.EndDisabled();
 
         RowGap();
@@ -261,42 +261,42 @@ public partial class ConfigWindow
             "dc", "Direct Critical Hit", FlyTextKind.DamageCritDh, Path.Combine(combatDir, "direct_critical.wav"),
             configuration.CombatDcEnabled,   v => { configuration.CombatDcEnabled  = v; configuration.Save(); },
             configuration.CombatDcShowText,  v => { configuration.CombatDcShowText = v; configuration.Save(); },
-            configuration.CombatDcText,      v => { configuration.CombatDcText     = v; configuration.Save(); },
+            configuration.CombatDcText,      v => configuration.CombatDcText      = v,
             configuration.CombatDcSound,     v => { configuration.CombatDcSound    = v; configuration.Save(); },
-            configuration.CombatDcVol,       v => { configuration.CombatDcVol      = v; configuration.Save(); },
+            configuration.CombatDcVol,       v => configuration.CombatDcVol       = v,
             firstSet: true);
 
         DrawCombatBlock(
             "c", "Critical Hit", FlyTextKind.DamageCrit, Path.Combine(combatDir, "critical.wav"),
             configuration.CombatCEnabled,   v => { configuration.CombatCEnabled  = v; configuration.Save(); },
             configuration.CombatCShowText,  v => { configuration.CombatCShowText = v; configuration.Save(); },
-            configuration.CombatCText,      v => { configuration.CombatCText     = v; configuration.Save(); },
+            configuration.CombatCText,      v => configuration.CombatCText       = v,
             configuration.CombatCSound,     v => { configuration.CombatCSound    = v; configuration.Save(); },
-            configuration.CombatCVol,       v => { configuration.CombatCVol      = v; configuration.Save(); });
+            configuration.CombatCVol,       v => configuration.CombatCVol        = v);
 
         DrawCombatBlock(
             "d", "Direct Hit", FlyTextKind.DamageDh, Path.Combine(combatDir, "critical.wav"),
             configuration.CombatDEnabled,   v => { configuration.CombatDEnabled  = v; configuration.Save(); },
             configuration.CombatDShowText,  v => { configuration.CombatDShowText = v; configuration.Save(); },
-            configuration.CombatDText,      v => { configuration.CombatDText     = v; configuration.Save(); },
+            configuration.CombatDText,      v => configuration.CombatDText       = v,
             configuration.CombatDSound,     v => { configuration.CombatDSound    = v; configuration.Save(); },
-            configuration.CombatDVol,       v => { configuration.CombatDVol      = v; configuration.Save(); });
+            configuration.CombatDVol,       v => configuration.CombatDVol        = v);
 
         DrawCombatBlock(
             "cho", "Critical Heal (own)", FlyTextKind.HealingCrit, Path.Combine(combatDir, "critical.wav"),
             configuration.CombatChoEnabled,   v => { configuration.CombatChoEnabled  = v; configuration.Save(); },
             configuration.CombatChoShowText,  v => { configuration.CombatChoShowText = v; configuration.Save(); },
-            configuration.CombatChoText,      v => { configuration.CombatChoText     = v; configuration.Save(); },
+            configuration.CombatChoText,      v => configuration.CombatChoText      = v,
             configuration.CombatChoSound,     v => { configuration.CombatChoSound    = v; configuration.Save(); },
-            configuration.CombatChoVol,       v => { configuration.CombatChoVol      = v; configuration.Save(); });
+            configuration.CombatChoVol,       v => configuration.CombatChoVol       = v);
 
         DrawCombatBlock(
             "cht", "Critical Heal (others + fairies)", FlyTextKind.HealingCrit, Path.Combine(combatDir, "heal.mp3"),
             configuration.CombatChtEnabled,   v => { configuration.CombatChtEnabled  = v; configuration.Save(); },
             configuration.CombatChtShowText,  v => { configuration.CombatChtShowText = v; configuration.Save(); },
-            configuration.CombatChtText,      v => { configuration.CombatChtText     = v; configuration.Save(); },
+            configuration.CombatChtText,      v => configuration.CombatChtText      = v,
             configuration.CombatChtSound,     v => { configuration.CombatChtSound    = v; configuration.Save(); },
-            configuration.CombatChtVol,       v => { configuration.CombatChtVol      = v; configuration.Save(); });
+            configuration.CombatChtVol,       v => configuration.CombatChtVol       = v);
 
         EndSection(10);
     }
@@ -335,6 +335,7 @@ public partial class ConfigWindow
         var t = text;
         PushInput();
         if (ImGui.InputText($"##{id}txt", ref t, 64)) setText(t);
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
 
         ImGui.EndDisabled();
@@ -370,6 +371,7 @@ public partial class ConfigWindow
         PushInput();
         // Slider drags 0-100%; no AlwaysClamp so Ctrl+Click can type up to 300%, capped by the setter.
         if (ImGui.SliderFloat($"##{id}vol", ref v, 0f, 100f, "%.0f%%")) setVol(Math.Clamp(v, 0f, 300f) / 100f);
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
 
         ImGui.EndDisabled();

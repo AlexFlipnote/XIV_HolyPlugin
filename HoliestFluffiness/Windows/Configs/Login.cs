@@ -165,7 +165,7 @@ public partial class ConfigWindow
                     case 3: configuration.InfoEnabled                = newEnabled; break;
                     case 4: configuration.ShowFcHouseLocation        = newEnabled; break;
                 }
-                configuration.Save();ImGui.Dummy(new Vector2(0, 6));
+                configuration.Save();
             }
             PopCheckbox();
 

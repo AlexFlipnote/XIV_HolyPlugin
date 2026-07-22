@@ -813,9 +813,9 @@ public partial class ConfigWindow : Window
         if (ImGui.InputText(label, ref current, maxLength))
         {
             setter(current);
-            configuration.Save();
             onChange?.Invoke();
         }
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
         if (hint != null) { ImGui.SameLine(); Common.DimmedText(hint); }
         ImGui.EndGroup();

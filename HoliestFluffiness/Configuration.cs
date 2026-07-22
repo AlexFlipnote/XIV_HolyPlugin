@@ -122,15 +122,15 @@ public class Configuration : IPluginConfiguration
     public bool   DoorbellEnterChat          { get; set; } = false;
     public bool   DoorbellEnterSound         { get; set; } = false;
     public string DoorbellEnterSoundPath     { get; set; } = "";
-    public float  DoorbellEnterSoundVolume   { get; set; } = 0.5f;
+    public float  DoorbellEnterSoundVolume   { get; set; } = 1.0f;
     public bool   DoorbellLeaveChat          { get; set; } = false;
     public bool   DoorbellLeaveSound         { get; set; } = false;
     public string DoorbellLeaveSoundPath     { get; set; } = "";
-    public float  DoorbellLeaveSoundVolume   { get; set; } = 0.5f;
+    public float  DoorbellLeaveSoundVolume   { get; set; } = 1.0f;
     public bool   DoorbellAlreadyHereChat    { get; set; } = false;
     public bool   DoorbellAlreadyHereSound   { get; set; } = false;
     public string DoorbellAlreadyHereSoundPath   { get; set; } = "";
-    public float  DoorbellAlreadyHereSoundVolume { get; set; } = 0.5f;
+    public float  DoorbellAlreadyHereSoundVolume { get; set; } = 1.0f;
 
     // "<player>" becomes a clickable player link when printed
     public const string DefaultDoorbellEnterText       = "<player> has come inside.";

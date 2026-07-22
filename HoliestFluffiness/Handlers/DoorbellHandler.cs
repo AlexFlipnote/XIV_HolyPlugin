@@ -31,17 +31,6 @@ public sealed class DoorbellHandler : IDisposable
     public event Action<string, string, uint>? OnLeft;
     public event Action<List<(string Name, string World, uint WorldId)>>? OnAlreadyHere;
 
-    private static readonly HashSet<uint> HouseTerritories =
-    [
-        282, 283, 284, 384, 608,  // Mist
-        342, 343, 344, 385, 609,  // Lavender Beds
-        345, 346, 347, 386, 610,  // Goblet
-        649, 650, 651, 652, 655,  // Shirogane
-        980, 981, 982, 983, 999,  // Empyreum
-        1249, 1250, 1251,          // Minimalist
-        1374, 1375, 1376,          // Minimalist Dark (7.5)
-    ];
-
     public DoorbellHandler(IClientState clientState, IObjectTable objectTable, IFramework framework)
     {
         this.clientState   = clientState;
@@ -61,7 +50,7 @@ public sealed class DoorbellHandler : IDisposable
         timeInHouse.Stop();
         framework.Update -= OnUpdate;
 
-        if (HouseTerritories.Contains(territory))
+        if (HousingDistricts.DoorbellTerritories.Contains(territory))
         {
             timeInHouse.Restart();
             framework.Update += OnUpdate;

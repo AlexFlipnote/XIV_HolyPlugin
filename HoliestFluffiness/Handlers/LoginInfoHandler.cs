@@ -34,6 +34,16 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         public string DbKey   => $"{Name}@{World}";
     }
 
+    private readonly record struct CharacterSnapshot(
+        FcData?   Fc,
+        string?   PrivateHouse,
+        string?   FcHouse,
+        long      Gil,
+        long      Mgp,
+        long      FcPoints,
+        SeString? Plate,
+        string?   Inventory);
+
     public event Action? OnInfoReady;
 
     // Once per RunAsync, after the background FC-points task finishes. Lets a caller that switches
@@ -173,21 +183,17 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         {
             var record = new CharacterRecord
             {
-                Key          = charInfo.DbKey,
-                Name         = charInfo.Name,
-                World        = charInfo.World,
-                DataCenter   = charInfo.Dc,
-                FreeCompany  = fc?.Display,
-                FcLeader     = fc?.IsLeader ?? false,
-                SearchInfo   = plate?.TextValue      ?? existing?.SearchInfo,
-                PrivateHouse = privateHouse          ?? existing?.PrivateHouse,
-                FcHouse      = fc == null ? null     : (fcHouse ?? existing?.FcHouse),
-                Gil          = gil >= 0 ? gil        : existing?.Gil ?? 0,
-                Mgp          = mgp >= 0 ? mgp        : existing?.Mgp ?? -1,
-                FcPoints     = fc == null ? -1    : existing?.FcPoints ?? -1,
-                Inventory    = inventory               ?? existing?.Inventory,
-                LastSeen     = DateTime.UtcNow,
+                Key        = charInfo.DbKey,
+                Name       = charInfo.Name,
+                World      = charInfo.World,
+                DataCenter = charInfo.Dc,
             };
+            // Fc points are not collected here; the -1 sentinel keeps the existing value (refreshed
+            // by the background task below). Gil falls back to 0, not -1, when there is no record yet.
+            var snapshot = new CharacterSnapshot(fc, privateHouse, fcHouse, gil, mgp, -1, plate, inventory);
+            var fallback = existing ?? new CharacterRecord { Gil = 0, Mgp = -1, FcPoints = -1 };
+            Merge(record, fallback, snapshot);
+            record.LastSeen = DateTime.UtcNow;
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
         }
 
@@ -250,24 +256,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey));
         if (existing == null) return;
 
-        var newFc           = await CollectFcAsync(CancellationToken.None, instant: true);
-        var newPrivateHouse = await CollectPrivateHouseAsync(CancellationToken.None);
-        var newFcHouse      = await CollectFcHouseAsync(CancellationToken.None);
-        var newGil          = await CollectGilAsync(CancellationToken.None);
-        var newMgp          = await CollectMgpAsync(CancellationToken.None);
-        var newFcPoints     = await CollectFcPointsAsync(CancellationToken.None);
-        var newPlate        = await CollectPlateAsync(CancellationToken.None);
-        var newInventory    = await CollectInventoryAsync(CancellationToken.None);
-
-        existing.FreeCompany = newFc?.Display;
-        existing.FcLeader    = newFc?.IsLeader ?? false;
-        existing.FcHouse     = newFc == null ? null : (newFcHouse ?? existing.FcHouse);
-        existing.FcPoints    = newFc == null ? -1   : (newFcPoints >= 0 ? newFcPoints : existing.FcPoints);
-        if (newPrivateHouse   != null) existing.PrivateHouse = newPrivateHouse;
-        if (newGil            >= 0)    existing.Gil          = newGil;
-        if (newMgp            >= 0)    existing.Mgp          = newMgp;
-        if (newPlate?.TextValue != null) existing.SearchInfo = newPlate.TextValue;
-        if (newInventory      != null) existing.Inventory    = newInventory;
+        var snapshot = await CollectSnapshotAsync(CancellationToken.None);
+        Merge(existing, existing, snapshot);
         existing.LastSeen = DateTime.UtcNow;
         await Task.Run(() => characterDb.Upsert(existing));
         log.Debug("Quick save written for {Key} before character switch.", charInfo.DbKey);
@@ -291,50 +281,13 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             {
                 if (await IsOnDifferentWorldAsync()) continue;
 
-                var newFc           = await CollectFcAsync(token, instant: true);
-                var newPrivateHouse = await CollectPrivateHouseAsync(token);
-                var newFcHouse      = await CollectFcHouseAsync(token);
-                var newGil          = await CollectGilAsync(token);
-                var newMgp          = await CollectMgpAsync(token);
-                var newFcPoints     = await CollectFcPointsAsync(token);
-                var newPlate        = await CollectPlateAsync(token);
-                var newInventory    = await CollectInventoryAsync(token);
+                var snapshot = await CollectSnapshotAsync(token);
 
                 var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token);
                 if (existing == null) continue;
 
-                // Only accept confident values
-                var newFcDisplay  = newFc?.Display;
-                var newFcLeader   = newFc?.IsLeader ?? false;
-                var newGilValue   = newGil >= 0 ? newGil    : existing.Gil;
-                var newMgpValue   = newMgp >= 0 ? newMgp    : existing.Mgp;
-                var newFcPointsValue = newFc == null ? -1   : (newFcPoints >= 0 ? newFcPoints : existing.FcPoints);
-                var newPlateText  = newPlate?.TextValue      ?? existing.SearchInfo;
-                var newPH         = newPrivateHouse          ?? existing.PrivateHouse;
-                var newFcH        = newFc == null ? null     : (newFcHouse ?? existing.FcHouse);
-                var newInv        = newInventory             ?? existing.Inventory;
-
-                if (existing.FreeCompany  == newFcDisplay  &&
-                    existing.FcLeader     == newFcLeader   &&
-                    existing.PrivateHouse == newPH         &&
-                    existing.FcHouse      == newFcH        &&
-                    existing.Gil          == newGilValue   &&
-                    existing.Mgp          == newMgpValue   &&
-                    existing.FcPoints     == newFcPointsValue &&
-                    existing.SearchInfo   == newPlateText  &&
-                    existing.Inventory    == newInv)
-                    continue;
-
-                existing.FreeCompany  = newFcDisplay;
-                existing.FcLeader     = newFcLeader;
-                existing.PrivateHouse = newPH;
-                existing.FcHouse      = newFcH;
-                existing.Gil          = newGilValue;
-                existing.Mgp          = newMgpValue;
-                existing.FcPoints     = newFcPointsValue;
-                existing.SearchInfo   = newPlateText;
-                existing.Inventory    = newInv;
-                existing.LastSeen     = DateTime.UtcNow;
+                if (!Merge(existing, existing, snapshot)) continue;
+                existing.LastSeen = DateTime.UtcNow;
                 await Task.Run(() => characterDb.Upsert(existing), token);
                 log.Debug("Periodic DB update written for {Key}", charInfo.DbKey);
             }
@@ -343,6 +296,61 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 log.Error(ex, "Periodic DB update failed for {Key}; will retry next cycle.", charInfo.DbKey);
             }
         }
+    }
+
+    // The collect-once path shared by QuickSaveAsync and RunPeriodicUpdatesAsync. RunAsync collects
+    // its own way (display toggles, cached-plate verification) and only reuses Merge.
+    private async Task<CharacterSnapshot> CollectSnapshotAsync(CancellationToken token)
+    {
+        var fc           = await CollectFcAsync(token, instant: true);
+        var privateHouse = await CollectPrivateHouseAsync(token);
+        var fcHouse      = await CollectFcHouseAsync(token);
+        var gil          = await CollectGilAsync(token);
+        var mgp          = await CollectMgpAsync(token);
+        var fcPoints     = await CollectFcPointsAsync(token);
+        var plate        = await CollectPlateAsync(token);
+        var inventory    = await CollectInventoryAsync(token);
+        return new CharacterSnapshot(fc, privateHouse, fcHouse, gil, mgp, fcPoints, plate, inventory);
+    }
+
+    // Applies the "only accept confident values" rules field by field, writing into target and using
+    // fallback for anything the snapshot did not load confidently. target and fallback are the same
+    // record for in-place updates; RunAsync passes a fresh target with a separate fallback source.
+    // Returns whether any merged field differs from target's prior value (used to skip no-op writes).
+    private static bool Merge(CharacterRecord target, CharacterRecord fallback, CharacterSnapshot snap)
+    {
+        var freeCompany  = snap.Fc?.Display;
+        var fcLeader     = snap.Fc?.IsLeader ?? false;
+        var gil          = snap.Gil >= 0 ? snap.Gil : fallback.Gil;
+        var mgp          = snap.Mgp >= 0 ? snap.Mgp : fallback.Mgp;
+        var fcPoints     = snap.Fc == null ? -1 : (snap.FcPoints >= 0 ? snap.FcPoints : fallback.FcPoints);
+        var searchInfo   = snap.Plate?.TextValue ?? fallback.SearchInfo;
+        var privateHouse = snap.PrivateHouse      ?? fallback.PrivateHouse;
+        var fcHouse      = snap.Fc == null ? null : (snap.FcHouse ?? fallback.FcHouse);
+        var inventory    = snap.Inventory         ?? fallback.Inventory;
+
+        var changed =
+            target.FreeCompany  != freeCompany  ||
+            target.FcLeader     != fcLeader     ||
+            target.PrivateHouse != privateHouse ||
+            target.FcHouse      != fcHouse      ||
+            target.Gil          != gil          ||
+            target.Mgp          != mgp          ||
+            target.FcPoints     != fcPoints     ||
+            target.SearchInfo   != searchInfo   ||
+            target.Inventory    != inventory;
+
+        target.FreeCompany  = freeCompany;
+        target.FcLeader     = fcLeader;
+        target.PrivateHouse = privateHouse;
+        target.FcHouse      = fcHouse;
+        target.Gil          = gil;
+        target.Mgp          = mgp;
+        target.FcPoints     = fcPoints;
+        target.SearchInfo   = searchInfo;
+        target.Inventory    = inventory;
+
+        return changed;
     }
 
     private async Task ShowData(string? character, FcData? fc, SeString? plate, string? privateHouse, string? fcHouse)

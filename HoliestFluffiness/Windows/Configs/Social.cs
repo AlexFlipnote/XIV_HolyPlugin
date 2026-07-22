@@ -135,7 +135,7 @@ public partial class ConfigWindow
             configuration.NearbyTargeterSoundPath,
             configuration.NearbyTargeterSoundVolume,
             p => { configuration.NearbyTargeterSoundPath   = p; configuration.Save(); },
-            v => { configuration.NearbyTargeterSoundVolume = v; configuration.Save(); });
+            v => configuration.NearbyTargeterSoundVolume = v);
         ImGui.EndDisabled();
         ImGui.EndDisabled();
         // ── House doorbell ────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ public partial class ConfigWindow
             configuration.DoorbellEnterText,    v => configuration.DoorbellEnterText = v, Configuration.DefaultDoorbellEnterText,
             configuration.DoorbellEnterSound,   v => configuration.DoorbellEnterSound = v,
             configuration.DoorbellEnterSoundPath,   p => { configuration.DoorbellEnterSoundPath   = p; configuration.Save(); },
-            configuration.DoorbellEnterSoundVolume, v => { configuration.DoorbellEnterSoundVolume = v; configuration.Save(); },
+            configuration.DoorbellEnterSoundVolume, v => configuration.DoorbellEnterSoundVolume = v,
             firstSet: true);
 
         DrawDoorbellBlock(
@@ -160,7 +160,7 @@ public partial class ConfigWindow
             configuration.DoorbellAlreadyHereText,    v => configuration.DoorbellAlreadyHereText = v, Configuration.DefaultDoorbellAlreadyHereText,
             configuration.DoorbellAlreadyHereSound,   v => configuration.DoorbellAlreadyHereSound = v,
             configuration.DoorbellAlreadyHereSoundPath,   p => { configuration.DoorbellAlreadyHereSoundPath   = p; configuration.Save(); },
-            configuration.DoorbellAlreadyHereSoundVolume, v => { configuration.DoorbellAlreadyHereSoundVolume = v; configuration.Save(); });
+            configuration.DoorbellAlreadyHereSoundVolume, v => configuration.DoorbellAlreadyHereSoundVolume = v);
 
         DrawDoorbellBlock(
             "doorbellleave", "Someone left", Path.Combine(doorbellDir, "leave.mp3"), () => onTestDoorbell?.Invoke(2),
@@ -168,7 +168,7 @@ public partial class ConfigWindow
             configuration.DoorbellLeaveText,    v => configuration.DoorbellLeaveText = v, Configuration.DefaultDoorbellLeaveText,
             configuration.DoorbellLeaveSound,   v => configuration.DoorbellLeaveSound = v,
             configuration.DoorbellLeaveSoundPath,   p => { configuration.DoorbellLeaveSoundPath   = p; configuration.Save(); },
-            configuration.DoorbellLeaveSoundVolume, v => { configuration.DoorbellLeaveSoundVolume = v; configuration.Save(); });
+            configuration.DoorbellLeaveSoundVolume, v => configuration.DoorbellLeaveSoundVolume = v);
 
         // ── Commendations ─────────────────────────────────────────────────────
 
@@ -194,7 +194,7 @@ public partial class ConfigWindow
             configuration.CommendationOneThirdPath,
             configuration.CommendationOneThirdVolume,
             p => { configuration.CommendationOneThirdPath   = p; configuration.Save(); },
-            v => { configuration.CommendationOneThirdVolume = v; configuration.Save(); });
+            v => configuration.CommendationOneThirdVolume = v);
 
         RowGap(8);
         Common.DimmedText("2/3 commends:");
@@ -205,7 +205,7 @@ public partial class ConfigWindow
             configuration.CommendationTwoThirdsPath,
             configuration.CommendationTwoThirdsVolume,
             p => { configuration.CommendationTwoThirdsPath   = p; configuration.Save(); },
-            v => { configuration.CommendationTwoThirdsVolume = v; configuration.Save(); });
+            v => configuration.CommendationTwoThirdsVolume = v);
 
         RowGap(8);
         Common.DimmedText("3/3 commends:");
@@ -216,7 +216,7 @@ public partial class ConfigWindow
             configuration.CommendationThreeThirdsPath,
             configuration.CommendationThreeThirdsVolume,
             p => { configuration.CommendationThreeThirdsPath   = p; configuration.Save(); },
-            v => { configuration.CommendationThreeThirdsVolume = v; configuration.Save(); });
+            v => configuration.CommendationThreeThirdsVolume = v);
 
         RowGap(8);
         Common.DimmedText("All 7 (full party):");
@@ -227,7 +227,7 @@ public partial class ConfigWindow
             configuration.CommendationAllSevenPath,
             configuration.CommendationAllSevenVolume,
             p => { configuration.CommendationAllSevenPath   = p; configuration.Save(); },
-            v => { configuration.CommendationAllSevenVolume = v; configuration.Save(); });
+            v => configuration.CommendationAllSevenVolume = v);
 
         ImGui.EndDisabled();
 
@@ -273,6 +273,7 @@ public partial class ConfigWindow
         // exceed the bar up to 300% to boost quiet files; the setter caps it there.
         if (ImGui.SliderFloat($"##{id}vol", ref vol, 0f, 100f, "%.0f%%"))
             setVolume(Math.Clamp(vol, 0f, 300f) / 100f);
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
 
         ImGui.EndGroup();
@@ -314,7 +315,8 @@ public partial class ConfigWindow
         ImGui.SetNextItemWidth(220);
         var t = text;
         PushInput();
-        if (ImGui.InputText($"##{id}txt", ref t, 128)) { setText(t); configuration.Save(); }
+        if (ImGui.InputText($"##{id}txt", ref t, 128)) setText(t);
+        if (ImGui.IsItemDeactivatedAfterEdit()) configuration.Save();
         PopInput();
         ImGui.SameLine();
         PushButton();
