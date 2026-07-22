@@ -30,6 +30,8 @@ public sealed class NearbyWindow : Window, IDisposable
     private bool   hoveredTargeterRow;
     private bool   hoveredNearbyRow;
     private bool   historyOpen;
+    private ulong? pinnedNearbyId;
+    private ulong? historyHoveredNearbyId;
 
     // Recomputed only when the underlying data or search text changes, not every frame
     private List<NearbyPlayer>? cachedNearbySource;
@@ -190,22 +192,31 @@ public sealed class NearbyWindow : Window, IDisposable
             ImGui.TableNextColumn();
             if (leftmostIdx == 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
 
-            var rowMin     = ImGui.GetCursorScreenPos() with { X = ImGui.GetWindowPos().X };
-            var rowMax     = new Vector2(ImGui.GetWindowPos().X + ImGui.GetWindowSize().X, rowMin.Y + ImGui.GetTextLineHeightWithSpacing());
-            var rowHovered = ImGui.IsMouseHoveringRect(rowMin, rowMax);
             var isTargeter = targeterIds.Contains(p.GameObjectId);
+            var isPinned   = pinnedNearbyId == p.GameObjectId;
 
-            if (rowHovered)
-                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ImGui.GetColorU32(Theme.ColGoldSub));
+            var isCrossHovered = !isPinned && historyHoveredNearbyId == p.GameObjectId;
 
             var col = p.IsParty     ? config.NearbyColParty
                     : p.IsFriend    ? config.NearbyColFriend
                     : p.IsLocalFc   ? config.NearbyColLocalFc
                     : Theme.ColWhite;
 
-            ImGui.PushStyleColor(ImGuiCol.Text, col);
-            ImGui.TextUnformatted(isTargeter ? $"+ {p.Name}" : p.Name);
-            ImGui.PopStyleColor();
+            // Selectable (not a hover-rect) spans every column, so it also blocks window-drag on the row
+            ImGui.PushStyleColor(ImGuiCol.Header,        isPinned ? Theme.ColGoldMid : isCrossHovered ? Theme.ColGoldSub : Vector4.Zero);
+            ImGui.PushStyleColor(ImGuiCol.HeaderHovered, isPinned ? Theme.ColGoldMid : Theme.ColGoldSub);
+            ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGoldMid);
+            ImGui.PushStyleColor(ImGuiCol.Text,          col);
+            var clicked = ImGui.Selectable(
+                $"{(isTargeter ? $"+ {p.Name}" : p.Name)}##row{p.GameObjectId}",
+                isPinned || isCrossHovered,
+                ImGuiSelectableFlags.SpanAllColumns);
+            ImGui.PopStyleColor(4);
+
+            var rowHovered = ImGui.IsItemHovered();
+
+            if (clicked)
+                pinnedNearbyId = isPinned ? null : p.GameObjectId;
 
             if (rowHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
                 ImGui.OpenPopup($"##ctx{p.GameObjectId}");
@@ -249,8 +260,8 @@ public sealed class NearbyWindow : Window, IDisposable
                 Common.DimmedText(p.CompanyTag);
         }
 
-        if (prevHoveredNearby && !hoveredNearbyRow)
-            targetManager.FocusTarget = null;
+        if (!hoveredNearbyRow)
+            ApplyPinnedOrClearFocus(prevHoveredNearby);
 
         ImGui.EndTable();
     }
@@ -291,6 +302,23 @@ public sealed class NearbyWindow : Window, IDisposable
     }
 
     private void ToggleHistory() => historyOpen = !historyOpen;
+
+    // Clears FocusTarget only on the hover->no-hover transition, so we don't fight a target set elsewhere
+    private void ApplyPinnedOrClearFocus(bool wasHoveredLastCheck)
+    {
+        if (pinnedNearbyId is ulong pinId)
+        {
+            var pinObj = objectTable.SearchById(pinId);
+            if (pinObj != null)
+                targetManager.FocusTarget = pinObj;
+            else
+                pinnedNearbyId = null;
+        }
+        else if (wasHoveredLastCheck)
+        {
+            targetManager.FocusTarget = null;
+        }
+    }
 
     // ── Attached history window ───────────────────────────────────────────────
 
@@ -346,8 +374,9 @@ public sealed class NearbyWindow : Window, IDisposable
 
         ImGui.BeginChild("##historyscroll", new Vector2(0, scrollH));
 
-        var prevHovered    = hoveredTargeterRow;
-        hoveredTargeterRow = false;
+        var prevHovered        = hoveredTargeterRow;
+        hoveredTargeterRow     = false;
+        historyHoveredNearbyId = null;
 
         if (current.Count == 0 && previous.Count == 0)
         {
@@ -373,8 +402,8 @@ public sealed class NearbyWindow : Window, IDisposable
             }
         }
 
-        if (prevHovered && !hoveredTargeterRow)
-            targetManager.FocusTarget = null;
+        if (!hoveredTargeterRow)
+            ApplyPinnedOrClearFocus(prevHovered);
 
         ImGui.EndChild();
 
@@ -402,6 +431,11 @@ public sealed class NearbyWindow : Window, IDisposable
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             ImGui.OpenPopup($"##ctx{t.GameObjectId}");
 
+        // Only mirrors the nearby-row pin/highlight when this person is actually in range.
+        var isInNearby = handler.NearbyPlayers.Any(p => p.GameObjectId == t.GameObjectId);
+        if (isInNearby && ImGui.IsItemClicked(ImGuiMouseButton.Left))
+            pinnedNearbyId = pinnedNearbyId == t.GameObjectId ? null : t.GameObjectId;
+
         var timeW  = ImGui.CalcTextSize(timeStr).X;
         var rightX = ImGui.GetWindowPos().X + ImGui.GetWindowSize().X - ImGui.GetStyle().WindowPadding.X - timeW;
         ImGui.GetWindowDrawList().AddText(
@@ -411,6 +445,7 @@ public sealed class NearbyWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             hoveredTargeterRow = true;
+            if (isInNearby) historyHoveredNearbyId = t.GameObjectId;
             var obj = objectTable.SearchById(t.GameObjectId);
             if (obj != null) targetManager.FocusTarget = obj;
         }
