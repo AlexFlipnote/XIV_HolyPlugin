@@ -169,7 +169,7 @@ public sealed class Plugin : IDalamudPlugin
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); },
                                                   () => configuration.CharactersDbEnabled);
-        loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, loginInfoWindow, characterDb, Log);
+        loginInfoHandler    = new LoginInfoHandler(configuration, ChatGui, Framework, ObjectTable, Condition, loginInfoWindow, characterDb, Log);
         noKillHandler          = new NoKillHandler(configuration, GameInterop, Log);
         physicsHandler         = new PhysicsHandler(configuration, Framework, GameInterop, Log);
         antiAfkHandler         = new AntiAfkHandler(configuration, Framework, ObjectTable, Log, windowHandle);

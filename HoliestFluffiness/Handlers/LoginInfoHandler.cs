@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
@@ -16,7 +17,7 @@ using HoliestFluffiness.Windows;
 
 namespace HoliestFluffiness;
 
-public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log)
+public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable, ICondition condition, LoginInfoWindow loginInfoWindow, CharacterDb characterDb, IPluginLog log)
 {
     public static readonly Dictionary<uint, string> TrackedItems = new()
     {
@@ -80,21 +81,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             if (dbEnabled)
             {
                 var xwChar = await CollectCharacterAsync(token);
-                if (xwChar != null)
-                {
-                    var xwExisting = await Task.Run(() => characterDb.GetByKey(xwChar.DbKey), token);
-                    if (xwExisting != null)
-                    {
-                        var xwGil   = await CollectGilAsync(token);
-                        var xwMgp   = await CollectMgpAsync(token);
-                        var xwPlate = await CollectPlateAsync(token, retry: true);
-                        if (xwGil >= 0)                     xwExisting.Gil        = xwGil;
-                        if (xwMgp >= 0)                     xwExisting.Mgp        = xwMgp;
-                        if (xwPlate?.TextValue != null)     xwExisting.SearchInfo = xwPlate.TextValue;
-                        xwExisting.LastSeen = DateTime.UtcNow;
-                        await Task.Run(() => characterDb.Upsert(xwExisting), token);
-                    }
-                }
+                if (xwChar != null) await UpdateCrossWorldFieldsAsync(token, xwChar.DbKey);
             }
 
             return;
@@ -179,10 +166,14 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             plate = await CollectPlateAsync(token);
         }
 
+        // Falls back to the cached name when this read is inconclusive or tag-only, so a mid-session
+        // hiccup (see CollectFcAsync) shows the last known-good FC instead of a truncated tag.
+        var (resolvedFc, _) = ResolveFc(fc, fcConfirmed, existing?.FreeCompany, existing?.FcLeader ?? false);
+
         string? displayChar = characterWanted    ? charInfo?.Display : null;
         string? displayPH   = privateHouseWanted ? privateHouse      : null;
         string? displayFcH  = fcHouseWanted      ? fcHouse           : null;
-        FcData? displayFc   = fcWanted           ? fc                : null;
+        string? displayFc   = fcWanted           ? resolvedFc        : null;
         SeString? displayPl = plateWanted        ? plate             : null;
 
         if (displayChar != null || displayFc != null || displayPl != null || displayPH != null || displayFcH != null)
@@ -255,6 +246,24 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return different;
     }
 
+    // FC info is unreliable while visiting another world (same underlying issue as being bound by a
+    // duty), but Gil/MGP/search info stay accurate, so those still get saved.
+    private async Task UpdateCrossWorldFieldsAsync(CancellationToken token, string dbKey)
+    {
+        var existing = await Task.Run(() => characterDb.GetByKey(dbKey), token);
+        if (existing == null) return;
+
+        var gil   = await CollectGilAsync(token);
+        var mgp   = await CollectMgpAsync(token);
+        var plate = await CollectPlateAsync(token, retry: true);
+
+        if (gil >= 0)                 existing.Gil        = gil;
+        if (mgp >= 0)                 existing.Mgp        = mgp;
+        if (plate?.TextValue != null) existing.SearchInfo = plate.TextValue;
+        existing.LastSeen = DateTime.UtcNow;
+        await Task.Run(() => characterDb.Upsert(existing), token);
+    }
+
     public async Task QuickSaveAsync()
     {
         if (!configuration.CharactersDbEnabled) return;
@@ -289,14 +298,28 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
             try
             {
-                if (await IsOnDifferentWorldAsync()) continue;
+                if (await IsOnDifferentWorldAsync())
+                {
+                    await UpdateCrossWorldFieldsAsync(token, charInfo.DbKey);
+                    log.Debug("Periodic tick for {Key}: different world, cross-world fields updated", charInfo.DbKey);
+                    continue;
+                }
 
                 var snapshot = await CollectSnapshotAsync(token);
 
                 var existing = await Task.Run(() => characterDb.GetByKey(charInfo.DbKey), token);
-                if (existing == null) continue;
+                if (existing == null)
+                {
+                    log.Debug("Periodic tick for {Key}: no existing DB record, skipped", charInfo.DbKey);
+                    continue;
+                }
 
-                if (!Merge(existing, existing, snapshot)) continue;
+                if (!Merge(existing, existing, snapshot))
+                {
+                    log.Debug("Periodic tick for {Key}: no change detected, skipped", charInfo.DbKey);
+                    continue;
+                }
+
                 existing.LastSeen = DateTime.UtcNow;
                 await Task.Run(() => characterDb.Upsert(existing), token);
                 log.Debug("Periodic DB update written for {Key}", charInfo.DbKey);
@@ -312,7 +335,19 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     // its own way (display toggles, cached-plate verification) and only reuses Merge.
     private async Task<CharacterSnapshot> CollectSnapshotAsync(CancellationToken token)
     {
-        var fcRead       = await CollectFcAsync(token, instant: true);
+        // FC is read from InfoProxyFreeCompany, which is known to misbehave in some game states (e.g.
+        // mid-duty); isolated so a bad FC read can never take Gil/MGP/etc down with it for this tick.
+        FcRead fcRead;
+        try
+        {
+            fcRead = await CollectFcAsync(token, instant: true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            log.Error(ex, "FC read failed during periodic snapshot; other fields still collected.");
+            fcRead = new FcRead(null, Confirmed: false);
+        }
+
         var privateHouse = await CollectPrivateHouseAsync(token);
         var fcHouse      = await CollectFcHouseAsync(token);
         var gil          = await CollectGilAsync(token);
@@ -323,27 +358,31 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return new CharacterSnapshot(fcRead.Fc, fcRead.Confirmed, privateHouse, fcHouse, gil, mgp, fcPoints, plate, inventory);
     }
 
+    // True if cachedDisplay is a "«Tag» Name" for the same tag: a tag-only read is the name proxy
+    // lagging behind, not a genuine FC change. Trimmed and case-insensitive to tolerate incidental
+    // formatting differences between reads.
+    private static bool SameFcTag(string? cachedDisplay, string tag) =>
+        !string.IsNullOrEmpty(cachedDisplay) &&
+        cachedDisplay.TrimStart().StartsWith($"«{tag.Trim()}»", StringComparison.OrdinalIgnoreCase);
+
+    // Resolves the FC display/leader flag to use, falling back to the cached value when the read is
+    // inconclusive or only got the tag (name proxy lagging). A confirmed read with a genuinely
+    // different tag always wins, since that means the FC actually changed. Shared by Merge (what gets
+    // persisted) and RunAsync (what gets shown), so a stale live read never regresses either one.
+    private static (string? Display, bool Leader) ResolveFc(FcData? fc, bool confirmed, string? cachedDisplay, bool cachedLeader)
+    {
+        bool tagOnly    = confirmed && fc is { Name.Length: 0 };
+        bool keepCached = !confirmed || (tagOnly && SameFcTag(cachedDisplay, fc!.Tag));
+        return keepCached ? (cachedDisplay, cachedLeader) : (fc?.Display, fc?.IsLeader ?? false);
+    }
+
     // Applies the "only accept confident values" rules field by field, writing into target and using
     // fallback for anything the snapshot did not load confidently. target and fallback are the same
     // record for in-place updates; RunAsync passes a fresh target with a separate fallback source.
     // Returns whether any merged field differs from target's prior value (used to skip no-op writes).
-    // True if cachedDisplay is a "«Tag» Name" for the same tag, meaning a tag-only read is the name
-    // proxy lagging rather than an actual FC change.
-    private static bool SameFcTag(string? cachedDisplay, string tag) =>
-        !string.IsNullOrEmpty(cachedDisplay) && cachedDisplay.StartsWith($"«{tag}»", StringComparison.Ordinal);
-
     private static bool Merge(CharacterRecord target, CharacterRecord fallback, CharacterSnapshot snap)
     {
-        // Unconfirmed reads and tag-only reads of an already-known FC fall back to the cached value
-        // instead of wiping or truncating it; see CollectFcAsync/FcRead.
-        bool tagOnly = snap.FcConfirmed && snap.Fc is { Name.Length: 0 };
-
-        var freeCompany = !snap.FcConfirmed ? fallback.FreeCompany
-            : tagOnly && SameFcTag(fallback.FreeCompany, snap.Fc!.Tag) ? fallback.FreeCompany
-            : snap.Fc?.Display;
-        var fcLeader = !snap.FcConfirmed ? fallback.FcLeader
-            : tagOnly && SameFcTag(fallback.FreeCompany, snap.Fc!.Tag) ? fallback.FcLeader
-            : snap.Fc?.IsLeader ?? false;
+        var (freeCompany, fcLeader) = ResolveFc(snap.Fc, snap.FcConfirmed, fallback.FreeCompany, fallback.FcLeader);
         var gil          = snap.Gil >= 0 ? snap.Gil : fallback.Gil;
         var mgp          = snap.Mgp >= 0 ? snap.Mgp : fallback.Mgp;
         var fcPoints     = !snap.FcConfirmed ? fallback.FcPoints : (snap.Fc == null ? -1 : (snap.FcPoints >= 0 ? snap.FcPoints : fallback.FcPoints));
@@ -376,14 +415,14 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return changed;
     }
 
-    private async Task ShowData(string? character, FcData? fc, SeString? plate, string? privateHouse, string? fcHouse)
+    private async Task ShowData(string? character, string? fc, SeString? plate, string? privateHouse, string? fcHouse)
     {
         switch (configuration.LoginInfoDisplay)
         {
             case LoginInfoDisplay.Popup:
                 var order = configuration.LoginInfoOrder;
                 await framework.RunOnFrameworkThread(() =>
-                    loginInfoWindow.SetData(character, fc?.Display, plate?.ToString(), privateHouse, fcHouse, order));
+                    loginInfoWindow.SetData(character, fc, plate?.ToString(), privateHouse, fcHouse, order));
                 break;
 
             case LoginInfoDisplay.Toast:
@@ -403,7 +442,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         }
     }
 
-    private SeString? BuildChatMessage(string? character, FcData? fc, SeString? plate, string? privateHouse, string? fcHouse, bool includeHeader = false)
+    private SeString? BuildChatMessage(string? character, string? fc, SeString? plate, string? privateHouse, string? fcHouse, bool includeHeader = false)
     {
         if (character == null && fc == null && plate == null && privateHouse == null && fcHouse == null) return null;
 
@@ -430,7 +469,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                     builder.AddText($"\n{spacer}》 Private house: {privateHouse}");
                     break;
                 case 3 when fc != null:
-                    builder.AddText($"\n{spacer}》 Free Company: {fc.Display}");
+                    builder.AddText($"\n{spacer}》 Free Company: {fc}");
                     break;
                 case 4 when fcHouse != null:
                     builder.AddText($"\n{spacer}》 FC house: {fcHouse}");
@@ -477,6 +516,14 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     private async Task<FcRead> CollectFcAsync(CancellationToken token, bool instant = false)
     {
         token.ThrowIfCancellationRequested();
+
+        // Both the tag and the name go blank while bound by a duty (confirmed: the tag alone is not a
+        // reliable "left the FC" signal in this state, unlike everywhere else). Reading is pointless
+        // here, so report unconfirmed straight away and let the caller keep whatever is cached.
+        bool boundByDuty = false;
+        await framework.RunOnFrameworkThread(() =>
+            boundByDuty = condition[ConditionFlag.BoundByDuty] || condition[ConditionFlag.BoundByDuty56] || condition[ConditionFlag.BoundByDuty95]);
+        if (boundByDuty) return new FcRead(null, Confirmed: false);
 
         var attempts = instant ? 1 : 10;
         string tag = string.Empty, name = string.Empty;
@@ -657,13 +704,11 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         return result;
     }
 
-    // Opens the FC window to trigger the server request, closes it, then polls until the value
-    // changes. The round trip can land after the window closes, so waiting on a real change beats a
-    // fixed delay. A window the player already had open is left alone.
-    private async Task<long> ForceRefreshFcWindowAsync(CancellationToken token)
+    // Opens the FC window (if not already open) to trigger the server round trip that fills in both
+    // the credit shop data and InfoProxyFreeCompany's name, waits for it to be ready, then closes it
+    // again if we were the one who opened it. A window the player already had open is left alone.
+    private async Task OpenFcWindowBrieflyAsync(CancellationToken token)
     {
-        var before = await ReadFcPointsRawAsync(token);
-
         bool alreadyOpen = false;
         await framework.RunOnFrameworkThread(() =>
         {
@@ -706,6 +751,15 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 }
             });
         }
+    }
+
+    // Opens the FC window to trigger the server request, closes it, then polls until the value
+    // changes. The round trip can land after the window closes, so waiting on a real change beats a
+    // fixed delay.
+    private async Task<long> ForceRefreshFcWindowAsync(CancellationToken token)
+    {
+        var before = await ReadFcPointsRawAsync(token);
+        await OpenFcWindowBrieflyAsync(token);
 
         for (var i = 0; i < 20; i++)
         {
