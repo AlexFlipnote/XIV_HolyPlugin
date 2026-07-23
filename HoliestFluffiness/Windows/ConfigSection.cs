@@ -6,7 +6,7 @@ public enum ConfigSection
     Login      = 1,
     Indicators = 2,
     // 3 intentionally unused (removed section; numbering kept stable for saved LastSelectedSection values)
-    Tracking   = 4,
+    Database   = 4,
     Characters = 5,
     Bids       = 6,
     About      = 7,

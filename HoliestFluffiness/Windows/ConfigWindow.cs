@@ -71,7 +71,7 @@ public partial class ConfigWindow : Window
         this.onClientSettingsChanged = onClientSettingsChanged;
         selectedSection = (ConfigSection)configuration.LastSelectedSection;
         if (!configuration.CharactersDbEnabled && (selectedSection == ConfigSection.Characters || selectedSection == ConfigSection.Bids))
-            selectedSection = ConfigSection.Tracking;
+            selectedSection = ConfigSection.Database;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -88,7 +88,7 @@ public partial class ConfigWindow : Window
     public void NavigateTo(ConfigSection section)
     {
         if (!configuration.CharactersDbEnabled && (section == ConfigSection.Characters || section == ConfigSection.Bids))
-            section = ConfigSection.Tracking;
+            section = ConfigSection.Database;
 
         selectedSection = section;
         configuration.LastSelectedSection = (int)section;
@@ -169,7 +169,7 @@ public partial class ConfigWindow : Window
         foreach (var section in new[]
                  {
                      ConfigSection.Client, ConfigSection.Login, ConfigSection.Indicators,
-                     ConfigSection.Social, ConfigSection.Tracking,
+                     ConfigSection.Social, ConfigSection.Database,
                  })
         {
             currentDrawSection = section;
@@ -179,7 +179,7 @@ public partial class ConfigWindow : Window
                 case ConfigSection.Login:      DrawLoginSection();      break;
                 case ConfigSection.Indicators: DrawIndicatorsSection(); break;
                 case ConfigSection.Social:     DrawSocialSection();     break;
-                case ConfigSection.Tracking:   DrawTrackingSection();   break;
+                case ConfigSection.Database:   DrawDatabaseSection();   break;
             }
         }
 
@@ -232,7 +232,7 @@ public partial class ConfigWindow : Window
         {
             ImGui.Dummy(new Vector2(0, 4));
             SidebarSeparator();
-            SidebarItem("Tracking", ConfigSection.Tracking);
+            SidebarItem("Database", ConfigSection.Database);
             if (SidebarItem("Characters", ConfigSection.Characters))
                 LoadCharacters();
             if (SidebarItem("House bids", ConfigSection.Bids))
@@ -240,7 +240,7 @@ public partial class ConfigWindow : Window
         } else
         {
             // With the DB off there is no separator, just the toggle
-            SidebarItem("Tracking", ConfigSection.Tracking);
+            SidebarItem("Database", ConfigSection.Database);
         }
 
         ImGui.Dummy(new Vector2(0, 4));
@@ -349,7 +349,7 @@ public partial class ConfigWindow : Window
                 case ConfigSection.Client:     DrawClientSection();     break;
                 case ConfigSection.Login:      DrawLoginSection();      break;
                 case ConfigSection.Indicators: DrawIndicatorsSection(); break;
-                case ConfigSection.Tracking:   DrawTrackingSection();   break;
+                case ConfigSection.Database:   DrawDatabaseSection();   break;
                 case ConfigSection.Characters: DrawCharactersSection(); break;
                 case ConfigSection.Bids:       DrawBidsSection();       break;
                 case ConfigSection.About:      DrawAboutSection();      break;
@@ -376,13 +376,13 @@ public partial class ConfigWindow : Window
             cachedSearchVersion   = SearchIndex.Version;
             cachedSearchDbEnabled = dbOn;
 
-            // Hidden sidebar entries stay out of the results, or clicking one bounces to Tracking
+            // Hidden sidebar entries stay out of the results, or clicking one bounces to Database
             var visible = SearchIndex.Entries.Where(e =>
                 dbOn || (e.Section != ConfigSection.Characters && e.Section != ConfigSection.Bids));
 
             var filtered = showAll ? visible : visible.Where(e => Matches(e, query));
 
-            // Kind first, so "tracking" leads with the section, then its groups, then its settings
+            // Kind first, so "database" leads with the section, then its groups, then its settings
             cachedSearchMatches = filtered
                 .OrderBy(e => e.Kind)
                 .ThenBy(e => e.Section)

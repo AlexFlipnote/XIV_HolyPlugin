@@ -26,9 +26,9 @@ public partial class ConfigWindow
             : s;
     }
 
-    private void DrawTrackingSection()
+    private void DrawDatabaseSection()
     {
-        BeginSection("Tracking", "Tracks info for your own characters only, across every world and data center you play on. " +
+        BeginSection("Database", "Tracks info for your own characters only, across every world and data center you play on. " +
             "Everything is stored in a local SQLite database on your machine, nothing is ever sent anywhere.");
 
         ConfigCheckbox(

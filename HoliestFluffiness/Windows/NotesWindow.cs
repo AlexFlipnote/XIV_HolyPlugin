@@ -340,7 +340,6 @@ public sealed class NotesWindow : Window, IDisposable
 
     private void DrawFilterPopup()
     {
-        Common.PushGoldCombo();
         if (ImGui.BeginPopup("##notesfilterpopup"))
         {
             foreach (var tab in Enum.GetValues<Filter>())
@@ -348,7 +347,6 @@ public sealed class NotesWindow : Window, IDisposable
                     filter = tab;
             ImGui.EndPopup();
         }
-        Common.PopGoldCombo();
     }
 
     private void CreateNote()
