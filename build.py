@@ -29,23 +29,41 @@ def get_dalamud_api_level():
     return int(match.group(1)) if match else 15
 
 
-def get_release(tag):
+def _api_get(url):
     token = os.environ.get("GITHUB_TOKEN", "")
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}"
     req = urllib.request.Request(url)
     req.add_header("Accept", "application/vnd.github+json")
     if token:
         req.add_header("Authorization", f"token {token}")
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read())
+
+
+def get_release(tag):
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}"
     try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+        return _api_get(url)
     except (urllib.error.URLError, json.JSONDecodeError) as e:
         print(f"Could not fetch release {tag}: {e}")
         return {}
 
 
-def get_download_count(release):
-    return sum(asset.get("download_count", 0) for asset in release.get("assets", []))
+def get_total_download_count():
+    total = 0
+    page = 1
+    while True:
+        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases?per_page=100&page={page}"
+        try:
+            releases = _api_get(url)
+        except (urllib.error.URLError, json.JSONDecodeError) as e:
+            print(f"Could not fetch releases page {page}: {e}")
+            break
+        if not releases:
+            break
+        for release in releases:
+            total += sum(asset.get("download_count", 0) for asset in release.get("assets", []))
+        page += 1
+    return total
 
 
 def get_changelog(release):
@@ -111,7 +129,7 @@ def main():
     if changelog:
         manifest["Changelog"] = changelog
 
-    manifest["DownloadCount"] = get_download_count(release)
+    manifest["DownloadCount"] = get_total_download_count()
     manifest["LastUpdate"] = get_last_update(version, get_published_at(release))
 
     with open("repo.json", "w") as f:
