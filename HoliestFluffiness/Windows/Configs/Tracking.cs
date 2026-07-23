@@ -26,9 +26,10 @@ public partial class ConfigWindow
             : s;
     }
 
-    private void DrawDatabaseSection()
+    private void DrawTrackingSection()
     {
-        BeginSection("Database", "Stores character info to a local SQLite database on every login.");
+        BeginSection("Tracking", "Tracks info for your own characters only, across every world and data center you play on. " +
+            "Everything is stored in a local SQLite database on your machine, nothing is ever sent anywhere.");
 
         ConfigCheckbox(
             "Enable character database##dbenabled",

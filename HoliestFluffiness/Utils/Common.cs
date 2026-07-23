@@ -278,6 +278,37 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
+    // Combo box (and its dropdown popup) with a gold accent border and gold-highlighted rows when
+    // hovered/selected, but plain white text - an all-gold combo reads as overdone.
+    internal static void PushGoldCombo()
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColWhite,   ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.Border,        T(Theme.ColGoldMid, ImGuiCol.Border));
+        ImGui.PushStyleColor(ImGuiCol.PopupBg,       FadeT(Theme.ColSecondary, ImGuiCol.PopupBg));
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, T(Theme.ColGoldMid, ImGuiCol.HeaderHovered));
+        ImGui.PushStyleColor(ImGuiCol.HeaderActive,  T(Theme.ColGold,    ImGuiCol.HeaderActive));
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
+    }
+    internal static void PopGoldCombo()
+    {
+        ImGui.PopStyleColor(5);
+        ImGui.PopStyleVar();
+    }
+
+    // Same gold checkmark/border convention ConfigWindow's private PushCheckbox uses, shared here
+    // since NotesWindow isn't part of that partial class.
+    internal static void PushGoldCheckbox()
+    {
+        ImGui.PushStyleColor(ImGuiCol.CheckMark, T(Theme.ColGold, ImGuiCol.CheckMark));
+        ImGui.PushStyleColor(ImGuiCol.Border,    T(Theme.ColGold, ImGuiCol.Border));
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
+    }
+    internal static void PopGoldCheckbox()
+    {
+        ImGui.PopStyleColor(2);
+        ImGui.PopStyleVar();
+    }
+
     internal static void CenterCursorForWidth(float width) =>
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetContentRegionAvail().X - width) * 0.5f);
 

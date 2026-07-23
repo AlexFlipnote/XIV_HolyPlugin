@@ -44,7 +44,7 @@ public partial class ConfigWindow
             ConfigSection.Login      => "Login",
             ConfigSection.Indicators => "Indicators",
             ConfigSection.Social     => "Social",
-            ConfigSection.Database   => "Database",
+            ConfigSection.Tracking   => "Tracking",
             ConfigSection.Characters => "Characters",
             ConfigSection.Bids       => "House bids",
             ConfigSection.About      => "About",
@@ -63,7 +63,8 @@ public partial class ConfigWindow
                 "loot mp bar server info repair food check ready check combat hits");
             Seed(ConfigSection.Social, "Nearby players, targeting tracker, house doorbell, commendation sounds, and nameplate tweaks.",
                 "nameplate doorbell commendation targeting");
-            Seed(ConfigSection.Database, "Stores character info to a local SQLite database on every login.",
+            Seed(ConfigSection.Tracking, "Tracks info for your own characters only, across every world and data center you play on. " +
+                "Everything is stored in a local SQLite database on your machine, nothing is ever sent anywhere.",
                 "sqlite storage backup export");
             Seed(ConfigSection.Characters, "Cached info for every character you've logged into, including gil, MGP, houses, and tracked items.",
                 "gil mgp inventory houses submarine alt");

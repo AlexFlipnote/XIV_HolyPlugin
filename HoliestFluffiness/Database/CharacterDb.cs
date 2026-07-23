@@ -38,19 +38,22 @@ public sealed class CharacterDb : IDisposable
         // entry points at the old load context's type and throws InvalidCastException.
         ClearStaleMapping<CharacterRecord>();
         ClearStaleMapping<HousingBidRecord>();
+        ClearStaleMapping<NoteRecord>();
         db = new SQLiteConnection(path);
         db.CreateTable<CharacterRecord>();
         db.CreateTable<HousingBidRecord>();
-        AddColumnIfMissing("slot", "INTEGER");
-        AddColumnIfMissing("inventory", "TEXT");
-        AddColumnIfMissing("mgp", "INTEGER");
-        AddColumnIfMissing("fc_points", "INTEGER");
-        AddColumnIfMissing("fc_leader", "INTEGER");
+        db.CreateTable<NoteRecord>();
+        AddColumnIfMissing("characters", "slot", "INTEGER");
+        AddColumnIfMissing("characters", "inventory", "TEXT");
+        AddColumnIfMissing("characters", "mgp", "INTEGER");
+        AddColumnIfMissing("characters", "fc_points", "INTEGER");
+        AddColumnIfMissing("characters", "fc_leader", "INTEGER");
+        AddColumnIfMissing("notes", "hide_on_combat", "INTEGER");
     }
 
-    private void AddColumnIfMissing(string column, string type)
+    private void AddColumnIfMissing(string table, string column, string type)
     {
-        try { db.Execute($"ALTER TABLE characters ADD COLUMN {column} {type}"); }
+        try { db.Execute($"ALTER TABLE {table} ADD COLUMN {column} {type}"); }
         catch { /* column already exists */ }
     }
 
@@ -250,6 +253,35 @@ public sealed class CharacterDb : IDisposable
     public void DeleteBid(int id)
     {
         lock (dbLock) db.Delete<HousingBidRecord>(id);
+    }
+
+    public List<NoteRecord> GetAllNotes()
+    {
+        lock (dbLock) return [.. db.Table<NoteRecord>()];
+    }
+
+    // Notes applicable to a given character: global notes plus notes authored under that character
+    public List<NoteRecord> GetNotesForCharacter(string characterKey)
+    {
+        lock (dbLock) return [.. db.Table<NoteRecord>().Where(n => n.IsGlobal || n.Author == characterKey)];
+    }
+
+    // InsertOrReplace would include the (unset, defaulted-to-0) autoincrement Id in the insert
+    // column list and collide every new note against whichever row already has id 0, so creation
+    // and update are split: Insert lets sqlite-net autogenerate the id, Update matches on it.
+    public void AddNote(NoteRecord note)
+    {
+        lock (dbLock) db.Insert(note);
+    }
+
+    public void UpdateNote(NoteRecord note)
+    {
+        lock (dbLock) db.Update(note);
+    }
+
+    public void DeleteNote(int id)
+    {
+        lock (dbLock) db.Delete<NoteRecord>(id);
     }
 
     public void Dispose()

@@ -41,6 +41,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string NearbyCommand    = "/nearby";
     private const string FoodCheckCommand = "/foodcheck";
     private const string FatesCommand     = "/fates";
+    private const string NotesCommand     = "/notes";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -64,6 +65,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IFlyTextGui    FlyTextGui    { get; init; } = null!;
     [PluginService] private INamePlateGui NamePlateGui  { get; init; } = null!;
     [PluginService] private IFateTable FateTable { get; init; } = null!;
+    [PluginService] private IDutyState DutyState { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -74,6 +76,9 @@ public sealed class Plugin : IDalamudPlugin
     private readonly AccessoryHandler accessoryHandler;
     private readonly LoginInfoHandler loginInfoHandler;
     private readonly CharacterDb characterDb;
+    private readonly NotesHandler notesHandler;
+    private readonly NotesWindow notesWindow;
+    private readonly NotePreviewWindow notePreviewWindow;
     private readonly CharaSelectHandler charaSelectHandler;
     private readonly HousingLotteryHandler housingLotteryHandler;
     private readonly ServerInfoHandler serverInfoHandler;
@@ -166,6 +171,12 @@ public sealed class Plugin : IDalamudPlugin
         var dbPath = Path.Combine(PluginInterface.GetPluginConfigDirectory(), "storage.db");
         characterDb = new CharacterDb(dbPath);
 
+        notesHandler      = new NotesHandler(characterDb, ClientState, Condition, ObjectTable, DataManager, Framework, DutyState);
+        notePreviewWindow = new NotePreviewWindow();
+        notesWindow       = new NotesWindow(characterDb, notesHandler, DataManager, notePreviewWindow);
+        notesHandler.RequestShowPreview += OnRequestShowNotePreview;
+        notesHandler.RequestUpdateDutyPreview += OnRequestUpdateDutyPreview;
+
         accessoryHandler    = new AccessoryHandler(configuration, ChatGui, Framework, ObjectTable);
         loginInfoWindow     = new LoginInfoWindow(() => { configWindow!.IsOpen = true; configWindow.NavigateTo(ConfigSection.Characters); },
                                                   () => configuration.CharactersDbEnabled);
@@ -232,10 +243,12 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(pingChartWindow);
         windowSystem.AddWindow(fpsChartWindow);
         windowSystem.AddWindow(foodCheckOverlay);
+        windowSystem.AddWindow(notesWindow);
+        windowSystem.AddWindow(notePreviewWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' for the about page, '/hf ping' for the ping chart, '/hf foodcheck' to run a food check."
+            HelpMessage = "Open The Holiest Fluffiness settings. Use '/hf about' for the about page, '/hf ping' for the ping chart, '/hf foodcheck' to run a food check, '/hf notes' (or '/notes') to open the notes window."
         });
         CommandManager.AddHandler(HwCommand, new CommandInfo(OnHwCommand)
         {
@@ -260,6 +273,10 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(FatesCommand, new CommandInfo(OnFatesCommand)
         {
             HelpMessage = "Toggle the Active FATEs window."
+        });
+        CommandManager.AddHandler(NotesCommand, new CommandInfo(OnNotesCommand)
+        {
+            HelpMessage = "Toggle the Notes window."
         });
 
         // Snapshot before anything draws, so a mid-frame toggle cannot desync the colour stack
@@ -326,6 +343,9 @@ public sealed class Plugin : IDalamudPlugin
             case "foodcheck":
                 foodCheckHandler.ForceCheck();
                 break;
+            case "notes":
+                OnNotesCommand(command, "");
+                break;
             default:
                 configWindow.IsOpen = !configWindow.IsOpen;
                 break;
@@ -386,6 +406,12 @@ public sealed class Plugin : IDalamudPlugin
     private void OnFoodCheckCommand(string command, string args) => foodCheckHandler.ForceCheck();
 
     private void OnFatesCommand(string command, string args) => fateListWindow.IsOpen = !fateListWindow.IsOpen;
+
+    private void OnNotesCommand(string command, string args) => notesWindow.IsOpen = !notesWindow.IsOpen;
+
+    private void OnRequestShowNotePreview(List<NoteRecord> notes) => notePreviewWindow.Show(notes);
+
+    private void OnRequestUpdateDutyPreview(List<NoteRecord> notes, int? dutyId) => notePreviewWindow.UpdateDutyPreview(notes, dutyId);
 
     private void OnNearbyCommand(string command, string args)
     {
@@ -935,6 +961,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(NearbyCommand);
         CommandManager.RemoveHandler(FoodCheckCommand);
         CommandManager.RemoveHandler(FatesCommand);
+        CommandManager.RemoveHandler(NotesCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
@@ -947,6 +974,10 @@ public sealed class Plugin : IDalamudPlugin
         }
         windowSystem.RemoveAllWindows();
         // RemoveAllWindows only unregisters from the draw loop, it does not dispose
+        notesHandler.RequestShowPreview -= OnRequestShowNotePreview;
+        notesHandler.RequestUpdateDutyPreview -= OnRequestUpdateDutyPreview;
+        notesHandler.Dispose();
+        notesWindow.Dispose();
         fateListWindow.Dispose();
         nearbyWindow.Dispose();
         pingChartWindow.Dispose();
