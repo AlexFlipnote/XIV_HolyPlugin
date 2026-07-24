@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
@@ -32,6 +33,12 @@ public sealed class PingChartWindow : Window, IDisposable
 
     public override void Draw()
     {
+        var address = handler.ConnectedAddress;
+        if (IPAddress.IsLoopback(address))
+            Common.RedText("Not connected");
+        else
+            Common.DimmedText($"Server: {address}");
+
         var data = handler.PingChartData;
         if (data.Length == 0)
         {

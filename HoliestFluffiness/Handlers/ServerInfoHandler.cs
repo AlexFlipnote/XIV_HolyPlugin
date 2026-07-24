@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.Gui.Dtr;
@@ -52,7 +53,14 @@ public sealed class ServerInfoHandler : IDisposable
     private int lastFps;
     private uint lastDcId;
     private int lastNearbyCount = -1;
-    private IPAddress serverAddress = IPAddress.Loopback;
+
+    // Approximate lobby IP for the current DC, used only when the real address can't be detected
+    private IPAddress dcFallbackAddress = IPAddress.Loopback;
+    private bool tcpDetectDidError;
+
+    // Written from the PingLoop thread; IPAddress is immutable so a bare volatile read/write is safe
+    private volatile IPAddress connectedAddress = IPAddress.Loopback;
+    public IPAddress ConnectedAddress => connectedAddress;
 
     public ServerInfoHandler(Configuration config, IDtrBar dtrBar, IFramework framework,
         IClientState clientState, IObjectTable objectTable, IPluginLog log)
@@ -119,7 +127,7 @@ public sealed class ServerInfoHandler : IDisposable
         var dcId   = player?.CurrentWorld.ValueNullable?.DataCenter.RowId;
         if (dcId == null || dcId == lastDcId) return;
         lastDcId = (uint)dcId;
-        serverAddress = dcId.Value switch
+        dcFallbackAddress = dcId.Value switch
         {
             1  => IPAddress.Parse("119.252.36.6"),  // Elemental
             2  => IPAddress.Parse("119.252.36.7"),  // Gaia
@@ -207,11 +215,14 @@ public sealed class ServerInfoHandler : IDisposable
     {
         while (!token.IsCancellationRequested)
         {
-            if (!IPAddress.IsLoopback(serverAddress))
+            var address = DetectRealServerAddress() ?? dcFallbackAddress;
+            connectedAddress = address;
+
+            if (!IPAddress.IsLoopback(address))
             {
                 try
                 {
-                    var reply = await ping.SendPingAsync(serverAddress).ConfigureAwait(false);
+                    var reply = await ping.SendPingAsync(address).ConfigureAwait(false);
                     RecordPing(reply.Status == IPStatus.Success ? (ulong)reply.RoundtripTime : null);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -223,6 +234,87 @@ public sealed class ServerInfoHandler : IDisposable
 
             await Task.Delay(3000, token).ConfigureAwait(false);
         }
+    }
+
+    // Reads the process' own TCP connection table to find the actual FFXIV server we're talking
+    // to, rather than guessing from the DC's lobby IP. Falls back to null (and dcFallbackAddress)
+    // if the table can't be read, or no matching connection is found (e.g. at the character select
+    // screen, or briefly during a zone change).
+    private const int AfInet = 2;
+    private const int TcpTableOwnerPidConnections = 4;
+    private const int TcpStateListen = 2;
+
+    private static readonly (ushort Min, ushort Max)[] XivPortRanges =
+    [
+        (54992, 54994),
+        (55006, 55007),
+        (55021, 55040),
+        (55296, 55551),
+    ];
+
+    private IPAddress? DetectRealServerAddress()
+    {
+        try
+        {
+            var size = 0;
+            _ = GetExtendedTcpTable(IntPtr.Zero, ref size, false, AfInet, TcpTableOwnerPidConnections);
+            if (size <= 0) return null;
+
+            var buffer = Marshal.AllocHGlobal(size);
+            try
+            {
+                if (GetExtendedTcpTable(buffer, ref size, false, AfInet, TcpTableOwnerPidConnections) != 0)
+                    return null;
+
+                var pid      = Environment.ProcessId;
+                var rowSize  = Marshal.SizeOf<TcpRow>();
+                var rowCount = Marshal.ReadInt32(buffer);
+                var rowsPtr  = buffer + 4;
+
+                for (var i = 0; i < rowCount && size - (4 + i * rowSize) >= rowSize; i++)
+                {
+                    var row = Marshal.PtrToStructure<TcpRow>(rowsPtr + i * rowSize);
+                    if (row.State == TcpStateListen || (int)row.OwningPid != pid) continue;
+
+                    var port = (ushort)IPAddress.NetworkToHostOrder((short)(ushort)row.RemotePort);
+                    if (!XivPortRanges.Any(r => port >= r.Min && port <= r.Max)) continue;
+
+                    var remote = new IPAddress(row.RemoteAddr);
+                    if (IPAddress.IsLoopback(remote)) continue;
+
+                    return remote;
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!tcpDetectDidError)
+            {
+                tcpDetectDidError = true;
+                log.Warning(ex, "[HF] Reading TCP table for server address failed, falling back to DC address.");
+            }
+        }
+
+        return null;
+    }
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern uint GetExtendedTcpTable(IntPtr tcpTable, ref int size, bool sort, int ipVersion,
+        int tableClass, uint reserved = 0);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct TcpRow
+    {
+        public readonly uint State;
+        public readonly uint LocalAddr;
+        public readonly uint LocalPort;
+        public readonly uint RemoteAddr;
+        public readonly uint RemotePort;
+        public readonly uint OwningPid;
     }
 
     public void Dispose()
