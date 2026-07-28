@@ -55,6 +55,22 @@ def sig_to_regex(sig: str) -> re.Pattern:
     return re.compile(pat, re.DOTALL)
 
 
+def suggest_pattern(old_pattern: str, new_bytes: bytes) -> str:
+    """
+    Diff the current pattern's literal bytes against the anchor's new location, wildcarding whatever changed.
+
+    Existing wildcard positions stay wildcarded; this only ever loosens the pattern, never guesses a byte back in.
+    """
+    new_tokens = new_bytes.hex(" ").upper().split()
+    suggested = []
+    for i, tok in enumerate(old_pattern.split()):
+        if tok == "??" or i >= len(new_tokens) or tok != new_tokens[i]:
+            suggested.append("??")
+        else:
+            suggested.append(tok)
+    return " ".join(suggested)
+
+
 def short_hash(path: Path) -> str:
     """Return an 8-char MD5 hash of the first 4KB of a file, used as a game version identifier."""
     return hashlib.md5(path.read_bytes()[:4096]).hexdigest()[:8]
@@ -97,7 +113,10 @@ def scan(exe_path: Path) -> None:
                 anchor = bytes.fromhex(last["bytes_at_rva"].replace(" ", ""))
                 m2 = re.search(re.escape(anchor), data, re.DOTALL)
                 if m2:
+                    new_bytes = data[m2.start():m2.start() + ANCHOR_N]
+                    suggestion = suggest_pattern(pattern, new_bytes)
                     print(f"      anchor hit at {hex(m2.start())}, function moved, update pattern in Sigs.cs")
+                    print(f"      suggested pattern: {suggestion}")
                 else:
                     print("      anchor also gone, function was rewritten, manual Ghidra needed")
             else:
