@@ -87,8 +87,8 @@ public partial class ConfigWindow
 
         BeginSection(
             "Bids",
-            "Housing lottery bids are tracked automatically when you place or confirm a bid. Once the lottery concludes, whether you win and claim the plot, get refunded, or simply lose, the entry is removed automatically, so anything still listed here is still an active, unresolved bid. " +
-            "Right-click the header to show/hide columns, drag a header to reorder.");
+            "Housing lottery bids are tracked automatically when you place or confirm a bid. " +
+            "Once the lottery concludes, whether you win and claim the plot, get refunded, or simply lose, the entry is removed automatically, anything still listed here is still an active, unresolved bid.");
 
         DrawTableToolbar(ref bidFilter, "##bidfilter", LoadBids, "Refresh##bidrefresh");
 

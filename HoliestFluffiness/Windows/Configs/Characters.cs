@@ -149,8 +149,7 @@ public partial class ConfigWindow
 
         BeginSection(
             "Characters",
-            "Shows cached info for every character you've logged into, including gil, MGP, houses, and tracked items like FC submarine materials. " +
-            "Right-click the header to show/hide columns, drag a header to reorder.");
+            "Shows cached info for every character you've logged into, including gil, MGP, houses, and tracked items like FC submarine materials.");
 
         DrawTableToolbar(ref charFilter, "##charfilter", LoadCharacters, "Refresh##charrefresh");
 
