@@ -61,7 +61,7 @@ public sealed class NearbyHandler : IDisposable
     private void OnUpdate(IFramework fw)
     {
         if (ShouldRun?.Invoke() != true) return;
-        if (DateTime.Now - lastUpdate < TimeSpan.FromMilliseconds(500)) return;
+        if (DateTime.Now - lastUpdate < TimeSpan.FromMilliseconds(100)) return;
         lastUpdate = DateTime.Now;
 
         var local = objectTable.LocalPlayer;
