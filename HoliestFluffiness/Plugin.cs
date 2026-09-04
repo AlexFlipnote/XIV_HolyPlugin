@@ -256,11 +256,11 @@ public sealed class Plugin : IDalamudPlugin
         });
         CommandManager.AddHandler(HwPlusCommand, new CommandInfo(OnHwPlusCommand)
         {
-            HelpMessage = "Switch to the next character on your current world (cycles through slots 1-8)."
+            HelpMessage = "Switch to the next character on your current world (cycles through slots 1-8). An optional trailing DESTINATION also travels after login, e.g. /hw+ fc."
         });
         CommandManager.AddHandler(HwMinCommand, new CommandInfo(OnHwMinusCommand)
         {
-            HelpMessage = "Switch to the previous character on your current world (cycles through slots 1-8)."
+            HelpMessage = "Switch to the previous character on your current world (cycles through slots 1-8). An optional trailing DESTINATION also travels after login, e.g. /hw- fc."
         });
         CommandManager.AddHandler(NearbyCommand, new CommandInfo(OnNearbyCommand)
         {
@@ -400,8 +400,8 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private void OnHwPlusCommand(string command, string args)  => CycleCharacter(+1);
-    private void OnHwMinusCommand(string command, string args) => CycleCharacter(-1);
+    private void OnHwPlusCommand(string command, string args)  => CycleCharacter(+1, args);
+    private void OnHwMinusCommand(string command, string args) => CycleCharacter(-1, args);
 
     private void OnFoodCheckCommand(string command, string args) => foodCheckHandler.ForceCheck();
 
@@ -534,7 +534,7 @@ public sealed class Plugin : IDalamudPlugin
     private string ResolveSound(string configPath, string defaultRelative) =>
         SoundEngine.Resolve(configPath, defaultRelative, PluginInterface.AssemblyLocation.DirectoryName!);
 
-    private void CycleCharacter(int direction)
+    private void CycleCharacter(int direction, string args = "")
     {
         if (ObjectTable[0] is not IPlayerCharacter player) { ChatGui.PrintError("[HF] Not logged in."); return; }
 
@@ -550,7 +550,13 @@ public sealed class Plugin : IDalamudPlugin
 
         int nextIdx = (idx + direction + slotted.Count) % slotted.Count;
         var next = slotted[nextIdx];
-        SwitchToCharacter(next.Name, next.World);
+
+        // Everything after the +/- alias is treated as a Lifestream destination, same as /hw's trailing args
+        var destination = args.Trim();
+        if (string.IsNullOrEmpty(destination))
+            SwitchToCharacter(next.Name, next.World);
+        else
+            GoToDestination(next, destination);
     }
 
     private void GoToBid(CharacterRecord rec, HousingBidRecord bid)
