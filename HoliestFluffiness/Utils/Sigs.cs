@@ -12,10 +12,11 @@ namespace HoliestFluffiness;
 // to be BoneSimulator::Update, which PhysicsHandler now reads straight off ClientStructs.
 public static class Sigs
 {
-    public const string AddToScreenLog      = "E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39";
-    public const string CountdownTimer      = "40 53 48 83 EC 40 80 79 38 00";
-    public const string LoadIconByID        = "E8 ?? ?? ?? ?? 41 8D 45 3E";
-    public const string LobbyError          = "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0";
-    public const string MouseClickDelay     = "EB 3F B8 ?? ?? ?? ?? 48 8B D7";
-    public const string ReceiveEvent        = "44 0F B7 C2 4D 8B D1";
+    public const string AddToScreenLog         = "E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39";
+    public const string CountdownTimer         = "40 53 48 83 EC 40 80 79 38 00";
+    public const string LoadIconByID           = "E8 ?? ?? ?? ?? 41 8D 45 3E";
+    public const string LobbyError             = "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0";
+    public const string MouseClickDelay        = "EB 3F B8 ?? ?? ?? ?? 48 8B D7";
+    public const string ReceiveEvent           = "44 0F B7 C2 4D 8B D1";
+    public const string HousingWardInfoHandler = "40 55 53 41 54 41 55 41 57 48 8D AC 24 ?? ?? ?? ?? B8";
 }

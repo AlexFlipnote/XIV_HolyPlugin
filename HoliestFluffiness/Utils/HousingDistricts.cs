@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Dalamud.Plugin.Services;
+using Lumina.Excel.Sheets;
 
 namespace HoliestFluffiness;
 
@@ -74,4 +76,20 @@ internal static class HousingDistricts
         var s when s.Contains("Empyreum",  StringComparison.OrdinalIgnoreCase) => "Empyreum",
         _                                                                       => raw,
     };
+
+    // Static per-plot size (S/M/L), keyed by district + 0-based plot index. Never changes and
+    // isn't part of the ward-info wire data, so it's looked up from the HousingLandSet sheet.
+    private static uint ToLandSetId(short territoryTypeId) => (ushort)territoryTypeId switch
+    {
+        641 => 3, // Shirogane
+        979 => 4, // Empyreum
+        _   => (uint)(territoryTypeId - 339), // Mist=0, Lavender Beds=1, Goblet=2
+    };
+
+    internal static byte? PlotSize(IDataManager dataManager, short territoryTypeId, int plotIndex)
+    {
+        var row = dataManager.GetExcelSheet<HousingLandSet>()?.GetRowOrDefault(ToLandSetId(territoryTypeId));
+        if (row is null || plotIndex < 0 || plotIndex >= row.Value.LandSet.Count) return null;
+        return row.Value.LandSet[plotIndex].PlotSize;
+    }
 }

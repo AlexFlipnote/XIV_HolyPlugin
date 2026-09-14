@@ -89,6 +89,8 @@ public class Configuration : IPluginConfiguration
     public bool ReadyCheckDrawOverlay { get; set; } = false;
     public int ReadyCheckClearAfterSeconds { get; set; } = 10;
 
+    public bool WardInfoWindowEnabled { get; set; } = false;
+
     public bool    NearbyDtrEnabled          { get; set; } = false;
     public bool    NearbyShowTargeters       { get; set; } = false;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;

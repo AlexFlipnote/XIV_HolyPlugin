@@ -42,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string FoodCheckCommand = "/foodcheck";
     private const string FatesCommand     = "/fates";
     private const string NotesCommand     = "/notes";
+    private const string HousesCommand    = "/houses";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -83,6 +84,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly HousingLotteryHandler housingLotteryHandler;
     private readonly ServerInfoHandler serverInfoHandler;
     private readonly RepairHandler repairHandler;
+    private readonly WardInfoHandler wardInfoHandler;
+    private readonly WardInfoWindow wardInfoWindow;
     private readonly NoKillHandler noKillHandler;
     private readonly PhysicsHandler physicsHandler;
     private readonly AntiAfkHandler antiAfkHandler;
@@ -194,6 +197,8 @@ public sealed class Plugin : IDalamudPlugin
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
+        wardInfoHandler        = new WardInfoHandler(SigScanner, GameInterop, GameGui, Framework, Log);
+        wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, GameGui, DataManager);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
         serverInfoHandler.SetNearbyHandler(nearbyHandler);
@@ -245,6 +250,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(foodCheckOverlay);
         windowSystem.AddWindow(notesWindow);
         windowSystem.AddWindow(notePreviewWindow);
+        windowSystem.AddWindow(wardInfoWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -277,6 +283,10 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(NotesCommand, new CommandInfo(OnNotesCommand)
         {
             HelpMessage = "Toggle the Notes window."
+        });
+        CommandManager.AddHandler(HousesCommand, new CommandInfo(OnHousesCommand)
+        {
+            HelpMessage = "Show a resizable, standalone Ward Info window (usable anywhere, browses cached data from this session). Close it with its own close button."
         });
 
         // Snapshot before anything draws, so a mid-frame toggle cannot desync the colour stack
@@ -408,6 +418,8 @@ public sealed class Plugin : IDalamudPlugin
     private void OnFatesCommand(string command, string args) => fateListWindow.IsOpen = !fateListWindow.IsOpen;
 
     private void OnNotesCommand(string command, string args) => notesWindow.IsOpen = !notesWindow.IsOpen;
+
+    private void OnHousesCommand(string command, string args) => wardInfoWindow.ShowStandalone();
 
     private void OnRequestShowNotePreview(List<NoteRecord> notes) => notePreviewWindow.Show(notes);
 
@@ -968,6 +980,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(FoodCheckCommand);
         CommandManager.RemoveHandler(FatesCommand);
         CommandManager.RemoveHandler(NotesCommand);
+        CommandManager.RemoveHandler(HousesCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
@@ -992,6 +1005,7 @@ public sealed class Plugin : IDalamudPlugin
         housingLotteryHandler.Dispose();
         serverInfoHandler.Dispose();
         repairHandler.Dispose();
+        wardInfoHandler.Dispose();
         noKillHandler.OnLobbyError -= OnNoKillLobbyError;
         noKillHandler.Dispose();
         physicsHandler.Dispose();

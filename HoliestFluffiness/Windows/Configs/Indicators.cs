@@ -20,6 +20,13 @@ public partial class ConfigWindow
         BeginSection("Indicators", "Settings for in-game indicators and HUD additions.");
 
         ConfigCheckbox(
+            "Show ward info panel##wardinfoenabled",
+            configuration.WardInfoWindowEnabled,
+            v => configuration.WardInfoWindowEnabled = v,
+            "Docks a searchable, sortable plot table (owner/FC, price, availability) to the right of the " +
+            "\"Select Residential Ward\" menu. Session-only: never written to disk.");
+
+        ConfigCheckbox(
             "Enable cast bar aetheryte names##castbaraetheryte",
             configuration.CastBarAetheryteEnabled,
             v => configuration.CastBarAetheryteEnabled = v,
