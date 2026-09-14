@@ -17,11 +17,10 @@ namespace HoliestFluffiness.Handlers;
 
 // Captures per-plot ownership/price/availability data for housing wards. Purely in-memory for the
 // life of the game process by design (per project convention, see
-// feedback-dalamud-plugin-constraints): nothing here is ever written to config or the database,
-// and the whole cache is dropped only on Dispose (plugin unload / game close). Deliberately kept
-// across character switches - everything is already keyed by (world, district, ward), so a
-// different character on the same world just sees the same data, and a different world is simply
-// another entry in the district dropdown; there is nothing to mix up.
+// feedback-dalamud-plugin-constraints): nothing here is ever written to config or the database.
+// The cache is cleared on Dispose (plugin unload / game close) and also on every logout/login
+// (character switch, relog, or return to title) - each fresh character session starts with an
+// empty cache rather than letting it grow across an entire play session with no upper bound.
 //
 // Data arrives passively whenever the game sends a HousingWardInfo blob (i.e. whenever the user
 // manually opens a ward in the "HousingSelectBlock" addon - normal gameplay, not something this
@@ -92,6 +91,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
     private readonly IObjectTable objectTable;
     private readonly ITargetManager targetManager;
     private readonly ICondition condition;
+    private readonly IClientState clientState;
 
     private readonly Dictionary<(short WorldId, short TerritoryTypeId, short WardNumber), HousingWardInfo> cache = new();
 
@@ -129,7 +129,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
 
     public WardInfoHandler(Configuration config, ISigScanner sigScanner, IGameInteropProvider gameInterop, IGameGui gameGui,
         IFramework framework, IPluginLog log, IObjectTable objectTable, ITargetManager targetManager,
-        ICondition condition)
+        ICondition condition, IClientState clientState)
     {
         this.config        = config;
         this.gameGui       = gameGui;
@@ -138,12 +138,37 @@ public sealed unsafe class WardInfoHandler : IDisposable
         this.objectTable   = objectTable;
         this.targetManager = targetManager;
         this.condition     = condition;
+        this.clientState   = clientState;
 
         wardInfoHook = Common.TryCreateHookFromSignature<HandleHousingWardInfoDelegate>(
             Sigs.HousingWardInfoHandler, OnHousingWardInfo, gameInterop, log,
             "[HF] WardInfo: HousingWardInfoHandler sig failed; ward capture disabled.");
 
-        framework.Update += OnUpdate;
+        framework.Update  += OnUpdate;
+        clientState.Login  += OnLogin;
+        clientState.Logout += OnLogout;
+    }
+
+    // Each fresh character session (a genuine relog/character switch, not just this handler's own
+    // travel automation) starts clean - keeping data across a switch would need per-character
+    // freshness tracking this handler doesn't have, and letting it grow across an entire play
+    // session with characters on many worlds has no natural upper bound otherwise.
+    private void OnLogin() => ClearCache();
+
+    private void OnLogout(int type, int code)
+    {
+        // Nothing should still be running once the character leaves the game, but stop cleanly
+        // rather than leaving stale automation state around into the next login.
+        if (IsAutoSweeping) CancelAutoSweepAll();
+        if (IsSweeping) CancelSweep();
+        ClearCache();
+    }
+
+    private void ClearCache()
+    {
+        cache.Clear();
+        LastLandIdent = null;
+        Version++;
     }
 
     private void OnHousingWardInfo(nint agentBase, nint dataPtr)
@@ -644,7 +669,9 @@ public sealed unsafe class WardInfoHandler : IDisposable
 
     public void Dispose()
     {
-        framework.Update -= OnUpdate;
+        framework.Update  -= OnUpdate;
+        clientState.Login  -= OnLogin;
+        clientState.Logout -= OnLogout;
         IsSweeping = false;
         IsAutoSweeping = false;
         autoSweepStage = AutoSweepStage.None;

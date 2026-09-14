@@ -198,7 +198,7 @@ public sealed class Plugin : IDalamudPlugin
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
-        wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition);
+        wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition, ClientState);
         wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, GameGui, DataManager, InvokeLifestreamTeleport, IsLifestreamBusy);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
