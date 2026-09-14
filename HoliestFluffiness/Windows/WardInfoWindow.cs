@@ -46,7 +46,7 @@ public sealed class WardInfoWindow : Window
     // FC-only/personal-only wards isn't fixed enough to hardcode reliably.
     private readonly record struct PlotRow(short WorldId, short TerritoryTypeId, short WardNumber, int PlotIndex, HouseInfoEntry Entry, TenantType Tenant, byte? Size);
 
-    private const uint ColWard = 0, ColPlot = 1, ColSize = 2, ColOwner = 3;
+    private const uint ColWard = 0, ColPlot = 1, ColSize = 2, ColOwner = 3, ColDistrict = 4, ColWorld = 5;
 
     private readonly TableColumn<PlotRow>[] columns;
 
@@ -67,6 +67,13 @@ public sealed class WardInfoWindow : Window
             new("Plot", ColPlot, ImGuiTableColumnFlags.WidthFixed, 34f, r => r.PlotIndex,  r => ImGui.TextUnformatted($"{r.PlotIndex + 1}")),
             new("Size", ColSize, ImGuiTableColumnFlags.WidthFixed, 34f, r => r.Size ?? -1, r => ImGui.TextUnformatted(SizeLabel(r.Size))),
             new("Owner/Price", ColOwner, ImGuiTableColumnFlags.WidthStretch, 1f, r => OwnerSortKey(r.Entry), DrawOwner),
+            // Hidden by default (right-click a header to show) - most people already know which
+            // district/world they're browsing, but power users combining "All indexes" with a sort
+            // or filter want these available without them cluttering the common case.
+            new("District", ColDistrict, ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultHide, 110f,
+                r => DistrictName(r.TerritoryTypeId), r => ImGui.TextUnformatted(DistrictName(r.TerritoryTypeId))),
+            new("World", ColWorld, ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultHide, 90f,
+                r => WorldName(r.WorldId), r => ImGui.TextUnformatted(WorldName(r.WorldId))),
         ];
     }
 
@@ -226,8 +233,12 @@ public sealed class WardInfoWindow : Window
                        r.Entry.EstateOwnerName.Contains(search, StringComparison.OrdinalIgnoreCase);
             }
 
+            // Same table id in both branches (not "##wardinfotableall" vs "##wardinfotable") so
+            // ImGui's own persisted column show/hide, order and width carry over between "All
+            // indexes" and a single district instead of each tracking its own independent state -
+            // the column set is identical either way, only which rows and sort tiebreak differ.
             if (showAll)
-                ConfigTable.DrawDataTable("##wardinfotableall", columns, ref rowsBuf,
+                ConfigTable.DrawDataTable("##wardinfotable", columns, ref rowsBuf,
                     stableTieBreak: r => $"{r.WorldId:D5}_{r.TerritoryTypeId:D5}_{r.WardNumber:D3}_{r.PlotIndex:D3}",
                     filter: Filter);
             else
