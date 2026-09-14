@@ -34,15 +34,16 @@ namespace HoliestFluffiness;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private const string CommandName       = "/hf";
-    private const string HwCommand        = "/hw";
-    private const string HwPlusCommand    = "/hw+";
-    private const string HwMinCommand     = "/hw-";
-    private const string NearbyCommand    = "/nearby";
-    private const string FoodCheckCommand = "/foodcheck";
-    private const string FatesCommand     = "/fates";
-    private const string NotesCommand     = "/notes";
-    private const string HousesCommand    = "/houses";
+    private const string CommandName          = "/hf";
+    private const string HwCommand            = "/hw";
+    private const string HwPlusCommand        = "/hw+";
+    private const string HwMinCommand         = "/hw-";
+    private const string NearbyCommand        = "/nearby";
+    private const string FoodCheckCommand     = "/foodcheck";
+    private const string FatesCommand         = "/fates";
+    private const string NotesCommand         = "/notes";
+    private const string WardInfoCommand      = "/wardinfo";
+    private const string WardInfoAliasCommand = "/wi";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -197,8 +198,8 @@ public sealed class Plugin : IDalamudPlugin
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
-        wardInfoHandler        = new WardInfoHandler(SigScanner, GameInterop, GameGui, Framework, Log);
-        wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, GameGui, DataManager);
+        wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition);
+        wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, GameGui, DataManager, InvokeLifestreamTeleport, IsLifestreamBusy);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
         serverInfoHandler.SetNearbyHandler(nearbyHandler);
@@ -284,9 +285,14 @@ public sealed class Plugin : IDalamudPlugin
         {
             HelpMessage = "Toggle the Notes window."
         });
-        CommandManager.AddHandler(HousesCommand, new CommandInfo(OnHousesCommand)
+        CommandManager.AddHandler(WardInfoCommand, new CommandInfo(OnWardInfoCommand)
         {
             HelpMessage = "Show a resizable, standalone Ward Info window (usable anywhere, browses cached data from this session). Close it with its own close button."
+        });
+        CommandManager.AddHandler(WardInfoAliasCommand, new CommandInfo(OnWardInfoCommand)
+        {
+            HelpMessage = "Alias for /wardinfo.",
+            ShowInHelp = false,
         });
 
         // Snapshot before anything draws, so a mid-frame toggle cannot desync the colour stack
@@ -419,7 +425,15 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnNotesCommand(string command, string args) => notesWindow.IsOpen = !notesWindow.IsOpen;
 
-    private void OnHousesCommand(string command, string args) => wardInfoWindow.ShowStandalone();
+    private void OnWardInfoCommand(string command, string args)
+    {
+        if (!configuration.WardInfoWindowEnabled)
+        {
+            ChatGui.PrintError("[HF] Ward Info is disabled - enable \"Show ward info panel\" under Settings > Indicators first.");
+            return;
+        }
+        wardInfoWindow.ShowStandalone();
+    }
 
     private void OnRequestShowNotePreview(List<NoteRecord> notes) => notePreviewWindow.Show(notes);
 
@@ -980,7 +994,8 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(FoodCheckCommand);
         CommandManager.RemoveHandler(FatesCommand);
         CommandManager.RemoveHandler(NotesCommand);
-        CommandManager.RemoveHandler(HousesCommand);
+        CommandManager.RemoveHandler(WardInfoCommand);
+        CommandManager.RemoveHandler(WardInfoAliasCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;

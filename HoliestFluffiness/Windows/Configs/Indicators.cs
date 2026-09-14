@@ -20,13 +20,6 @@ public partial class ConfigWindow
         BeginSection("Indicators", "Settings for in-game indicators and HUD additions.");
 
         ConfigCheckbox(
-            "Show ward info panel##wardinfoenabled",
-            configuration.WardInfoWindowEnabled,
-            v => configuration.WardInfoWindowEnabled = v,
-            "Docks a searchable, sortable plot table (owner/FC, price, availability) to the right of the " +
-            "\"Select Residential Ward\" menu. Session-only: never written to disk.");
-
-        ConfigCheckbox(
             "Enable cast bar aetheryte names##castbaraetheryte",
             configuration.CastBarAetheryteEnabled,
             v => configuration.CastBarAetheryteEnabled = v,
@@ -47,6 +40,33 @@ public partial class ConfigWindow
                 if (!v) clientTweaksHandler?.RestoreHotbarLock();
             },
             "Hides the padlock icon on the action bar");
+
+
+        // ── Ward Info ──────────────────────────────────────────────────────────
+        SubsectionLabel("Ward Info");
+
+        ConfigCheckbox(
+            "Show ward info panel##wardinfoenabled",
+            configuration.WardInfoWindowEnabled,
+            v => configuration.WardInfoWindowEnabled = v,
+            "Docks a searchable, sortable plot table (owner/FC, price, availability) to the right of the " +
+            "\"Select Residential Ward\" menu, and enables the /wardinfo (alias /wi) command that opens it " +
+            "as its own standalone window. Session-only: never written to disk.");
+
+        ImGui.BeginDisabled(!configuration.WardInfoWindowEnabled);
+        RowGap();
+        Common.DimmedText("Auto districts to check:");
+        DrawWardInfoAutoSweepCheckbox("Mist##wardinfoautosweepmist",
+            configuration.WardInfoAutoSweepMist, v => configuration.WardInfoAutoSweepMist = v);
+        DrawWardInfoAutoSweepCheckbox("The Lavender Beds##wardinfoautosweeplavenderbeds",
+            configuration.WardInfoAutoSweepLavenderBeds, v => configuration.WardInfoAutoSweepLavenderBeds = v);
+        DrawWardInfoAutoSweepCheckbox("The Goblet##wardinfoautosweepgoblet",
+            configuration.WardInfoAutoSweepGoblet, v => configuration.WardInfoAutoSweepGoblet = v);
+        DrawWardInfoAutoSweepCheckbox("Shirogane##wardinfoautosweepshirogane",
+            configuration.WardInfoAutoSweepShirogane, v => configuration.WardInfoAutoSweepShirogane = v);
+        DrawWardInfoAutoSweepCheckbox("Empyreum##wardinfoautosweepempyreum",
+            configuration.WardInfoAutoSweepEmpyreum, v => configuration.WardInfoAutoSweepEmpyreum = v);
+        ImGui.EndDisabled();
 
         // ── Loot ──────────────────────────────────────────────────────────────
         SubsectionLabel("Loot");
@@ -306,6 +326,15 @@ public partial class ConfigWindow
             configuration.CombatChtVol,       v => configuration.CombatChtVol       = v);
 
         EndSection(10);
+    }
+
+    // Dims the label when unticked, so it's obvious at a glance which districts auto-sweep-all
+    // will actually visit without needing to read every checkbox state individually.
+    private void DrawWardInfoAutoSweepCheckbox(string label, bool current, Action<bool> setter)
+    {
+        if (!current) ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColWhiteDim);
+        ConfigCheckbox(label, current, setter);
+        if (!current) ImGui.PopStyleColor();
     }
 
     private void DrawCombatBlock(

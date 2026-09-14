@@ -12,4 +12,5 @@ public enum ConfigSection
     About      = 7,
     Social     = 8,
     // 9 intentionally unused (Inventory merged into Characters; numbering kept stable for saved LastSelectedSection values)
+    // 10 intentionally unused (Ward Info settings moved into Indicators; numbering kept stable for saved LastSelectedSection values)
 }

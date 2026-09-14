@@ -91,6 +91,14 @@ public class Configuration : IPluginConfiguration
 
     public bool WardInfoWindowEnabled { get; set; } = false;
 
+    // Which districts "Sweep all districts" (the standalone Ward Info window's auto-sweep-all
+    // automation) walks through - unticking one skips it entirely, all on by default.
+    public bool WardInfoAutoSweepMist          { get; set; } = true;
+    public bool WardInfoAutoSweepLavenderBeds  { get; set; } = true;
+    public bool WardInfoAutoSweepGoblet        { get; set; } = true;
+    public bool WardInfoAutoSweepShirogane     { get; set; } = true;
+    public bool WardInfoAutoSweepEmpyreum      { get; set; } = true;
+
     public bool    NearbyDtrEnabled          { get; set; } = false;
     public bool    NearbyShowTargeters       { get; set; } = false;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;
