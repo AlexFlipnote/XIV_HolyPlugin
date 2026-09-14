@@ -28,9 +28,12 @@ public sealed class WardInfoWindow : Window
 
     private const float WindowWidth = 430f;
 
+    private enum PlotSubset { All, MainOnly, SubdivisionOnly }
+
     private string search = "";
     private bool hideOwned;
     private TenantType? tenantFilter;
+    private PlotSubset plotSubset;
     private bool standaloneOpen;
     private bool wasOpen;
     private bool docked;
@@ -156,21 +159,38 @@ public sealed class WardInfoWindow : Window
     {
         var busy = IsBusy;
 
-        // Everything except the toolbar (which still needs its Cancel button live) is disabled
-        // while busy - there's no manual browsing to do while auto-sweep-all or Lifestream is
-        // actively driving the character, and leaving it interactive risks a click fighting with
-        // whatever the automation is doing this same frame.
-        ImGui.BeginDisabled(busy);
+        // Sweep/Cancel (or Sweep-all/Cancel) now shares the top row with the header/dropdown
+        // instead of the toolbar below, freeing that row for the growing set of filters. It's
+        // drawn outside the disabled block below - Cancel must stay clickable while busy, since
+        // that's the only way to stop auto-sweep-all once it's running.
         if (docked)
+        {
+            ImGui.BeginDisabled(busy);
             DrawHeader(handler.LastLandIdent);
+            ImGui.EndDisabled();
+            ImGui.SameLine();
+            DrawSweepButtonRightAligned();
+        }
         else
-            DrawDistrictDropdown();
+        {
+            var autoSweepLabel = AutoSweepButtonLabel();
+            var autoSweepWidth = ImGui.CalcTextSize(autoSweepLabel.Split('#')[0]).X + ImGui.GetStyle().FramePadding.X * 2;
 
+            ImGui.BeginDisabled(busy);
+            DrawDistrictDropdown(autoSweepWidth + ImGui.GetStyle().ItemSpacing.X);
+            ImGui.EndDisabled();
+            ImGui.SameLine();
+            DrawAutoSweepAllButtonRightAligned(autoSweepLabel);
+        }
+
+        // Everything else here is disabled while busy - there's no manual browsing to do while
+        // auto-sweep-all or Lifestream is actively driving the character, and leaving it
+        // interactive risks a click fighting with whatever the automation is doing this same frame.
+        ImGui.BeginDisabled(busy);
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
         ImGui.InputTextWithHint("##wardinfosearch", "Search owner/FC...", ref search, 64);
-        ImGui.EndDisabled();
-
         DrawToolbar();
+        ImGui.EndDisabled();
 
         ImGui.Dummy(new Vector2(0, 4));
 
@@ -229,6 +249,9 @@ public sealed class WardInfoWindow : Window
                 // only ever excludes the OPPOSITE restriction, never the unrestricted majority.
                 if (tenantFilter == TenantType.FreeCompany && r.Tenant == TenantType.Personal) return false;
                 if (tenantFilter == TenantType.Personal && r.Tenant == TenantType.FreeCompany) return false;
+                // Plot 1-30 (index 0-29) is a ward's main area, 31-60 (index 30-59) its subdivision.
+                if (plotSubset == PlotSubset.MainOnly && r.PlotIndex >= 30) return false;
+                if (plotSubset == PlotSubset.SubdivisionOnly && r.PlotIndex < 30) return false;
                 return string.IsNullOrWhiteSpace(search) ||
                        r.Entry.EstateOwnerName.Contains(search, StringComparison.OrdinalIgnoreCase);
             }
@@ -262,37 +285,38 @@ public sealed class WardInfoWindow : Window
         return handler.LastLandIdent;
     }
 
+    // Plain left-aligned "District (World)" - no captured count - since this now shares its row
+    // with the Sweep button and needs to stay compact.
     private void DrawHeader(LandIdent? current)
     {
-        if (current == null)
-        {
-            CenteredText("Not browsing a residential ward yet.", null);
-            return;
-        }
-
-        var wardsCaptured = handler.CapturedWardCount(current.WorldId, current.TerritoryTypeId);
-        var captureText = wardsCaptured > 0 ? $"({wardsCaptured} ward(s) captured this session)" : null;
-        CenteredText(DistrictLabel(current.WorldId, current.TerritoryTypeId), captureText);
+        ImGui.TextUnformatted(current == null
+            ? "Not browsing a residential ward yet."
+            : DistrictLabel(current.WorldId, current.TerritoryTypeId));
     }
 
     // Replaces the plain header when not docked: lets a standalone viewer pick any previously-
     // captured (world, district) to browse, or "All indexes" to combine every captured district/
     // world into one table, instead of only ever showing whatever was most recently browsed live.
-    private void DrawDistrictDropdown()
+    // `reserveWidth` is the space to leave for the Sweep-all button the caller draws right after
+    // this via SameLine - kept as a separate method (rather than drawing the button here) so that
+    // button can sit outside the disabled-while-busy block this is wrapped in.
+    private void DrawDistrictDropdown(float reserveWidth)
     {
         var districts = handler.GetCachedDistricts().ToList();
+        var dropdownWidth = Math.Max(80f, ImGui.GetContentRegionAvail().X - reserveWidth);
+
         if (districts.Count == 0)
         {
-            CenteredText("Not browsing a residential ward yet.", null);
+            ImGui.TextUnformatted("Not browsing a residential ward yet.");
             return;
         }
 
         var current = ResolveCurrentContext();
         var currentLabel = allIndexesSelected
             ? "All indexes"
-            : current != null ? DistrictLabel(current.WorldId, current.TerritoryTypeId, withCount: true) : "Select district...";
+            : current != null ? DistrictLabel(current.WorldId, current.TerritoryTypeId) : "Select district...";
 
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        ImGui.SetNextItemWidth(dropdownWidth);
         if (ImGui.BeginCombo("##wardinfodistrict", currentLabel))
         {
             if (ImGui.Selectable("All indexes##wardinfoallindexes", allIndexesSelected))
@@ -327,35 +351,15 @@ public sealed class WardInfoWindow : Window
         return count > 0 ? $"{label} - {count} captured" : label;
     }
 
-    // Draws `main` in normal text and, if given, `dimmed` right after it in dimmed text, with the
-    // whole combined line horizontally centered in the window.
-    private static void CenteredText(string main, string? dimmed)
-    {
-        var spacing = dimmed == null ? 0f : ImGui.GetStyle().ItemSpacing.X;
-        var totalWidth = ImGui.CalcTextSize(main).X + spacing + (dimmed == null ? 0f : ImGui.CalcTextSize(dimmed).X);
-        var startX = Math.Max(ImGui.GetCursorPosX(), (ImGui.GetWindowSize().X - totalWidth) * 0.5f);
-        ImGui.SetCursorPosX(startX);
-
-        ImGui.TextUnformatted(main);
-        if (dimmed == null) return;
-        ImGui.SameLine(0, spacing);
-        Common.DimmedText(dimmed);
-    }
-
-    // Hide-owned toggle on the left (gold-themed like NearbyWindow's pin button); the right side
-    // depends on mode - Sweep while docked (that's the only time it can do anything, since it
-    // drives the currently-open native menu), or "Sweep all districts" while standalone (that one
-    // drives its own travel via Lifestream instead, so it makes no sense docked).
+    // Filter row: hide-owned toggle (gold-themed like NearbyWindow's pin button), tenant filter,
+    // and plot-subset filter. Sweep/Sweep-all now lives up on the header row instead (see Draw()).
     private void DrawToolbar()
     {
         DrawHideOwnedButton();
         ImGui.SameLine();
         DrawTenantFilterDropdown();
         ImGui.SameLine();
-        if (docked)
-            DrawSweepButtonRightAligned();
-        else
-            DrawAutoSweepAllButtonRightAligned();
+        DrawPlotSubsetDropdown();
     }
 
     private void DrawHideOwnedButton()
@@ -395,6 +399,30 @@ public sealed class WardInfoWindow : Window
         }
     }
 
+    // Plots 1-30 are a ward's main area, 31-60 its subdivision (a separate area some wards have) -
+    // house hunters often only care about one or the other.
+    private void DrawPlotSubsetDropdown()
+    {
+        var preview = plotSubset switch
+        {
+            PlotSubset.MainOnly        => "Main plots",
+            PlotSubset.SubdivisionOnly => "Subdivision plots",
+            _                          => "All plots",
+        };
+
+        ImGui.SetNextItemWidth(140);
+        if (ImGui.BeginCombo("##wardinfoplotsubset", preview))
+        {
+            if (ImGui.Selectable("Show all plots", plotSubset == PlotSubset.All))
+                plotSubset = PlotSubset.All;
+            if (ImGui.Selectable("Show only main plots", plotSubset == PlotSubset.MainOnly))
+                plotSubset = PlotSubset.MainOnly;
+            if (ImGui.Selectable("Show only subdivision plots", plotSubset == PlotSubset.SubdivisionOnly))
+                plotSubset = PlotSubset.SubdivisionOnly;
+            ImGui.EndCombo();
+        }
+    }
+
     private void DrawSweepButtonRightAligned()
     {
         var label = handler.IsSweeping
@@ -421,15 +449,17 @@ public sealed class WardInfoWindow : Window
             ImGui.SetTooltip("Clicks through the wards currently shown in the open menu to fill in the table faster.\nOnly runs while you keep the menu open.");
     }
 
-    // Standalone-only counterpart to Sweep: teleports through every housing district on this world
-    // via Lifestream, sweeping each one before moving to the next. Runs unattended once started -
-    // Cancel stops it at any point, same as the docked Sweep button's Cancel.
-    private void DrawAutoSweepAllButtonRightAligned()
-    {
-        var label = handler.IsAutoSweeping
-            ? $"Cancel ({handler.AutoSweepCurrentDistrict}: {handler.SweptCount}/{handler.SweepTotal})##wardinfoautosweep"
-            : "Sweep all districts##wardinfoautosweep";
+    // Standalone-only counterpart to Sweep: teleports through every housing district on this world,
+    // sweeping each one before moving to the next. Runs unattended once started - Cancel stops it
+    // at any point, same as the docked Sweep button's Cancel.
+    private string AutoSweepButtonLabel() => handler.IsAutoSweeping
+        ? $"Cancel ({handler.AutoSweepCurrentDistrict}: {handler.SweptCount}/{handler.SweepTotal})##wardinfoautosweep"
+        : "Sweep all districts##wardinfoautosweep";
 
+    // Takes the label pre-computed by the caller (Draw()) rather than recomputing it, since Draw()
+    // also needs it up front to size the district dropdown that sits to this button's left.
+    private void DrawAutoSweepAllButtonRightAligned(string label)
+    {
         var width = ImGui.CalcTextSize(label.Split('#')[0]).X + ImGui.GetStyle().FramePadding.X * 2;
         var avail = ImGui.GetContentRegionAvail().X;
         if (avail > width)
