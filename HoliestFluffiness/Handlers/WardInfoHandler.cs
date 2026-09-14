@@ -7,6 +7,7 @@ using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -436,6 +437,12 @@ public sealed unsafe class WardInfoHandler : IDisposable
         targetManager.Target = aetheryte;
         Common.ExecuteCommand("/lockon");
         Common.ExecuteCommand("/automove on");
+
+        // Once we've been walking a moment, throw in a jump each retry too - geometry (pillars,
+        // railings, stairs) can block the straight-line path /automove takes, and a small hop is
+        // usually enough to clear it rather than getting stuck walking in place.
+        if (DateTime.UtcNow - autoSweepStageStartedAt > TimeSpan.FromSeconds(1))
+            ActionManager.Instance()->UseAction(ActionType.GeneralAction, 2);
     }
 
     private void StopAutoMove() => Common.ExecuteCommand("/automove off");
