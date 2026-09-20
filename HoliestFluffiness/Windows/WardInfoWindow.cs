@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -28,12 +29,16 @@ public sealed class WardInfoWindow : Window
 
     private const float WindowWidth = 430f;
 
-    private enum PlotSubset { All, MainOnly, SubdivisionOnly }
-
     private string search = "";
+    private bool useRegex;
+    private Regex? cachedSearchRegex;
+    private string cachedSearchPattern = string.Empty;
+    private bool cachedSearchUseRegex;
+    private bool cachedSearchRegexValid = true;
     private bool hideOwned;
-    private TenantType? tenantFilter;
-    private PlotSubset plotSubset;
+    private bool showUnrestricted = true, showFcOnly = true, showPrivateOnly = true;
+    private bool showMainPlots = true, showSubdivisionPlots = true;
+    private bool showSmall = true, showMedium = true, showLarge = true;
     private bool standaloneOpen;
     private bool wasOpen;
     private bool docked;
@@ -192,8 +197,7 @@ public sealed class WardInfoWindow : Window
         // auto-sweep-all or Lifestream is actively driving the character, and leaving it
         // interactive risks a click fighting with whatever the automation is doing this same frame.
         ImGui.BeginDisabled(busy);
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        ImGui.InputTextWithHint("##wardinfosearch", "Search owner/FC...", ref search, 64);
+        DrawSearchRow();
         DrawToolbar();
         ImGui.EndDisabled();
 
@@ -250,15 +254,20 @@ public sealed class WardInfoWindow : Window
             bool Filter(PlotRow r)
             {
                 if (hideOwned && r.Entry.IsOwned) return false;
-                // Most wards are unrestricted (neither FreeCompany nor Personal) - a tenant filter
-                // only ever excludes the OPPOSITE restriction, never the unrestricted majority.
-                if (tenantFilter == TenantType.FreeCompany && r.Tenant == TenantType.Personal) return false;
-                if (tenantFilter == TenantType.Personal && r.Tenant == TenantType.FreeCompany) return false;
+                if (r.Tenant == TenantType.FreeCompany) { if (!showFcOnly) return false; }
+                else if (r.Tenant == TenantType.Personal) { if (!showPrivateOnly) return false; }
+                else if (!showUnrestricted) return false;
                 // Plot 1-30 (index 0-29) is a ward's main area, 31-60 (index 30-59) its subdivision.
-                if (plotSubset == PlotSubset.MainOnly && r.PlotIndex >= 30) return false;
-                if (plotSubset == PlotSubset.SubdivisionOnly && r.PlotIndex < 30) return false;
-                return string.IsNullOrWhiteSpace(search) ||
-                       r.Entry.EstateOwnerName.Contains(search, StringComparison.OrdinalIgnoreCase);
+                if (r.PlotIndex < 30 ? !showMainPlots : !showSubdivisionPlots) return false;
+                // Unresolved size (Excel row not yet available) always passes - same fail-open
+                // rule as the tenant filter, since we can't tell which checkbox it should honor.
+                if (r.Size == 0 && !showSmall) return false;
+                if (r.Size == 1 && !showMedium) return false;
+                if (r.Size == 2 && !showLarge) return false;
+                if (string.IsNullOrWhiteSpace(search)) return true;
+                return useRegex
+                    ? cachedSearchRegex != null && SafeIsMatch(cachedSearchRegex, r.Entry.EstateOwnerName)
+                    : r.Entry.EstateOwnerName.Contains(search, StringComparison.OrdinalIgnoreCase);
             }
 
             // Same table id in both branches (not "##wardinfotableall" vs "##wardinfotable") so
@@ -356,8 +365,80 @@ public sealed class WardInfoWindow : Window
         return count > 0 ? $"{label} - {count} captured" : label;
     }
 
+    // Regex toggle glued to the left of the search box, matching NearbyWindow's search row.
+    private void DrawSearchRow()
+    {
+        const string regexLabel = ".*";
+        const float  regexGap   = 4f; // tighter than the default item spacing, so the toggle reads as glued to the search box
+
+        UpdateSearchRegex();
+
+        if (useRegex) Common.PushGoldButton(); else Common.PushGreyButton();
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+        if (ImGui.Button(regexLabel))
+            useRegex = !useRegex;
+        ImGui.PopStyleVar();
+        ImGui.PopStyleColor(4);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(useRegex ? "Regex search (click to disable)" : "Plain text search (click to enable regex)");
+
+        ImGui.SameLine(0f, regexGap);
+        Common.PushSearchInput();
+        if (!cachedSearchRegexValid) ImGui.PushStyleColor(ImGuiCol.Border, Theme.ColRed);
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        ImGui.InputTextWithHint("##wardinfosearch", "Search owner/FC...", ref search, 64);
+        if (!cachedSearchRegexValid)
+        {
+            ImGui.PopStyleColor();
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Invalid regex pattern");
+        }
+        Common.PopSearchInput();
+    }
+
+    // Recompiled only when the pattern or the regex toggle actually changes, not every frame.
+    private void UpdateSearchRegex()
+    {
+        if (cachedSearchPattern == search && cachedSearchUseRegex == useRegex) return;
+        cachedSearchPattern  = search;
+        cachedSearchUseRegex = useRegex;
+
+        if (!useRegex || string.IsNullOrWhiteSpace(search))
+        {
+            cachedSearchRegex      = null;
+            cachedSearchRegexValid = true;
+            return;
+        }
+
+        try
+        {
+            cachedSearchRegex      = new Regex(search, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+            cachedSearchRegexValid = true;
+        }
+        catch (ArgumentException)
+        {
+            cachedSearchRegex      = null;
+            cachedSearchRegexValid = false;
+        }
+    }
+
+    // A pathological pattern (catastrophic backtracking) fails one row's match instead of hanging
+    // the UI thread; the search box border still flags it as invalid for the rest of the frame.
+    private bool SafeIsMatch(Regex regex, string input)
+    {
+        try
+        {
+            return regex.IsMatch(input);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            cachedSearchRegexValid = false;
+            return false;
+        }
+    }
+
     // Filter row: hide-owned toggle (gold-themed like NearbyWindow's pin button), tenant filter,
-    // and plot-subset filter. Sweep/Sweep-all now lives up on the header row instead (see Draw()).
+    // plot-subset filter, and size filter. Sweep/Sweep-all now lives up on the header row instead
+    // (see Draw()).
     private void DrawToolbar()
     {
         DrawHideOwnedButton();
@@ -365,6 +446,8 @@ public sealed class WardInfoWindow : Window
         DrawTenantFilterDropdown();
         ImGui.SameLine();
         DrawPlotSubsetDropdown();
+        ImGui.SameLine();
+        DrawSizeFilterDropdown();
     }
 
     private void DrawHideOwnedButton()
@@ -382,48 +465,68 @@ public sealed class WardInfoWindow : Window
     // Every plot in a ward shares one tenant restriction, so filtering by it is really filtering by
     // ward - lets a house hunter looking only for an FC (or only a personal) plot skip straight past
     // wards that could never have what they want, without reading each row's tag individually.
+    // Multi-select combo, same shape as the size filter: each checkbox is an independent category,
+    // so e.g. "FC" + "Unrestricted" can be shown together while "Private" stays excluded.
     private void DrawTenantFilterDropdown()
     {
-        var preview = tenantFilter switch
+        var preview = (showUnrestricted, showFcOnly, showPrivateOnly) switch
         {
-            TenantType.FreeCompany => "FC only",
-            TenantType.Personal    => "Private only",
-            _                      => "FC + Private",
+            (true,  true,  true)  => "Any tenant",
+            (false, false, false) => "No tenants",
+            _ => string.Join("+", new[] { (showUnrestricted, "Any"), (showFcOnly, "FC"), (showPrivateOnly, "Private") }
+                .Where(t => t.Item1).Select(t => t.Item2)),
         };
 
-        ImGui.SetNextItemWidth(120);
+        ImGui.SetNextItemWidth(100);
         if (ImGui.BeginCombo("##wardinfotenantfilter", preview))
         {
-            if (ImGui.Selectable("FC + Private", tenantFilter == null))
-                tenantFilter = null;
-            if (ImGui.Selectable("FC only", tenantFilter == TenantType.FreeCompany))
-                tenantFilter = TenantType.FreeCompany;
-            if (ImGui.Selectable("Private only", tenantFilter == TenantType.Personal))
-                tenantFilter = TenantType.Personal;
+            ImGui.Checkbox("Unrestricted##wardinfotenantunrestricted", ref showUnrestricted);
+            ImGui.Checkbox("FC##wardinfotenantfc",                     ref showFcOnly);
+            ImGui.Checkbox("Private##wardinfotenantprivate",           ref showPrivateOnly);
             ImGui.EndCombo();
         }
     }
 
     // Plots 1-30 are a ward's main area, 31-60 its subdivision (a separate area some wards have) -
-    // house hunters often only care about one or the other.
+    // house hunters often only care about one or the other. Every plot is exactly one of the two,
+    // so unlike tenant/size there's no third "unresolved" case to fail open on.
     private void DrawPlotSubsetDropdown()
     {
-        var preview = plotSubset switch
+        var preview = (showMainPlots, showSubdivisionPlots) switch
         {
-            PlotSubset.MainOnly        => "Main plots",
-            PlotSubset.SubdivisionOnly => "Subdivision plots",
-            _                          => "All plots",
+            (true,  true)  => "All plots",
+            (false, false) => "No plots",
+            (true,  false) => "Main",
+            (false, true)  => "Subdivision",
         };
 
-        ImGui.SetNextItemWidth(140);
+        ImGui.SetNextItemWidth(100);
         if (ImGui.BeginCombo("##wardinfoplotsubset", preview))
         {
-            if (ImGui.Selectable("Show all plots", plotSubset == PlotSubset.All))
-                plotSubset = PlotSubset.All;
-            if (ImGui.Selectable("Show only main plots", plotSubset == PlotSubset.MainOnly))
-                plotSubset = PlotSubset.MainOnly;
-            if (ImGui.Selectable("Show only subdivision plots", plotSubset == PlotSubset.SubdivisionOnly))
-                plotSubset = PlotSubset.SubdivisionOnly;
+            ImGui.Checkbox("Main##wardinfoplotmain",               ref showMainPlots);
+            ImGui.Checkbox("Subdivision##wardinfoplotsubdivision", ref showSubdivisionPlots);
+            ImGui.EndCombo();
+        }
+    }
+
+    // Multi-select combo (checkboxes stay checked and the popup stays open across clicks, unlike
+    // Selectable) - toggling any of the three off narrows the table to the remaining size(s).
+    private void DrawSizeFilterDropdown()
+    {
+        var preview = (showSmall, showMedium, showLarge) switch
+        {
+            (true,  true,  true)  => "All sizes",
+            (false, false, false) => "No sizes",
+            _ => string.Join("+", new[] { (showSmall, "S"), (showMedium, "M"), (showLarge, "L") }
+                .Where(t => t.Item1).Select(t => t.Item2)),
+        };
+
+        ImGui.SetNextItemWidth(90);
+        if (ImGui.BeginCombo("##wardinfosizefilter", preview))
+        {
+            ImGui.Checkbox("Small##wardinfosizesmall",   ref showSmall);
+            ImGui.Checkbox("Medium##wardinfosizemedium", ref showMedium);
+            ImGui.Checkbox("Large##wardinfosizelarge",   ref showLarge);
             ImGui.EndCombo();
         }
     }

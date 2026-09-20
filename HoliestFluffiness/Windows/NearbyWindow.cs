@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Interface.Utility;
@@ -27,6 +28,7 @@ public sealed class NearbyWindow : Window, IDisposable
     private readonly IGameGui        gameGui;
 
     private string searchText      = string.Empty;
+    private bool   useRegex;
     private bool   hoveredTargeterRow;
     private bool   hoveredNearbyRow;
     private bool   historyOpen;
@@ -37,6 +39,8 @@ public sealed class NearbyWindow : Window, IDisposable
     private List<NearbyPlayer>? cachedNearbySource;
     private List<Targeter>?     cachedTargetersSource;
     private string              cachedSearchText  = string.Empty;
+    private bool                cachedUseRegex;
+    private bool                cachedRegexValid  = true;
     private HashSet<ulong>      cachedTargeterIds = [];
     private List<NearbyPlayer>  cachedSorted      = [];
 
@@ -167,20 +171,34 @@ public sealed class NearbyWindow : Window, IDisposable
         // The handler swaps these list references on update, so reference equality detects changes
         if (!ReferenceEquals(cachedNearbySource, handler.NearbyPlayers) ||
             !ReferenceEquals(cachedTargetersSource, handler.CurrentTargeters) ||
-            cachedSearchText != searchText)
+            cachedSearchText != searchText ||
+            cachedUseRegex != useRegex)
         {
             cachedNearbySource    = handler.NearbyPlayers;
             cachedTargetersSource = handler.CurrentTargeters;
             cachedSearchText      = searchText;
+            cachedUseRegex        = useRegex;
             cachedTargeterIds     = handler.CurrentTargeters.Select(t => t.GameObjectId).ToHashSet();
 
-            var source = string.IsNullOrEmpty(searchText)
-                ? handler.NearbyPlayers
-                : handler.NearbyPlayers.Where(p =>
+            IEnumerable<NearbyPlayer> source;
+            if (string.IsNullOrEmpty(searchText))
+            {
+                source           = handler.NearbyPlayers;
+                cachedRegexValid = true;
+            }
+            else if (useRegex)
+            {
+                source = FilterByRegex(handler.NearbyPlayers, searchText, out cachedRegexValid);
+            }
+            else
+            {
+                cachedRegexValid = true;
+                source = handler.NearbyPlayers.Where(p =>
                     p.Name.Contains(searchText,       StringComparison.OrdinalIgnoreCase) ||
                     p.HomeWorld.Contains(searchText,  StringComparison.OrdinalIgnoreCase) ||
                     p.CompanyTag.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                     p.JobAbbr.Contains(searchText,    StringComparison.OrdinalIgnoreCase));
+            }
 
             // Targeters float to top; stable, so sort order is preserved within each group
             cachedSorted = source.OrderByDescending(p => cachedTargeterIds.Contains(p.GameObjectId)).ToList();
@@ -272,6 +290,38 @@ public sealed class NearbyWindow : Window, IDisposable
         ImGui.EndTable();
     }
 
+    // A bad pattern or a pathological one (catastrophic backtracking) both fall back to "no
+    // matches" plus an invalid flag, rather than throwing mid-frame or hanging the UI thread.
+    private static List<NearbyPlayer> FilterByRegex(IEnumerable<NearbyPlayer> players, string pattern, out bool valid)
+    {
+        Regex regex;
+        try
+        {
+            regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+        }
+        catch (ArgumentException)
+        {
+            valid = false;
+            return [];
+        }
+
+        var matches = new List<NearbyPlayer>();
+        try
+        {
+            foreach (var p in players)
+                if (regex.IsMatch(p.Name) || regex.IsMatch(p.HomeWorld) || regex.IsMatch(p.CompanyTag) || regex.IsMatch(p.JobAbbr))
+                    matches.Add(p);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            valid = false;
+            return [];
+        }
+
+        valid = true;
+        return matches;
+    }
+
     // Reserves the same height the table would have used, so the footer never shifts, then
     // centers the empty-state message in it like the game's own "No active FATEs" panel.
     private static void DrawEmptyState(float height)
@@ -291,21 +341,40 @@ public sealed class NearbyWindow : Window, IDisposable
 
     private void DrawFooter()
     {
-        const string historyLabel = "Target History";
-        const float  margin       = 24f;
+        const string historyLabel  = "Target History";
+        const string regexLabel    = ".*";
+        const float  margin        = 24f;
+        const float  regexGap      = 4f; // tighter than the default item spacing, so the toggle reads as glued to the search box
         var showHistory = config.NearbyShowTargeters;
 
         if (!showHistory) historyOpen = false;
 
-        var buttonW   = showHistory ? ImGui.CalcTextSize(historyLabel).X + ImGui.GetStyle().FramePadding.X * 2 : 0f;
-        var hasActive = handler.CurrentTargeters.Count > 0;
+        var historyBtnW = showHistory ? ImGui.CalcTextSize(historyLabel).X + ImGui.GetStyle().FramePadding.X * 2 : 0f;
+        var regexBtnW   = ImGui.CalcTextSize(regexLabel).X + ImGui.GetStyle().FramePadding.X * 2;
+        var hasActive   = handler.CurrentTargeters.Count > 0;
 
         ImGui.SetCursorPosX(margin);
+        if (useRegex) Common.PushGoldButton(); else Common.PushGreyButton();
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+        if (ImGui.Button(regexLabel))
+            useRegex = !useRegex;
+        ImGui.PopStyleVar();
+        ImGui.PopStyleColor(4);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(useRegex ? "Regex search (click to disable)" : "Plain text search (click to enable regex)");
+
+        ImGui.SameLine(0f, regexGap);
         Common.PushSearchInput();
+        if (!cachedRegexValid) ImGui.PushStyleColor(ImGuiCol.Border, Theme.ColRed);
         var searchW = ImGui.GetContentRegionAvail().X - margin
-                      - (showHistory ? buttonW + ImGui.GetStyle().ItemSpacing.X : 0f);
+                      - (showHistory ? historyBtnW + ImGui.GetStyle().ItemSpacing.X : 0f);
         ImGui.SetNextItemWidth(searchW);
         ImGui.InputTextWithHint("##nearbysearch", $"Search... ({handler.NearbyPlayers.Count} nearby)", ref searchText, 64);
+        if (!cachedRegexValid)
+        {
+            ImGui.PopStyleColor();
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Invalid regex pattern");
+        }
         Common.PopSearchInput();
 
         if (showHistory)
