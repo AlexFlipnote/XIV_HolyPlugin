@@ -28,6 +28,11 @@ internal static class ConfigTable
         | ImGuiTableFlags.RowBg
         | ImGuiTableFlags.SizingStretchProp;
 
+    // Tracks, per table, the exact list reference last sorted - so a caller swapping `rows` for a
+    // freshly rebuilt list (e.g. WardInfoWindow reloading plots after a teleport) is detected as
+    // needing a re-sort even though ImGui's own SpecsDirty only fires on a user-driven sort change.
+    private static readonly Dictionary<string, object?> lastSortedRows = new();
+
     // The leftmost visible column has no left divider for margin, so it needs a nudge.
     // Reordering can change which one that is, so find it fresh each frame by screen X.
     // Must be called inside a table, on the row whose columns are being measured.
@@ -83,7 +88,8 @@ internal static class ConfigTable
         Common.PopTableHeader();
 
         var sortSpecs = ImGui.TableGetSortSpecs();
-        if (sortSpecs.SpecsDirty && sortSpecs.SpecsCount > 0)
+        bool rowsSwapped = !lastSortedRows.TryGetValue(tableId, out var lastRows) || !ReferenceEquals(lastRows, rows);
+        if ((sortSpecs.SpecsDirty || rowsSwapped) && sortSpecs.SpecsCount > 0)
         {
             var spec = sortSpecs.Specs;
             var sortCol = columns.FirstOrDefault(c => c.UserId == spec.ColumnUserID);
@@ -97,6 +103,7 @@ internal static class ConfigTable
             }
             sortSpecs.SpecsDirty = false;
         }
+        lastSortedRows[tableId] = rows;
 
         foreach (var row in rows)
         {

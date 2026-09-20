@@ -44,6 +44,11 @@ public sealed class WardInfoWindow : Window
     private LandIdent? rowsBufContext;
     private bool rowsBufIsAll;
 
+    // The plot whose row was last clicked (i.e. last teleported to), so it stays highlighted -
+    // otherwise, switching between characters mid-sweep leaves no way to tell which row was
+    // actually checked last without cross-referencing ward/plot numbers by hand.
+    private (short WorldId, short TerritoryTypeId, short WardNumber, int PlotIndex)? lastClickedPlot;
+
     // Tenant is per-ward (every plot in a ward shares the same restriction), captured straight from
     // the game's own HousingWardInfo blob - not guessed from ward numbers, which the assignment of
     // FC-only/personal-only wards isn't fixed enough to hardcode reliably.
@@ -492,20 +497,24 @@ public sealed class WardInfoWindow : Window
     {
         var world    = WorldName(r.WorldId);
         var district = DistrictName(r.TerritoryTypeId);
+        var isLastClicked = lastClickedPlot == (r.WorldId, r.TerritoryTypeId, r.WardNumber, r.PlotIndex);
 
-        ImGui.PushStyleColor(ImGuiCol.Header,        Vector4.Zero);
+        ImGui.PushStyleColor(ImGuiCol.Header,        isLastClicked ? Theme.ColGoldMid : Vector4.Zero);
         ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Theme.ColGoldSub);
         ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Theme.ColGoldMid);
         var clicked = ImGui.Selectable(
             $"{r.WardNumber + 1}##row{r.WorldId}_{r.TerritoryTypeId}_{r.WardNumber}_{r.PlotIndex}",
-            false, ImGuiSelectableFlags.SpanAllColumns);
+            isLastClicked, ImGuiSelectableFlags.SpanAllColumns);
         ImGui.PopStyleColor(3);
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip($"{world}, {district}, Ward {r.WardNumber + 1} ({TenantTag(r.Tenant)}), Plot {r.PlotIndex + 1}");
 
         if (clicked && !docked)
+        {
+            lastClickedPlot = (r.WorldId, r.TerritoryTypeId, r.WardNumber, r.PlotIndex);
             teleport($"{world}, {district}, ward {r.WardNumber + 1}, plot {r.PlotIndex + 1}");
+        }
     }
 
     // Mirrors the native "Owner/Price" column exactly for owned plots: green name if the house
