@@ -66,6 +66,24 @@ public partial class ConfigWindow
             configuration.WardInfoAutoSweepShirogane, v => configuration.WardInfoAutoSweepShirogane = v);
         DrawWardInfoAutoSweepCheckbox("Empyreum##wardinfoautosweepempyreum",
             configuration.WardInfoAutoSweepEmpyreum, v => configuration.WardInfoAutoSweepEmpyreum = v);
+
+        ImGui.Dummy(new Vector2(0, 4));
+        ConfigCheckbox(
+            "Play sound when an apartment is found##wardinfoapartmentsound",
+            configuration.WardInfoApartmentSound,
+            v => configuration.WardInfoApartmentSound = v,
+            "Plays a sound when \"Find apartment\" reaches a building with a vacant room.");
+
+        ImGui.Dummy(new Vector2(0, 2));
+        ImGui.BeginDisabled(!configuration.WardInfoApartmentSound);
+        DrawSoundPicker(
+            "wardinfoapartment", "Apartment found sound",
+            Path.Combine(pluginInterface.AssemblyLocation.DirectoryName!, ApartmentSweepHandler.DefaultFoundSound),
+            configuration.WardInfoApartmentSoundPath,
+            configuration.WardInfoApartmentSoundVolume,
+            p => { configuration.WardInfoApartmentSoundPath = p; configuration.Save(); },
+            v => configuration.WardInfoApartmentSoundVolume = v);
+        ImGui.EndDisabled();
         ImGui.EndDisabled();
 
         // ── Loot ──────────────────────────────────────────────────────────────

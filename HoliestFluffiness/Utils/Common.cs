@@ -633,4 +633,56 @@ internal static class Common
         shellModule->ExecuteCommandInner(str, uiModule);
         str->Dtor(true);
     }
+
+    // The game renders these choice popups as either of two addons depending on whether any entry
+    // carries an icon (e.g. a star marking a registered Favored Destination) - a city aetheryte's
+    // "Welcome to <City>." menu is "SelectIconString", while plainer NPC dialogue choices use
+    // "SelectString". Both expose the same PopupMenu shape, just at different field offsets, so
+    // both are checked and whichever is actually open (has entries) wins. EntryCount > 0 is used
+    // as the "genuinely open" signal instead of Common.IsAddonVisible, which is tuned for
+    // HousingSelectBlock and isn't a reliable indicator for these two.
+    internal static unsafe bool TryGetOpenSelectMenu(IGameGui gameGui, out AtkUnitBase* addon, out List<string> entries)
+    {
+        var selectString = (AddonSelectString*)gameGui.GetAddonByName("SelectString").Address;
+        if (selectString != null && selectString->PopupMenu.PopupMenu.EntryCount > 0)
+        {
+            addon   = (AtkUnitBase*)selectString;
+            entries = ReadPopupEntries(&selectString->PopupMenu.PopupMenu);
+            return true;
+        }
+
+        var selectIconString = (AddonSelectIconString*)gameGui.GetAddonByName("SelectIconString").Address;
+        if (selectIconString != null && selectIconString->PopupMenu.PopupMenu.EntryCount > 0)
+        {
+            addon   = (AtkUnitBase*)selectIconString;
+            entries = ReadPopupEntries(&selectIconString->PopupMenu.PopupMenu);
+            return true;
+        }
+
+        addon   = null;
+        entries = [];
+        return false;
+    }
+
+    private static unsafe List<string> ReadPopupEntries(PopupMenu* popup)
+    {
+        var list = new List<string>();
+        for (var i = 0; i < popup->EntryCount; i++)
+        {
+            var ptr = popup->EntryNames[i];
+            if (!ptr.HasValue) continue;
+            list.Add(ptr.ToString());
+        }
+        return list;
+    }
+
+    // Same synthetic click ECommons' ClickAddonButton performs: replays the button's own
+    // registered event through the owning addon, as if the player clicked it.
+    internal static unsafe void ClickButton(AtkUnitBase* addon, AtkComponentButton* button)
+    {
+        var res = &button->AtkComponentBase.OwnerNode->AtkResNode;
+        var evt = res->AtkEventManager.Event;
+        if (evt == null) return;
+        addon->ReceiveEvent(evt->State.EventType, (int)evt->Param, evt, null);
+    }
 }

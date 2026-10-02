@@ -16,6 +16,20 @@ internal static class HousingDistricts
         ["Empyreum"]          = 979,
     };
 
+    // Each residential district is entered from one specific main-city aetheryte's own interaction
+    // menu ("Residential District Aethernet"), not from a district-specific aetheryte - these IDs
+    // are the same gateway-city Aetheryte IDs Lifestream itself uses for this exact purpose
+    // (Lifestream.Enums.ResidentialAetheryteKind: Limsa=8, Gridania=2, Uldah=9, Kugane=111,
+    // Foundation=70), cross-referenced against its ResidentialTerritoryForResidentialAetheryte map.
+    internal static readonly Dictionary<string, uint> GatewayAetheryteIds = new()
+    {
+        ["Mist"]              = 8,   // Limsa Lominsa
+        ["The Lavender Beds"] = 2,   // New Gridania
+        ["The Goblet"]        = 9,   // Ul'dah - Steps of Nald
+        ["Shirogane"]         = 111, // Kugane
+        ["Empyreum"]          = 70,  // Foundation
+    };
+
     // Housing interior territory types mapped to their outdoor district territory, for zone preload.
     internal static readonly Dictionary<uint, uint> InteriorToOutdoor = new()
     {

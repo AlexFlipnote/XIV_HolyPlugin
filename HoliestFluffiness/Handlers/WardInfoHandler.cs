@@ -10,7 +10,6 @@ using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace HoliestFluffiness.Handlers;
@@ -46,20 +45,6 @@ public sealed unsafe class WardInfoHandler : IDisposable
     // rather than depending on dictionary enumeration order.
     private static readonly string[] AutoSweepDistricts =
         ["Mist", "The Lavender Beds", "The Goblet", "Shirogane", "Empyreum"];
-
-    // Each residential district is entered from one specific main-city aetheryte's own interaction
-    // menu ("Residential District Aethernet"), not from a district-specific aetheryte - these IDs
-    // are the same gateway-city Aetheryte IDs Lifestream itself uses for this exact purpose
-    // (Lifestream.Enums.ResidentialAetheryteKind: Limsa=8, Gridania=2, Uldah=9, Kugane=111,
-    // Foundation=70), cross-referenced against its ResidentialTerritoryForResidentialAetheryte map.
-    private static readonly Dictionary<string, uint> AutoSweepGatewayAetheryteId = new()
-    {
-        ["Mist"]              = 8,   // Limsa Lominsa
-        ["The Lavender Beds"] = 2,   // New Gridania
-        ["The Goblet"]        = 9,   // Ul'dah - Steps of Nald
-        ["Shirogane"]         = 111, // Kugane
-        ["Empyreum"]          = 70,  // Foundation
-    };
 
     private const string ResidentialDistrictEntryText = "Residential District Aethernet";
     private const string GoToSpecifiedWardEntryText    = "Go to specified ward. (Review Tabs)";
@@ -382,7 +367,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
 
         var district = AutoSweepDistricts[autoSweepDistrictIndex];
         log.Debug("[HF] WardInfo: auto-sweep-all teleporting to {District}'s gateway.", district);
-        Telepo.Instance()->Teleport(AutoSweepGatewayAetheryteId[district], 0);
+        Telepo.Instance()->Teleport(HousingDistricts.GatewayAetheryteIds[district], 0);
         autoSweepSawBetweenAreas = false;
         EnterAutoSweepStage(AutoSweepStage.WaitForZoneChange);
     }
@@ -486,7 +471,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
         // Let residual movement from /automove actually stop before the first interact attempt.
         if (DateTime.UtcNow - autoSweepStageStartedAt < AutoSweepSettleDelay) return;
 
-        if (TryGetOpenSelectMenu(out _, out _))
+        if (Common.TryGetOpenSelectMenu(gameGui, out _, out _))
         {
             EnterAutoSweepStage(AutoSweepStage.SelectResidentialDistrict);
             return;
@@ -522,7 +507,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
     // this always runs before AdvanceAutoSweepDistrict actually teleports anywhere.
     private void CloseLingeringAutoSweepMenus()
     {
-        if (TryGetOpenSelectMenu(out var selectMenu, out _))
+        if (Common.TryGetOpenSelectMenu(gameGui, out var selectMenu, out _))
             selectMenu->Close(true);
 
         var housing = GetAddon();
@@ -545,7 +530,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
         if (DateTime.UtcNow - autoSweepLastActionAt < AutoSweepRetryInterval) return;
         autoSweepLastActionAt = DateTime.UtcNow;
 
-        if (!TryGetOpenSelectMenu(out var addon, out var entries))
+        if (!Common.TryGetOpenSelectMenu(gameGui, out var addon, out var entries))
         {
             log.Debug("[HF] WardInfo: auto-sweep-all - waiting for a menu with '{Entry}'; none open right now.", entryText);
             return;
@@ -584,48 +569,6 @@ public sealed unsafe class WardInfoHandler : IDisposable
 
         if (DateTime.UtcNow - autoSweepStageStartedAt > AutoSweepMenuTimeout)
             AbortAutoSweepDistrict("timed out waiting for the ward-select menu to open");
-    }
-
-    // The game renders these choice popups as either of two addons depending on whether any entry
-    // carries an icon (e.g. a star marking a registered Favored Destination) - a city aetheryte's
-    // "Welcome to <City>." menu is "SelectIconString", while plainer NPC dialogue choices use
-    // "SelectString". Both expose the same PopupMenu shape, just at different field offsets, so
-    // both are checked and whichever is actually open (has entries) wins. EntryCount > 0 is used
-    // as the "genuinely open" signal instead of Common.IsAddonVisible, which is tuned for
-    // HousingSelectBlock and isn't a reliable indicator for these two.
-    private bool TryGetOpenSelectMenu(out AtkUnitBase* addon, out List<string> entries)
-    {
-        var selectString = (AddonSelectString*)gameGui.GetAddonByName("SelectString").Address;
-        if (selectString != null && selectString->PopupMenu.PopupMenu.EntryCount > 0)
-        {
-            addon   = (AtkUnitBase*)selectString;
-            entries = ReadPopupEntries(&selectString->PopupMenu.PopupMenu);
-            return true;
-        }
-
-        var selectIconString = (AddonSelectIconString*)gameGui.GetAddonByName("SelectIconString").Address;
-        if (selectIconString != null && selectIconString->PopupMenu.PopupMenu.EntryCount > 0)
-        {
-            addon   = (AtkUnitBase*)selectIconString;
-            entries = ReadPopupEntries(&selectIconString->PopupMenu.PopupMenu);
-            return true;
-        }
-
-        addon   = null;
-        entries = [];
-        return false;
-    }
-
-    private static List<string> ReadPopupEntries(PopupMenu* popup)
-    {
-        var list = new List<string>();
-        for (var i = 0; i < popup->EntryCount; i++)
-        {
-            var ptr = popup->EntryNames[i];
-            if (!ptr.HasValue) continue;
-            list.Add(ptr.ToString());
-        }
-        return list;
     }
 
     private void FireNextWard(AtkUnitBase* addon)

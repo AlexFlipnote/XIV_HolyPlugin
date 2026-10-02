@@ -22,6 +22,7 @@ public sealed class WardInfoWindow : Window
 {
     private readonly Configuration config;
     private readonly WardInfoHandler handler;
+    private readonly ApartmentSweepHandler apartmentSweep;
     private readonly IGameGui gameGui;
     private readonly IDataManager dataManager;
     private readonly Action<string> teleport;
@@ -63,12 +64,13 @@ public sealed class WardInfoWindow : Window
 
     private readonly TableColumn<PlotRow>[] columns;
 
-    public WardInfoWindow(Configuration config, WardInfoHandler handler, IGameGui gameGui, IDataManager dataManager,
-        Action<string> teleport, Func<bool> isLifestreamBusy)
+    public WardInfoWindow(Configuration config, WardInfoHandler handler, ApartmentSweepHandler apartmentSweep,
+        IGameGui gameGui, IDataManager dataManager, Action<string> teleport, Func<bool> isLifestreamBusy)
         : base("Ward Info##HFWardInfo", ImGuiWindowFlags.NoCollapse)
     {
         this.config           = config;
         this.handler          = handler;
+        this.apartmentSweep   = apartmentSweep;
         this.gameGui          = gameGui;
         this.dataManager      = dataManager;
         this.teleport         = teleport;
@@ -130,7 +132,7 @@ public sealed class WardInfoWindow : Window
     // True while either our own auto-sweep-all or Lifestream itself is actively driving the
     // character/menus - the window must not dock or accept input during this, since none of it is
     // the user manually browsing right now.
-    private bool IsBusy => handler.IsAutoSweeping || isLifestreamBusy();
+    private bool IsBusy => handler.IsAutoSweeping || apartmentSweep.IsRunning || isLifestreamBusy();
 
     public override unsafe void PreDraw()
     {
@@ -179,7 +181,7 @@ public sealed class WardInfoWindow : Window
             DrawHeader(handler.LastLandIdent);
             ImGui.EndDisabled();
             ImGui.SameLine();
-            DrawSweepButtonRightAligned();
+            DrawDockedButtonsRightAligned();
         }
         else
         {
@@ -531,17 +533,47 @@ public sealed class WardInfoWindow : Window
         }
     }
 
-    private void DrawSweepButtonRightAligned()
+    // "Find apartment" and Sweep share the right edge of the docked header as one group.
+    private void DrawDockedButtonsRightAligned()
     {
-        var label = handler.IsSweeping
+        const string apartmentLabel = "Find apartment##wardinfoapartment";
+        var sweepLabel = handler.IsSweeping
             ? $"Cancel ({handler.SweptCount}/{handler.SweepTotal})##wardinfosweep"
             : "Sweep this ward list##wardinfosweep";
 
-        var width = ImGui.CalcTextSize(label.Split('#')[0]).X + ImGui.GetStyle().FramePadding.X * 2;
+        var style = ImGui.GetStyle();
+        var width = ButtonWidth(apartmentLabel) + style.ItemSpacing.X + ButtonWidth(sweepLabel);
         var avail = ImGui.GetContentRegionAvail().X;
         if (avail > width)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
 
+        DrawFindApartmentButton(apartmentLabel);
+        ImGui.SameLine();
+        DrawSweepButton(sweepLabel);
+    }
+
+    private static float ButtonWidth(string label) =>
+        ImGui.CalcTextSize(label.Split('#')[0]).X + ImGui.GetStyle().FramePadding.X * 2;
+
+    // Only offered here, on the panel docked to the live ward menu, so it always targets the
+    // district that menu is showing. Progress and the result appear in ApartmentSweepWindow.
+    private void DrawFindApartmentButton(string label)
+    {
+        var current = handler.LastLandIdent;
+        var lifestream = apartmentSweep.IsLifestreamAvailable;
+
+        ImGui.BeginDisabled(handler.IsSweeping || !apartmentSweep.CanStart(current));
+        if (ImGui.Button(label) && current != null)
+            apartmentSweep.Start(current);
+        ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(lifestream
+                ? "Visits every apartment building in this district (ward 1-30, main and subdivision)\nand stops at the first one with a vacant room. Uses Lifestream for travel."
+                : "Requires Lifestream to be installed and loaded.");
+    }
+
+    private void DrawSweepButton(string label)
+    {
         if (handler.IsSweeping)
         {
             if (ImGui.Button(label))
@@ -549,7 +581,7 @@ public sealed class WardInfoWindow : Window
             return;
         }
 
-        ImGui.BeginDisabled(!handler.CanSweep);
+        ImGui.BeginDisabled(!handler.CanSweep || apartmentSweep.IsRunning);
         if (ImGui.Button(label))
             handler.StartSweep();
         ImGui.EndDisabled();
@@ -580,7 +612,7 @@ public sealed class WardInfoWindow : Window
             return;
         }
 
-        ImGui.BeginDisabled(!handler.CanAutoSweepAll);
+        ImGui.BeginDisabled(!handler.CanAutoSweepAll || apartmentSweep.IsRunning);
         if (ImGui.Button(label))
             handler.StartAutoSweepAll();
         ImGui.EndDisabled();

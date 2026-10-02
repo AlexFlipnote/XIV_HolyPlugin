@@ -99,6 +99,11 @@ public class Configuration : IPluginConfiguration
     public bool WardInfoAutoSweepShirogane     { get; set; } = true;
     public bool WardInfoAutoSweepEmpyreum      { get; set; } = true;
 
+    // "Find apartment" plays this when it reaches a building with a vacant room.
+    public bool   WardInfoApartmentSound        { get; set; } = false;
+    public string WardInfoApartmentSoundPath    { get; set; } = "";
+    public float  WardInfoApartmentSoundVolume  { get; set; } = 0.5f;
+
     public bool    NearbyDtrEnabled          { get; set; } = false;
     public bool    NearbyShowTargeters       { get; set; } = false;
     public bool    NearbyTargeterTrackSelf   { get; set; } = false;

@@ -87,6 +87,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly RepairHandler repairHandler;
     private readonly WardInfoHandler wardInfoHandler;
     private readonly WardInfoWindow wardInfoWindow;
+    private readonly ApartmentSweepHandler apartmentSweepHandler;
+    private readonly ApartmentSweepWindow apartmentSweepWindow;
     private readonly NoKillHandler noKillHandler;
     private readonly PhysicsHandler physicsHandler;
     private readonly AntiAfkHandler antiAfkHandler;
@@ -199,7 +201,9 @@ public sealed class Plugin : IDalamudPlugin
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition, ClientState);
-        wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, GameGui, DataManager, InvokeLifestreamTeleport, IsLifestreamBusy);
+        apartmentSweepHandler  = new ApartmentSweepHandler(configuration, PluginInterface, GameGui, Framework, AddonLifecycle, ClientState, ObjectTable, TargetManager, Condition, DataManager, Log);
+        apartmentSweepWindow   = new ApartmentSweepWindow(apartmentSweepHandler);
+        wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, apartmentSweepHandler, GameGui, DataManager, InvokeLifestreamTeleport, IsLifestreamBusy);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
         serverInfoHandler.SetNearbyHandler(nearbyHandler);
@@ -252,6 +256,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(notesWindow);
         windowSystem.AddWindow(notePreviewWindow);
         windowSystem.AddWindow(wardInfoWindow);
+        windowSystem.AddWindow(apartmentSweepWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -1021,6 +1026,7 @@ public sealed class Plugin : IDalamudPlugin
         serverInfoHandler.Dispose();
         repairHandler.Dispose();
         wardInfoHandler.Dispose();
+        apartmentSweepHandler.Dispose();
         noKillHandler.OnLobbyError -= OnNoKillLobbyError;
         noKillHandler.Dispose();
         physicsHandler.Dispose();
