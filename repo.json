@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.10",
+        "AssemblyVersion": "0.12.11",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.10/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.10/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.10/latest.zip",
-        "Changelog": "Find apartment is now much faster and more reliable. Moving between wards no longer teleports back to the city (no more gil spent per ward): it hops to the ward's entrance aetheryte and uses the ferry, gate or Odilie to pick the next ward, in every district.\nWalking is smoother: it locks on and runs straight to shards and ferry NPCs, waits until menus have closed before moving, and no longer jumps around when a walk takes a while.\nFixed getting stuck on the side of the Shirogane apartment stairs (both main and subdivision), under the Empyreum shard terraces, and standing still after reading a building's rooms.",
-        "DownloadCount": 264,
-        "LastUpdate": 1791036276
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.11/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.11/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.11/latest.zip",
+        "Changelog": "New optional setting (Social): right-click a player in the world, or on the target / focus target bar, to add them to your blacklist without waiting for them to talk in chat.\nSweep all districts now starts from where you are: if you are already near an aetheryte in a district's gateway city or in the district itself, that district is swept first without teleporting, saving gil.\nFixed \"Add to Blacklist\" and \"Invite to Party\" in the Nearby window doing nothing.",
+        "DownloadCount": 268,
+        "LastUpdate": 1791064322
     }
 ]
