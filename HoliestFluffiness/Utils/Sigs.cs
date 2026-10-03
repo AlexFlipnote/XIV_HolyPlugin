@@ -19,4 +19,9 @@ public static class Sigs
     public const string MouseClickDelay        = "EB 3F B8 ?? ?? ?? ?? 48 8B D7";
     public const string ReceiveEvent           = "44 0F B7 C2 4D 8B D1";
     public const string HousingWardInfoHandler = "40 55 53 41 54 41 55 41 57 48 8D AC 24 ?? ?? ?? ?? B8";
+    // Ground movement input (PlayerMoveController::ReadInput) and its two "is input enabled" checks;
+    // same patterns Lifestream's OverrideMovement uses.
+    public const string RMIWalk                = "E8 ?? ?? ?? ?? 80 7B 3E 00 48 8D 3D";
+    public const string RMIWalkIsInputEnabled1 = "E8 ?? ?? ?? ?? 84 C0 75 10 38 43 3C";
+    public const string RMIWalkIsInputEnabled2 = "E8 ?? ?? ?? ?? 84 C0 75 03 88 47 3F";
 }

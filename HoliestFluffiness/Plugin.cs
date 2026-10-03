@@ -61,6 +61,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private IGameInteropProvider GameInterop { get; init; } = null!;
     [PluginService] private IDtrBar DtrBar { get; init; } = null!;
     [PluginService] private ISigScanner SigScanner { get; init; } = null!;
+    [PluginService] private IGameConfig GameConfig { get; init; } = null!;
     [PluginService] private IGameGui GameGui { get; init; } = null!;
     [PluginService] private IPartyList PartyList { get; init; } = null!;
     [PluginService] private ITargetManager TargetManager { get; init; } = null!;
@@ -87,6 +88,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly RepairHandler repairHandler;
     private readonly WardInfoHandler wardInfoHandler;
     private readonly WardInfoWindow wardInfoWindow;
+    private readonly PointWalker pointWalker;
     private readonly ApartmentSweepHandler apartmentSweepHandler;
     private readonly ApartmentSweepWindow apartmentSweepWindow;
     private readonly NoKillHandler noKillHandler;
@@ -202,7 +204,8 @@ public sealed class Plugin : IDalamudPlugin
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition, ClientState);
-        apartmentSweepHandler  = new ApartmentSweepHandler(configuration, PluginInterface, GameGui, Framework, AddonLifecycle, ClientState, ObjectTable, TargetManager, Condition, DataManager, Log);
+        pointWalker            = new PointWalker(ObjectTable, GameConfig, SigScanner, GameInterop, Log);
+        apartmentSweepHandler  = new ApartmentSweepHandler(configuration, PluginInterface, GameGui, Framework, AddonLifecycle, ClientState, ObjectTable, TargetManager, Condition, DataManager, pointWalker, Log);
         apartmentSweepWindow   = new ApartmentSweepWindow(apartmentSweepHandler);
         wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, apartmentSweepHandler, GameGui, DataManager, InvokeLifestreamTeleport, IsLifestreamBusy);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
@@ -1036,6 +1039,7 @@ public sealed class Plugin : IDalamudPlugin
         repairHandler.Dispose();
         wardInfoHandler.Dispose();
         apartmentSweepHandler.Dispose();
+        pointWalker.Dispose();
         noKillHandler.OnLobbyError -= OnNoKillLobbyError;
         noKillHandler.Dispose();
         physicsHandler.Dispose();

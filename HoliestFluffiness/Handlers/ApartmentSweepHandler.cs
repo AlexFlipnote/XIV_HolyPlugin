@@ -6,6 +6,7 @@ using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -27,10 +28,12 @@ namespace HoliestFluffiness.Handlers;
 //   Lifestream trip to the main apartment (city aetheryte -> ward -> walk to the entrance)
 //   -> read room list -> shard hop to the subdivision apartment -> read room list
 // Ward 1 instead travels straight from the ward menu the button was clicked on, since it's
-// already open. Lifestream is used for the per-ward trip because moving between wards from
-// inside a district means going back to a city aetheryte anyway, which it already handles; the
-// main -> subdivision hop goes through its HousingAethernetTeleportById IPC instead, avoiding a
-// second full trip for a building a single shard away.
+// already open. The main -> subdivision hop goes through Lifestream's HousingAethernetTeleportById
+// IPC instead, avoiding a second full trip for a building a single shard away.
+//
+// Districts with a known ward exit (see WardExitRoutes) skip the city trip between wards too,
+// which costs a teleport each time: shard hop to the ward entrance aetheryte, walk to the NPC
+// there that offers "Go to specified ward", and travel to the next ward from its ward menu.
 //
 // If a ward-menu or shard step fails, the building is retried with that same Lifestream trip,
 // which can reach it from anywhere. Lifestream would finish every such trip by picking a room and offering to enter it, so the moment the room list
@@ -61,6 +64,28 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
     // Same IDs as Lifestream's ResidentialAethernet.
     private static readonly uint[] ApartmentAethernetIds    = [1966132, 1966088, 1966120, 1966104, 1966149];
     private static readonly uint[] ApartmentSubAethernetIds = [1966142, 1966096, 1966128, 1966112, 1966157];
+    // The aetheryte next to where ward travel drops you (Lifestream's StartingAetherytes).
+    private static readonly uint[] WardEntranceAethernetIds = [1966103, 1966081, 1966118, 1966145, 1966129];
+
+    // Walk from the ward entrance aetheryte to whatever offers "Go to specified ward". With TalkToNpc
+    // that's whichever event NPC stands nearest the last point; without, it's the district exit
+    // itself, whose menu pops up on walking into it, so the last point sits a few yalms past the
+    // exit line to make sure the walk actually crosses it. Points taken in-game. TargetDelay is how
+    // long into the last leg the NPC is reliably loaded and can be targeted.
+    private sealed record WardExitRoute(string Name, Vector3[] Path, bool TalkToNpc, double TargetDelay = 0);
+    private static readonly Dictionary<string, WardExitRoute> WardExitRoutes = new()
+    {
+        ["Mist"]      = new("the district exit", [new(-10.490199f, 48.996967f, -126.59106f), new(-10.059337f, 48.346664f, -169.46365f),
+                                                  new(-10.0f, 48.346664f, -174.5f)], TalkToNpc: false),
+        ["The Goblet"] = new("the district exit", [new(-10.556103f, -11.076661f, -198.26257f), new(-14.58f, -11.076661f, -201.23f)], TalkToNpc: false),
+        ["The Lavender Beds"] = new("the ferry", [new(4.1270623f, 2.6108832f, 193.42778f), new(10.623131f, 2.6109006f, 205.35211f)], TalkToNpc: true, TargetDelay: 1),
+        ["Shirogane"] = new("the ferry", [new(-101.64072f, 2.0699985f, 126.58039f), new(-118.73602f, 2.02f, 153.73157f)], TalkToNpc: true, TargetDelay: 3),
+        ["Empyreum"]  = new("Odilie", [new(40.248085f, -15.400002f, 174.06548f), new(17.930742f, -15.200001f, 181.06882f)], TalkToNpc: true, TargetDelay: 1),
+    };
+    private const float WardExitNpcRange = 6f;
+    // Close enough to talk to the NPC; the walk hands over the moment it gets here instead of
+    // finishing the last leg.
+    private const float WardExitTalkRange = 4f;
 
     // EObjName rows whose name is one of the aethernet shard variants; every EObj sharing one of
     // these names is a shard (same lookup Lifestream's Utils.AethernetShards does).
@@ -69,19 +94,51 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
     private const uint HousingSelectBlockTravelButtonId = 34;
 
     private const string GoToSpecifiedApartmentText    = "Go to specified apartment";
+    private const string GoToSpecifiedWardText         = "Go to specified ward";
+    private const string TalkAddonName                 = "Talk";
     private const string TravelToPromptText            = "Travel to";
 
     private const int LifestreamPropertyApartment = 1;
 
     private const float ObjectSearchRange       = 60f;
     private const float EntranceInteractRange   = 3.5f;
+    private const float LeadInPointReached      = 1.5f;
+    private const float WalkStallDistance       = 0.5f;
+    private const float ShardSnugRange          = 2f;
+    private const float ShardPressDistance      = 0.15f;
+
+    // Sprint, plus the statuses Lifestream also treats as "already sprinting".
+    private const uint SprintActionId = 3;
+    private static readonly uint[] SprintStatusIds = [50, 1199, 4209];
+
+    // Ward travel drops you at the district entrance, not at a shard. Shirogane and the Lavender
+    // Beds use Lifestream's TaskApproachHousingAetheryte steps for getting clear of it: Shirogane
+    // runs straight ahead until it's out of the entrance corridor (Z < 128), the Lavender Beds
+    // runs ahead until a shard is in sight. Empyreum walks to a point clear of the entrance (taken
+    // in-game; Lifestream's own waypoint there kept getting caught on the scenery), from where the
+    // shard step's straight lock-on run has a clear line to the shard.
+    private static readonly Vector3[] EmpyreumPlazaPath = [new(23.849737f, -15.200001f, 179.62442f)];
+    private const float ShiroganePlazaExitZ  = 128f;
+    private const float LavenderShardInSight = 9.35f;
+
+    // Shirogane's apartment shards drop you where a straight run at the entrance can wedge against
+    // the side of the staircase, so walk to the middle of the stairs first. Lifestream has no
+    // equivalent; this is the main-area point, mirrored from one taken in-game in the subdivision.
+    private static readonly Vector3 ShiroganeStairsPoint = SubdivisionToMain(new(-690.1085f, 25.05f, -719.8623f));
+
+    // Every district's subdivision is the main area turned 90 degrees and shifted by -704 on X and
+    // Z, at the same height (fits all 60 plot fronts in Lifestream's HousingData to within 0.7y).
+    private const float SubdivisionOffset = -704f;
 
     private static readonly TimeSpan SettleDelay        = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan RetryInterval      = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ClickInterval      = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan JumpAfter          = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan TalkClickInterval  = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan WalkStallCheck     = TimeSpan.FromSeconds(1.5);
+    private static readonly TimeSpan ShardPressCheck    = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan StepTimeout        = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ApproachTimeout    = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan LeadInTimeout      = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ZoneStartTimeout   = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ZoneTimeout        = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan TravelTimeout      = TimeSpan.FromMinutes(3);
@@ -104,6 +161,10 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
         // Shard hop inside the district
         ApproachShard, AethernetTeleport,
         WaitArrival,
+        // District-specific walk before heading for the shard or entrance
+        LeadIn,
+        // Ward exit: walk to the ward-travel NPC and open its ward menu
+        WalkWardExit, TalkWardExit,
         // Apartment building
         ApproachEntrance, InteractEntrance, SelectGoToApartment, ReadRooms,
         // Lifestream trip to the building from wherever we are
@@ -123,6 +184,7 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
     private readonly ITargetManager targetManager;
     private readonly ICondition condition;
     private readonly IDataManager dataManager;
+    private readonly PointWalker pointWalker;
     private readonly IPluginLog log;
 
     private Stage stage = Stage.None;
@@ -137,13 +199,24 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
     private int buildingVacant;
     private int buildingFirstVacantRoom;
     private bool walkStarted;
+    private bool lockedOn;
+    private DateTime lastLockOnAt;
+    private DateTime walkCheckAt;
+    private DateTime shardCheckAt;
+    private Vector3 shardCheckPos;
+    private Vector3 walkCheckPos;
     private int consecutiveFailures;
     private int worldId;
     private int lifestreamCity;
-    private uint apartmentAethernetId, apartmentSubAethernetId;
+    private uint apartmentAethernetId, apartmentSubAethernetId, wardEntranceAethernetId;
+    private WardExitRoute? wardExitRoute;
+    private int wardExitPathIndex;
+    private DateTime wardExitLegStartedAt;
     private uint aethernetTarget;
     private Stage afterAethernet;
     private Stage afterArrival;
+    private LeadInStep? leadIn;
+    private int leadInPathIndex;
     private HashSet<uint>? shardDataIds;
     private readonly List<ApartmentVacancy> found = [];
 
@@ -161,7 +234,7 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
 
     public ApartmentSweepHandler(Configuration config, IDalamudPluginInterface pluginInterface, IGameGui gameGui, IFramework framework,
         IAddonLifecycle addonLifecycle, IClientState clientState, IObjectTable objectTable,
-        ITargetManager targetManager, ICondition condition, IDataManager dataManager, IPluginLog log)
+        ITargetManager targetManager, ICondition condition, IDataManager dataManager, PointWalker pointWalker, IPluginLog log)
     {
         this.config          = config;
         this.assemblyDir     = pluginInterface.AssemblyLocation.DirectoryName!;
@@ -174,6 +247,7 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
         this.targetManager   = targetManager;
         this.condition       = condition;
         this.dataManager     = dataManager;
+        this.pointWalker     = pointWalker;
         this.log             = log;
 
         framework.Update += OnUpdate;
@@ -206,6 +280,8 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
 
         apartmentAethernetId    = ResolveAethernet(ApartmentAethernetIds, territory);
         apartmentSubAethernetId = ResolveAethernet(ApartmentSubAethernetIds, territory);
+        wardEntranceAethernetId = ResolveAethernet(WardEntranceAethernetIds, territory);
+        wardExitRoute           = WardExitRoutes.GetValueOrDefault(District);
 
         BuildingIndex       = 0;
         consecutiveFailures = 0;
@@ -248,6 +324,7 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
     }
 
     private bool HasFastRoute => apartmentAethernetId != 0 && apartmentSubAethernetId != 0;
+    private bool HasWardExitRoute => HasFastRoute && wardEntranceAethernetId != 0 && wardExitRoute != null && pointWalker.IsAvailable;
 
     private uint ResolveAethernet(uint[] ids, ushort territory)
     {
@@ -267,6 +344,8 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
         stageStartedAt = DateTime.UtcNow;
         lastActionAt   = DateTime.MinValue;
         walkStarted    = false;
+        lockedOn       = false;
+        pointWalker.Destination = null;
         if (status != null) Status = status;
     }
 
@@ -280,6 +359,9 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
             case Stage.ApproachShard:             HandleApproachShard(); break;
             case Stage.AethernetTeleport:         HandleAethernetTeleport(); break;
             case Stage.WaitArrival:               HandleWaitArrival(); break;
+            case Stage.LeadIn:                    HandleLeadIn(); break;
+            case Stage.WalkWardExit:              HandleWalkWardExit(); break;
+            case Stage.TalkWardExit:              HandleTalkWardExit(); break;
             case Stage.ApproachEntrance:          HandleApproachEntrance(); break;
             case Stage.InteractEntrance:          HandleInteractEntrance(); break;
             case Stage.SelectGoToApartment:       HandleSelectEntry(GoToSpecifiedApartmentText, BeginReadingRooms); break;
@@ -365,20 +447,35 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
     private void HandleApproachShard()
     {
         if (StageTimedOut(ApproachTimeout)) { FailRoute("could not reach an aethernet shard"); return; }
-        if (DateTime.UtcNow - stageStartedAt < TimeSpan.FromMilliseconds(500)) return;
+        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return;
 
+        var target = FindNearest(player.Position, IsShardOrAetheryte);
+        var now    = DateTime.UtcNow;
+
+        // Lifestream counts a shard as in reach from 4.6y, but the game refuses the interaction
+        // ("Too far away") from the edge of that. So once Lifestream says it's in reach, keep
+        // running at the shard until up against it (barely moving any more) or right next to it,
+        // then hop straight away. Aetherytes are big enough that Lifestream's range is fine.
         if (GetActiveResidentialAetheryte() != 0)
         {
-            StopAutoMove();
-            EnterStage(Stage.AethernetTeleport);
-            return;
+            var snug = target == null || target.ObjectKind == ObjectKind.Aetheryte ||
+                       Vector3.Distance(player.Position, target.Position) < ShardSnugRange;
+            var pressed = walkStarted && now - shardCheckAt >= ShardPressCheck &&
+                          Vector3.Distance(player.Position, shardCheckPos) < ShardPressDistance;
+            if (snug || pressed)
+            {
+                StopAutoMove();
+                EnterStage(Stage.AethernetTeleport);
+                return;
+            }
         }
 
-        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return;
-        var shards = ShardDataIds;
-        var target = FindNearest(player.Position, o =>
-            o.ObjectKind == ObjectKind.Aetheryte ||
-            (o.ObjectKind == ObjectKind.EventObj && shards.Contains(o.BaseId)));
+        if (now - shardCheckAt >= ShardPressCheck)
+        {
+            shardCheckAt  = now;
+            shardCheckPos = player.Position;
+        }
+
         if (target != null) WalkTowards(target);
     }
 
@@ -425,18 +522,105 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
             if (StageTimedOut(ZoneStartTimeout)) FailRoute("the zone change never started");
             return;
         }
-        if (!Common.TryGetLocalPlayer(objectTable, out _)) return;
+        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return;
 
         if (arrivedAt == DateTime.MinValue) arrivedAt = DateTime.UtcNow;
         if (DateTime.UtcNow - arrivedAt < SettleDelay || IsLifestreamBusy()) return;
 
-        EnterStage(afterArrival, afterArrival switch
+        var status = afterArrival switch
         {
             Stage.ApproachShard     => "Heading to the apartment shard",
             Stage.ApproachEntrance  => "Walking to the apartment entrance",
             _                       => null,
-        });
+        };
+
+        leadIn = afterArrival switch
+        {
+            Stage.ApproachShard    => PlazaLeadIn(),
+            Stage.ApproachEntrance => ApartmentLeadIn(player.Position),
+            _                      => null,
+        };
+        if (leadIn is { Path: not null } && !pointWalker.IsAvailable) leadIn = null;
+
+        leadInPathIndex = 0;
+        EnterStage(leadIn != null ? Stage.LeadIn : afterArrival, status);
     }
+
+    // ── District lead-ins ───────────────────────────────────────────────────
+
+    // Either walk Path point by point until the last one is reached, or (Path null) run straight
+    // ahead with /automove until Done.
+    private sealed record LeadInStep(string Name, Vector3[]? Path, Func<Vector3, bool>? Done = null);
+
+    // Ward travel arrival -> first shard.
+    private LeadInStep? PlazaLeadIn() => District switch
+    {
+        "Empyreum"          => new("Empyreum plaza", EmpyreumPlazaPath),
+        "Shirogane"         => new("Shirogane plaza", null, p => p.Z < ShiroganePlazaExitZ),
+        "The Lavender Beds" => new("Lavender Beds plaza", null, p => FindNearest(p, IsShard, LavenderShardInSight) != null),
+        _                   => null,
+    };
+
+    // Shard arrival -> apartment entrance. Only used when the point is actually nearby, so a drop
+    // somewhere unexpected still goes straight for the entrance.
+    private LeadInStep? ApartmentLeadIn(Vector3 from) =>
+        StairsPointNear(from) is { } stairs ? new("Shirogane stairs", [stairs]) : null;
+
+    // The Shirogane stairs point (main or subdivision) within reach of a spot, if any.
+    private Vector3? StairsPointNear(Vector3 from)
+    {
+        if (District != "Shirogane") return null;
+        foreach (var point in (Vector3[])[ShiroganeStairsPoint, MainToSubdivision(ShiroganeStairsPoint)])
+            if (HorizontalDistance(from, point) <= ObjectSearchRange) return point;
+        return null;
+    }
+
+    private static Vector3 MainToSubdivision(Vector3 p) => new(SubdivisionOffset - p.Z, p.Y, p.X + SubdivisionOffset);
+    private static Vector3 SubdivisionToMain(Vector3 p) => new(p.Z - SubdivisionOffset, p.Y, SubdivisionOffset - p.X);
+
+    // A lead-in that times out hands over to the normal approach instead of failing the building;
+    // it only exists to give that approach a better starting spot.
+    private void HandleLeadIn()
+    {
+        if (leadIn == null) { EnterStage(afterArrival); return; }
+        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return;
+
+        var path = leadIn.Path;
+        while (path != null && leadInPathIndex < path.Length &&
+               HorizontalDistance(player.Position, path[leadInPathIndex]) < LeadInPointReached)
+        {
+            leadInPathIndex++;
+            if (leadInPathIndex < path.Length) pointWalker.Destination = path[leadInPathIndex];
+        }
+
+        // A shard on the way is already within Lifestream's reach: hand over to the shard step's
+        // straight lock-on and automove run.
+        if (afterArrival == Stage.ApproachShard && GetActiveResidentialAetheryte() != 0)
+        {
+            if (path == null) StopAutoMove();
+            leadIn = null;
+            EnterStage(afterArrival);
+            return;
+        }
+
+        var done = path != null ? leadInPathIndex >= path.Length : leadIn.Done!(player.Position);
+        if (done || StageTimedOut(LeadInTimeout))
+        {
+            if (!done) log.Debug("[HF] ApartmentSweep: {LeadIn:l} lead-in timed out; carrying on.", leadIn.Name);
+            if (path == null) StopAutoMove();
+            leadIn = null;
+            EnterStage(afterArrival);
+            return;
+        }
+
+        if (walkStarted || IsOccupied()) return;
+        walkStarted = true;
+        UseSprint(player);
+        if (path != null) pointWalker.Destination = path[leadInPathIndex];
+        else Common.ExecuteCommand("/automove on");
+    }
+
+    private static float HorizontalDistance(Vector3 a, Vector3 b) => Vector2.Distance(new(a.X, a.Z), new(b.X, b.Z));
 
     // ── Apartment building ──────────────────────────────────────────────────
 
@@ -585,8 +769,121 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
         BuildingIndex++;
         if (CurrentIsSubdivision && HasFastRoute)
             GoAethernet(apartmentSubAethernetId, Stage.ApproachEntrance, "Heading to the subdivision apartment");
+        else if (HasWardExitRoute)
+        {
+            wardExitPathIndex = 0;
+            GoAethernet(wardEntranceAethernetId, Stage.WalkWardExit, $"Heading to {wardExitRoute!.Name} for ward {CurrentWard}");
+        }
         else
             EnterLifestreamTravel();
+    }
+
+    // ── Ward exit ───────────────────────────────────────────────────────────
+
+    private void HandleWalkWardExit()
+    {
+        if (StageTimedOut(ApproachTimeout)) { FailRoute($"could not reach {wardExitRoute!.Name}"); return; }
+        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return;
+
+        // A walk-in exit has opened its menu: stop here and answer it.
+        if (Common.TryGetOpenSelectMenu(gameGui, out _, out _)) { EnterStage(Stage.TalkWardExit); return; }
+
+        // On the last leg, lock on to the NPC so it's clear where the walk is headed (earlier legs
+        // can pass other NPCs standing near it), and start talking as soon as it's in reach.
+        var path = wardExitRoute!.Path;
+        if (walkStarted && wardExitPathIndex == path.Length - 1 &&
+            DateTime.UtcNow - wardExitLegStartedAt >= TimeSpan.FromSeconds(wardExitRoute.TargetDelay))
+        {
+            var npc = FindWardExitNpc();
+            if (npc != null)
+            {
+                // From here it's a straight run: lock on (the camera follows) and automove at it.
+                if (!lockedOn)
+                {
+                    pointWalker.Destination = null;
+                    LockOnWhileWalking(npc);
+                    Common.ExecuteCommand("/automove on");
+                }
+                if (HorizontalDistance(player.Position, npc.Position) < WardExitTalkRange)
+                {
+                    StopAutoMove();
+                    EnterStage(Stage.TalkWardExit);
+                    return;
+                }
+            }
+        }
+
+        if (HorizontalDistance(player.Position, path[wardExitPathIndex]) < LeadInPointReached)
+        {
+            if (++wardExitPathIndex >= path.Length)
+            {
+                if (lockedOn) StopAutoMove();
+                EnterStage(Stage.TalkWardExit);
+                return;
+            }
+            wardExitLegStartedAt    = DateTime.UtcNow;
+            pointWalker.Destination = path[wardExitPathIndex];
+            return;
+        }
+
+        if (walkStarted || IsOccupied()) return;
+        walkStarted             = true;
+        wardExitLegStartedAt    = DateTime.UtcNow;
+        UseSprint(player);
+        pointWalker.Destination = path[wardExitPathIndex];
+    }
+
+    // Interact with the NPC, click through its line of dialogue, pick "Go to specified ward", then
+    // carry on from its ward menu exactly as from the one the sweep was started on.
+    private void HandleTalkWardExit()
+    {
+        if (StageTimedOut(StepTimeout)) { FailRoute($"{wardExitRoute!.Name} never offered the ward menu"); return; }
+
+        if (GetAddon(WardMenuAddonName) != null)
+        {
+            EnterStage(Stage.SelectWard, $"Selecting ward {CurrentWard}");
+            return;
+        }
+
+        if (Common.TryGetOpenSelectMenu(gameGui, out var menu, out var entries))
+        {
+            var index = entries.FindIndex(e => e.Contains(GoToSpecifiedWardText, StringComparison.OrdinalIgnoreCase));
+            if (index < 0 || !ReadyForAction(RetryInterval)) return;
+            var value = new AtkValue { Type = AtkValueType.Int, Int = index };
+            menu->FireCallback(1, &value, true);
+            return;
+        }
+
+        var talk = GetAddon(TalkAddonName);
+        if (talk != null)
+        {
+            if (IsAddonReady(talk) && ReadyForAction(TalkClickInterval)) ClickTalk(talk);
+            return;
+        }
+
+        if (IsOccupied() || !ReadyForAction(ClickInterval)) return;
+
+        var npc = FindWardExitNpc();
+        if (npc != null) Interact(npc);
+    }
+
+    private IGameObject? FindWardExitNpc() => wardExitRoute!.TalkToNpc
+        ? FindNearest(wardExitRoute.Path[^1], o => o.ObjectKind == ObjectKind.EventNpc, WardExitNpcRange)
+        : null;
+
+    // Advances a Talk dialog the way a click on it does (the same mouse down, click, mouse up
+    // events ECommons' AddonMaster.Talk sends).
+    private static void ClickTalk(AtkUnitBase* talk)
+    {
+        var evt = stackalloc AtkEvent[1];
+        evt->Listener = (AtkEventListener*)talk;
+        evt->Target   = &AtkStage.Instance()->AtkEventTarget;
+        evt->State    = new AtkEventState { StateFlags = (AtkEventStateFlags)132 };
+        var data = stackalloc AtkEventData[1];
+        *data = default;
+        talk->ReceiveEvent(AtkEventType.MouseDown, 0, evt, data);
+        talk->ReceiveEvent(AtkEventType.MouseClick, 0, evt, data);
+        talk->ReceiveEvent(AtkEventType.MouseUp, 0, evt, data);
     }
 
     // Shared by every SelectString/SelectIconString step: waits for the open menu to contain the
@@ -633,6 +930,8 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
         }
 
         sawLifestreamBusy = false;
+        sawBetweenAreas   = false;
+        arrivedAt         = DateTime.MinValue;
         EnterStage(Stage.LifestreamTravel);
     }
 
@@ -643,6 +942,8 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
             BeginReadingRooms();
             return;
         }
+
+        if (TryTakeOverFromLifestream()) return;
 
         var now = DateTime.UtcNow;
         if (IsLifestreamBusy())
@@ -661,6 +962,31 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
             AbortLifestream();
             FailLifestream("timed out travelling");
         }
+    }
+
+    // Lifestream's walk from the apartment shard to the entrance is a straight run, which is what
+    // wedges on Shirogane's stairs. So once its trip lands within reach of a building that has a
+    // lead-in, it's stopped there and the rest of the walk is done here instead.
+    private bool TryTakeOverFromLifestream()
+    {
+        if (IsBetweenAreas()) { sawBetweenAreas = true; arrivedAt = DateTime.MinValue; return false; }
+        if (!sawBetweenAreas || !Common.TryGetLocalPlayer(objectTable, out var player)) return false;
+        if (HousingDistricts.FromTerritoryId((ushort)clientState.TerritoryType) != District) return false;
+
+        if (arrivedAt == DateTime.MinValue) arrivedAt = DateTime.UtcNow;
+        if (DateTime.UtcNow - arrivedAt < SettleDelay) return false;
+
+        var lead = ApartmentLeadIn(player.Position);
+        if (lead == null || !pointWalker.IsAvailable) return false;
+        if (FindNearest(player.Position, o => o.ObjectKind == ObjectKind.EventObj && o.BaseId == ApartmentEntranceDataId) == null) return false;
+
+        log.Debug("[HF] ApartmentSweep: taking over from Lifestream for the {LeadIn:l} lead-in.", lead.Name);
+        AbortLifestream();
+        leadIn          = lead;
+        leadInPathIndex = 0;
+        afterArrival = Stage.ApproachEntrance;
+        EnterStage(Stage.LeadIn, "Walking to the apartment entrance");
+        return true;
     }
 
     // ── Failure handling ────────────────────────────────────────────────────
@@ -703,6 +1029,8 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
 
     private void StopEverything()
     {
+        pointWalker.Destination = null;
+        leadIn = null;
         if (IsLifestreamBusy()) AbortLifestream();
         StopAutoMove();
     }
@@ -716,10 +1044,10 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
 
     // ── Movement / interaction ──────────────────────────────────────────────
 
-    private IGameObject? FindNearest(Vector3 from, Func<IGameObject, bool> predicate)
+    private IGameObject? FindNearest(Vector3 from, Func<IGameObject, bool> predicate, float range = ObjectSearchRange)
     {
         IGameObject? best = null;
-        var bestDistSq = ObjectSearchRange * ObjectSearchRange;
+        var bestDistSq = range * range;
         foreach (var obj in objectTable)
         {
             if (!obj.IsTargetable || !predicate(obj)) continue;
@@ -731,23 +1059,82 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
         return best;
     }
 
-    // Target, lock on and start the game's own automove once per approach, the same way Lifestream
-    // does; the target is already found at range, so there's nothing to re-select. If we still
-    // haven't arrived after a few seconds, hop now and then in case scenery is in the way.
+    // Target, lock on and start the game's own automove, the same way Lifestream does. The game
+    // drops those commands while the character is still held by an event (the room list closing,
+    // say), so this waits until it's free, and starts over if the character still isn't moving a
+    // moment later. Never jumps: a jump on Shirogane's entrance bridge can land you in the river,
+    // and the paths and lead-ins are what get around scenery.
     private void WalkTowards(IGameObject target)
     {
+        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return;
+        var now = DateTime.UtcNow;
+
         if (!walkStarted)
         {
+            if (IsOccupied()) return;
             walkStarted          = true;
-            lastActionAt         = DateTime.UtcNow;
+            lastActionAt         = now;
+            walkCheckAt          = now;
+            walkCheckPos         = player.Position;
+            UseSprint(player);
             targetManager.Target = target;
             Common.ExecuteCommand("/lockon");
             Common.ExecuteCommand("/automove on");
             return;
         }
 
-        if (DateTime.UtcNow - stageStartedAt > JumpAfter && ReadyForAction(RetryInterval))
-            ActionManager.Instance()->UseAction(ActionType.GeneralAction, 2);
+        if (now - walkCheckAt > WalkStallCheck)
+        {
+            var moved = HorizontalDistance(player.Position, walkCheckPos);
+            walkCheckAt  = now;
+            walkCheckPos = player.Position;
+            if (moved < WalkStallDistance && !condition[ConditionFlag.Jumping])
+            {
+                log.Debug("[HF] ApartmentSweep: not moving towards {Target:l}; restarting the walk.", target.Name.TextValue);
+                walkStarted = false;
+                return;
+            }
+        }
+    }
+
+    private bool IsOccupied() =>
+        condition[ConditionFlag.Occupied] || condition[ConditionFlag.OccupiedInEvent] ||
+        condition[ConditionFlag.OccupiedInQuestEvent] || condition[ConditionFlag.Occupied33] ||
+        condition[ConditionFlag.OccupiedInCutSceneEvent];
+
+    // Same as Lifestream's UseSprint: free in residential districts, skipped while a sprint-like
+    // status is already up.
+    private static void UseSprint(IPlayerCharacter player)
+    {
+        foreach (var status in player.StatusList)
+            if (SprintStatusIds.Contains(status.StatusId)) return;
+
+        var am = ActionManager.Instance();
+        if (am->GetActionStatus(ActionType.Action, SprintActionId) == 0)
+            am->UseAction(ActionType.Action, SprintActionId);
+    }
+
+    private bool IsShard(IGameObject obj) => obj.ObjectKind == ObjectKind.EventObj && ShardDataIds.Contains(obj.BaseId);
+    private bool IsShardOrAetheryte(IGameObject obj) => obj.ObjectKind == ObjectKind.Aetheryte || IsShard(obj);
+
+    // Target and lock on once per stage, so the camera follows where the walk is headed.
+    // If the game drops the target anyway, it's re-taken at most once a second rather than
+    // re-sending /lockon every frame.
+    private void LockOnWhileWalking(IGameObject target)
+    {
+        if (IsOccupied()) return;
+
+        var now = DateTime.UtcNow;
+        if (targetManager.Target?.Address != target.Address)
+        {
+            if (now - lastLockOnAt < RetryInterval) return;
+            targetManager.Target = target;
+            lockedOn = false;
+        }
+        if (lockedOn) return;
+        lockedOn     = true;
+        lastLockOnAt = now;
+        Common.ExecuteCommand("/lockon");
     }
 
     private void Interact(IGameObject target)
