@@ -6,6 +6,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Hooking;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -632,6 +633,17 @@ internal static class Common
         var str = Utf8String.FromString(command);
         shellModule->ExecuteCommandInner(str, uiModule);
         str->Dtor(true);
+    }
+
+    // For game commands that only accept placeholders (/blacklist add, /partycmd add): briefly
+    // targets obj, runs the command with <t>, then restores the previous target. The placeholder
+    // resolves synchronously inside ExecuteCommand, so the swap never reaches the screen.
+    internal static void ExecuteCommandOnTarget(ITargetManager targetManager, IGameObject obj, string commandWithT)
+    {
+        var previous = targetManager.Target;
+        targetManager.Target = obj;
+        ExecuteCommand(commandWithT);
+        targetManager.Target = previous;
     }
 
     // The game renders these choice popups as either of two addons depending on whether any entry

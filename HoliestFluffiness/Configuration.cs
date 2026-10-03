@@ -157,6 +157,7 @@ public class Configuration : IPluginConfiguration
     public string DoorbellAlreadyHereText { get; set; } = DefaultDoorbellAlreadyHereText;
 
     public bool DynamicTravelerEnabled    { get; set; } = false;
+    public bool BlacklistContextMenuEnabled { get; set; } = false;
 
     public bool LoginSkipLogo    { get; set; } = false;
     public bool PreloadTerritory { get; set; } = false;

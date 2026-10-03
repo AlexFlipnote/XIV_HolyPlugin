@@ -30,6 +30,16 @@ internal static class HousingDistricts
         ["Empyreum"]          = 70,  // Foundation
     };
 
+    // Territory each GatewayAetheryteIds entry stands in.
+    internal static readonly Dictionary<string, ushort> GatewayTerritoryIds = new()
+    {
+        ["Mist"]              = 129, // Limsa Lominsa Lower Decks
+        ["The Lavender Beds"] = 132, // New Gridania
+        ["The Goblet"]        = 130, // Ul'dah - Steps of Nald
+        ["Shirogane"]         = 628, // Kugane
+        ["Empyreum"]          = 418, // Foundation
+    };
+
     // Housing interior territory types mapped to their outdoor district territory, for zone preload.
     internal static readonly Dictionary<uint, uint> InteriorToOutdoor = new()
     {

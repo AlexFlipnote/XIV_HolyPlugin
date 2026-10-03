@@ -90,16 +90,21 @@ public sealed unsafe class WardInfoHandler : IDisposable
     public int SweepTotal { get; private set; }
 
     // ── Auto-sweep-all state ────────────────────────────────────────────────
+    // Enabled districts in the order this run visits them (see StartAutoSweepAll).
+    private readonly List<string> autoSweepOrder = new();
     private int autoSweepDistrictIndex = -1;
     private AutoSweepStage autoSweepStage = AutoSweepStage.None;
     private DateTime autoSweepStageStartedAt;
     private DateTime autoSweepLastActionAt;
     private bool autoSweepSawBetweenAreas;
+    // Set while the current district is being driven from an aetheryte the player was already
+    // standing near (no teleport) - a failure then falls back to teleporting instead of skipping.
+    private bool autoSweepLocalStart;
 
     public bool IsAutoSweeping { get; private set; }
     public string? AutoSweepCurrentDistrict =>
-        IsAutoSweeping && autoSweepDistrictIndex >= 0 && autoSweepDistrictIndex < AutoSweepDistricts.Length
-            ? AutoSweepDistricts[autoSweepDistrictIndex]
+        IsAutoSweeping && autoSweepDistrictIndex >= 0 && autoSweepDistrictIndex < autoSweepOrder.Count
+            ? autoSweepOrder[autoSweepDistrictIndex]
             : null;
 
     // The most recently received ward's identity - used by the UI to know which district/world
@@ -318,9 +323,37 @@ public sealed unsafe class WardInfoHandler : IDisposable
     {
         if (!CanAutoSweepAll) return;
 
-        IsAutoSweeping        = true;
+        autoSweepOrder.Clear();
+        autoSweepOrder.AddRange(AutoSweepDistricts.Where(IsAutoSweepDistrictEnabled));
+
+        IsAutoSweeping         = true;
         autoSweepDistrictIndex = -1;
+
+        // Already standing near an aetheryte in an enabled district's gateway city (or in the
+        // district itself)? Do that district first from right here and save one teleport's gil.
+        var local = FindLocalStartDistrict();
+        if (local != null)
+        {
+            autoSweepOrder.Remove(local);
+            autoSweepOrder.Insert(0, local);
+            autoSweepDistrictIndex = 0;
+            autoSweepLocalStart    = true;
+            log.Debug("[HF] WardInfo: auto-sweep-all starting with {District} from the nearby aetheryte, no teleport.", local);
+            EnterAutoSweepStage(AutoSweepStage.ApproachAetheryte);
+            return;
+        }
+
         AdvanceAutoSweepDistrict();
+    }
+
+    private string? FindLocalStartDistrict()
+    {
+        if (!Common.TryGetLocalPlayer(objectTable, out var player)) return null;
+        if (!TryFindNearbyAetheryte(player.Position, AetheryteSearchRange, out _)) return null;
+
+        var territory = clientState.TerritoryType;
+        return autoSweepOrder.FirstOrDefault(d =>
+            HousingDistricts.GatewayTerritoryIds[d] == territory || HousingDistricts.TerritoryIds[d] == territory);
     }
 
     public void CancelAutoSweepAll()
@@ -342,18 +375,16 @@ public sealed unsafe class WardInfoHandler : IDisposable
         // them defensively before firing it. Harmless no-ops when there's nothing to clear.
         StopAutoMove();
         CloseLingeringAutoSweepMenus();
+        autoSweepLocalStart = false;
 
-        do
+        autoSweepDistrictIndex++;
+        if (autoSweepDistrictIndex >= autoSweepOrder.Count)
         {
-            autoSweepDistrictIndex++;
-            if (autoSweepDistrictIndex >= AutoSweepDistricts.Length)
-            {
-                log.Debug("[HF] WardInfo: auto-sweep-all finished.");
-                IsAutoSweeping = false;
-                autoSweepStage = AutoSweepStage.None;
-                return;
-            }
-        } while (!IsAutoSweepDistrictEnabled(AutoSweepDistricts[autoSweepDistrictIndex]));
+            log.Debug("[HF] WardInfo: auto-sweep-all finished.");
+            IsAutoSweeping = false;
+            autoSweepStage = AutoSweepStage.None;
+            return;
+        }
 
         // Give the close (and, on the very first district, nothing) a moment to actually settle
         // before teleporting - firing Telepo::Teleport in the same tick a menu was told to close
@@ -365,7 +396,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
     {
         if (DateTime.UtcNow - autoSweepStageStartedAt < AutoSweepSettleDelay) return;
 
-        var district = AutoSweepDistricts[autoSweepDistrictIndex];
+        var district = autoSweepOrder[autoSweepDistrictIndex];
         log.Debug("[HF] WardInfo: auto-sweep-all teleporting to {District}'s gateway.", district);
         Telepo.Instance()->Teleport(HousingDistricts.GatewayAetheryteIds[district], 0);
         autoSweepSawBetweenAreas = false;
@@ -381,8 +412,20 @@ public sealed unsafe class WardInfoHandler : IDisposable
 
     private void AbortAutoSweepDistrict(string reason)
     {
-        log.Warning("[HF] WardInfo: auto-sweep-all - {District}: {Reason}; skipping.",
-            AutoSweepDistricts[autoSweepDistrictIndex], reason);
+        var district = autoSweepOrder[autoSweepDistrictIndex];
+
+        if (autoSweepLocalStart)
+        {
+            log.Warning("[HF] WardInfo: auto-sweep-all - {District}: {Reason} at the nearby aetheryte; teleporting instead.",
+                district, reason);
+            autoSweepLocalStart = false;
+            StopAutoMove();
+            CloseLingeringAutoSweepMenus();
+            EnterAutoSweepStage(AutoSweepStage.SettleBeforeTeleport);
+            return;
+        }
+
+        log.Warning("[HF] WardInfo: auto-sweep-all - {District}: {Reason}; skipping.", district, reason);
         AdvanceAutoSweepDistrict();
     }
 
@@ -541,6 +584,19 @@ public sealed unsafe class WardInfoHandler : IDisposable
         // up as a few mojibake characters, e.g. "◆◆F♦ Residential District Aethernet."),
         // and every entry also ends with a trailing period neither is worth hardcoding around.
         var index = entries.FindIndex(e => e.Contains(entryText, StringComparison.OrdinalIgnoreCase));
+
+        // A housing ward's own aetheryte (local start from inside the district) may list
+        // "Go to specified ward" straight away, without the Residential District submenu.
+        if (index < 0 && nextStage == AutoSweepStage.SelectGoToWard)
+        {
+            index = entries.FindIndex(e => e.Contains(GoToSpecifiedWardEntryText, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+            {
+                entryText = GoToSpecifiedWardEntryText;
+                nextStage = AutoSweepStage.WaitForHousingMenu;
+            }
+        }
+
         if (index < 0)
         {
             log.Debug("[HF] WardInfo: auto-sweep-all - menu open but '{Entry}' not among: {Entries}",
@@ -557,7 +613,7 @@ public sealed unsafe class WardInfoHandler : IDisposable
 
     private void HandleAutoSweepWaitForHousingMenu()
     {
-        var targetTerritory = (short)HousingDistricts.TerritoryIds[AutoSweepDistricts[autoSweepDistrictIndex]];
+        var targetTerritory = (short)HousingDistricts.TerritoryIds[autoSweepOrder[autoSweepDistrictIndex]];
         var addon = GetAddon();
 
         if (addon != null && LastLandIdent?.TerritoryTypeId == targetTerritory && lastLandIdentAt >= autoSweepStageStartedAt)

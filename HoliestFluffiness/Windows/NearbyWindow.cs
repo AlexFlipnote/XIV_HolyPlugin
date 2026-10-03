@@ -574,11 +574,11 @@ public sealed class NearbyWindow : Window, IDisposable
 
         if (!forTargeter)
         {
-            if (ImGui.MenuItem("Invite to Party"))
-                commandManager.ProcessCommand($"/partycmd add {name}@{world}");
+            if (ImGui.MenuItem("Invite to Party") && obj != null)
+                Common.ExecuteCommandOnTarget(targetManager, obj, "/partycmd add <t>");
 
-            if (ImGui.MenuItem("Add to Blacklist"))
-                commandManager.ProcessCommand($"/blacklist add {name}@{world}");
+            if (ImGui.MenuItem("Add to Blacklist") && obj != null)
+                Common.ExecuteCommandOnTarget(targetManager, obj, "/blacklist add <t>");
 
             if (ImGui.MenuItem("Find on Map") && obj != null)
                 OpenOnMap(obj.Position);

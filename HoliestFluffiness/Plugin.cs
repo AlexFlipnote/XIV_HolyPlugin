@@ -69,6 +69,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private INamePlateGui NamePlateGui  { get; init; } = null!;
     [PluginService] private IFateTable FateTable { get; init; } = null!;
     [PluginService] private IDutyState DutyState { get; init; } = null!;
+    [PluginService] private IContextMenu ContextMenu { get; init; } = null!;
 
     private readonly Configuration configuration;
     private readonly WindowSystem windowSystem = new("HoliestFluffiness");
@@ -109,6 +110,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ClientTweaksHandler     clientTweaksHandler;
     private readonly DrawSheatheHandler       drawSheatheHandler;
     private readonly LootFadeHandler          lootFadeHandler;
+    private readonly BlacklistMenuHandler     blacklistMenuHandler;
     private readonly HideMpBarsHandler        hideMpBarsHandler;
     private readonly DutyTimerHandler dutyTimerHandler;
     private readonly QueueTimerHandler queueTimerHandler;
@@ -219,6 +221,7 @@ public sealed class Plugin : IDalamudPlugin
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework, windowHandle);
         drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
+        blacklistMenuHandler    = new BlacklistMenuHandler(configuration, ContextMenu, ObjectTable, TargetManager);
         hideMpBarsHandler       = new HideMpBarsHandler(configuration, AddonLifecycle, ClientState, ObjectTable, DataManager);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
         queueTimerHandler      = new QueueTimerHandler(configuration, AddonLifecycle, Log);
@@ -1060,6 +1063,7 @@ public sealed class Plugin : IDalamudPlugin
         clientTweaksHandler.Dispose();
         drawSheatheHandler.Dispose();
         lootFadeHandler.Dispose();
+        blacklistMenuHandler.Dispose();
         hideMpBarsHandler.Dispose();
         dutyTimerHandler.Dispose();
         queueTimerHandler.Dispose();

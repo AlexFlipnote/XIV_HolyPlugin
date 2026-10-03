@@ -21,6 +21,12 @@ public partial class ConfigWindow
             v => configuration.DynamicTravelerEnabled = v,
             "Replaces the Wanderer / Traveller FC tags on cross-world nameplates with the player's home world.");
 
+        ConfigCheckbox(
+            "Add \"Add to Blacklist\" to player right-click menu##blacklistctx",
+            configuration.BlacklistContextMenuEnabled,
+            v => configuration.BlacklistContextMenuEnabled = v,
+            "Right-clicking a player in the world, or on the target / focus target bar, offers to blacklist them without waiting for them to speak in chat.");
+
         // ── Nearby players ────────────────────────────────────────────────────
         SubsectionLabel("Nearby players",
             "A window listing every player around you. Open or close it with the /nearby command.");
