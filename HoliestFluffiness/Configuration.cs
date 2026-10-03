@@ -77,6 +77,7 @@ public class Configuration : IPluginConfiguration
     public bool AntiAfkRespectManualAfk { get; set; } = false;
 
     public bool DutyTimerEnabled       { get; set; } = false;
+    public bool QueueTimerEnabled      { get; set; } = false;
     public bool CastBarAetheryteEnabled { get; set; } = false;
 
     public bool  LootFadeEnabled { get; set; } = false;

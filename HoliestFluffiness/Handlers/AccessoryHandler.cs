@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -9,25 +10,18 @@ namespace HoliestFluffiness;
 
 public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFramework framework, IObjectTable objectTable)
 {
-    public async Task RunAsync(CancellationToken token)
+    // True only when /fashion was actually sent, so callers know whether to give it time to land
+    public async Task<bool> RunAsync(CancellationToken token)
     {
-        if (!configuration.AccessoryEnabled) return;
+        if (!configuration.AccessoryEnabled) return false;
 
         bool alreadyEquipped = false;
-        await framework.RunOnFrameworkThread(() =>
-        {
-            if (objectTable[0] is not IPlayerCharacter pc) return;
-            unsafe
-            {
-                var bchara = (BattleChara*)pc.Address;
-                alreadyEquipped = bchara->OrnamentData.OrnamentObject != null;
-            }
-        });
+        await framework.RunOnFrameworkThread(() => { alreadyEquipped = IsEquipped(); });
 
         if (alreadyEquipped)
         {
             await framework.RunOnFrameworkThread(() => chatGui.Print("Accessory already equipped, skipping"));
-            return;
+            return false;
         }
 
         if (configuration.AccessoryInventory >= 1 || configuration.AccessoryInventoryMin >= 1)
@@ -48,13 +42,13 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
                 if (configuration.AccessoryInventory >= 1 && freeSlots <= configuration.AccessoryInventory)
                 {
                     await framework.RunOnFrameworkThread(() => chatGui.Print("Not enough empty space, stopping equip"));
-                    return;
+                    return false;
                 }
 
                 if (configuration.AccessoryInventoryMin >= 1 && freeSlots >= configuration.AccessoryInventoryMin)
                 {
                     await framework.RunOnFrameworkThread(() => chatGui.Print("Too much empty space, stopping equip"));
-                    return;
+                    return false;
                 }
             }
         }
@@ -62,6 +56,27 @@ public class AccessoryHandler(Configuration configuration, IChatGui chatGui, IFr
         token.ThrowIfCancellationRequested();
 
         await framework.RunOnFrameworkThread(() => Common.ExecuteCommand($"/fashion \"{configuration.AccessoryName}\""));
+        return true;
+    }
+
+    // Polls until the accessory shows up on the player, or gives up after timeoutMs
+    public async Task WaitForEquipAsync(int timeoutMs, CancellationToken token)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            bool equipped = false;
+            await framework.RunOnFrameworkThread(() => { equipped = IsEquipped(); });
+            if (equipped) return;
+            await Task.Delay(250, token);
+        }
+    }
+
+    private unsafe bool IsEquipped()
+    {
+        if (objectTable[0] is not IPlayerCharacter pc) return false;
+        var bchara = (BattleChara*)pc.Address;
+        return bchara->OrnamentData.OrnamentObject != null;
     }
 
     private static unsafe int GetFreeInventorySlots()

@@ -109,6 +109,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LootFadeHandler          lootFadeHandler;
     private readonly HideMpBarsHandler        hideMpBarsHandler;
     private readonly DutyTimerHandler dutyTimerHandler;
+    private readonly QueueTimerHandler queueTimerHandler;
     private readonly CastBarHandler castBarHandler;
     private readonly LoginEnhancementHandler loginEnhancementHandler;
     private readonly FoodCheckHandler foodCheckHandler;
@@ -217,6 +218,7 @@ public sealed class Plugin : IDalamudPlugin
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
         hideMpBarsHandler       = new HideMpBarsHandler(configuration, AddonLifecycle, ClientState, ObjectTable, DataManager);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
+        queueTimerHandler      = new QueueTimerHandler(configuration, AddonLifecycle, Log);
         castBarHandler         = new CastBarHandler(configuration, GameInterop, AddonLifecycle, DataManager, ClientState, Log);
         loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
         foodCheckHandler       = new FoodCheckHandler(configuration, PartyList, ObjectTable, ClientState, ChatGui, DataManager, Framework, GameInterop, Log, PluginInterface.AssemblyLocation.DirectoryName!);
@@ -859,7 +861,7 @@ public sealed class Plugin : IDalamudPlugin
             token.ThrowIfCancellationRequested();
 
             await loginInfoHandler.RunAsync(token);
-            await accessoryHandler.RunAsync(token);
+            var equipSent = await accessoryHandler.RunAsync(token);
 
             var tp  = pendingLifestreamArgs;
             var bid = pendingBid;
@@ -868,6 +870,13 @@ public sealed class Plugin : IDalamudPlugin
 
             if (tp != null)
             {
+                // A /li fired while /fashion is still landing drops the accessory, so let it finish first
+                if (equipSent)
+                {
+                    await accessoryHandler.WaitForEquipAsync(5000, token);
+                    await Task.Delay(1000, token);
+                }
+
                 if (bid != null)
                 {
                     // Wait up to 2s for the "Shirogane, Ward 7" zone announcement chat line
@@ -1049,6 +1058,7 @@ public sealed class Plugin : IDalamudPlugin
         lootFadeHandler.Dispose();
         hideMpBarsHandler.Dispose();
         dutyTimerHandler.Dispose();
+        queueTimerHandler.Dispose();
         castBarHandler.Dispose();
         loginEnhancementHandler.Dispose();
         foodCheckHandler.CountdownStarted -= OnCountdownStartedFlash;

@@ -48,6 +48,13 @@ public partial class ConfigWindow
             v => configuration.DrawSheatheEmoteEnabled = v,
             "Replaces your draw/sheathe weapon keybind with the /draw and /sheathe emotes when possible.");
 
+        ConfigCheckbox(
+            "Show congestion queue timer##queuetimer",
+            configuration.QueueTimerEnabled,
+            v => configuration.QueueTimerEnabled = v,
+            "Adds a countdown to the \"server is currently congested\" dialog. The refresh rate is measured " +
+            "while you wait, so it shows time since the queue started or last updated until it is known.");
+
         SubsectionLabel(
             "Window title",
             "When the game launches, change the window title to something else.");
