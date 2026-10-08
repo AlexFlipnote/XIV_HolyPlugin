@@ -18,7 +18,8 @@ public sealed unsafe class QueueTimerHandler : IDisposable
     private const string AddonName     = "SelectOk";
     private const long   MinIntervalMs = 5000;
 
-    private static readonly Regex QueueRx = new(@"queue:\s*\d+", RegexOptions.IgnoreCase);
+    private static readonly Regex QueueRx  = new(@"queue:\s*\d+", RegexOptions.IgnoreCase);
+    private static readonly Regex SuffixRx = new(@"(?: \((?:next in ~\d+s|started \d+s ago|updated \d+s ago)\))+$");
 
     private readonly Configuration   config;
     private readonly IAddonLifecycle addonLifecycle;
@@ -55,7 +56,14 @@ public sealed unsafe class QueueTimerHandler : IDisposable
         var refreshed = lastWritten == null || !current.SequenceEqual(lastWritten);
         if (refreshed)
         {
-            if (sinceRefresh.IsRunning)
+            // Our own suffix can survive a state reset (dialog reopened), so strip it to avoid stacking.
+            // Latin1 maps bytes 1:1, keeping any SeString payloads intact.
+            var raw      = Encoding.Latin1.GetString(current);
+            var stripped = SuffixRx.Replace(raw, "");
+            var stale    = stripped.Length != raw.Length;
+            current      = stale ? Encoding.Latin1.GetBytes(stripped) : current;
+
+            if (sinceRefresh.IsRunning && !stale)
             {
                 refreshCount++;
                 var ms = sinceRefresh.ElapsedMilliseconds;
@@ -65,7 +73,7 @@ public sealed unsafe class QueueTimerHandler : IDisposable
                 log.Debug("[HF] Queue refresh #{Count} after {Ms} ms: {Text}", refreshCount, ms, node->NodeText.ToString());
             }
             baseText = current.ToArray();
-            sinceRefresh.Restart();
+            if (!stale || !sinceRefresh.IsRunning) sinceRefresh.Restart();
         }
 
         var elapsed = (int)(sinceRefresh.ElapsedMilliseconds / 1000);
