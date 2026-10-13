@@ -1,0 +1,12 @@
+{
+  "name": "RMIWalk",
+  "history": [
+    {
+      "pattern": "E8 ?? ?? ?? ?? 80 7B 3E 00 48 8D 3D",
+      "rva": "0x182ab00",
+      "bytes_at_rva": "E8 DB 25 00 00 80 7B 3E 00 48 8D 3D 50 12 27 01 F3 44 0F 10 44 24 70 F3 44 0F 10 4C 24 74 0F 85",
+      "exe_hash": "5dbf8603",
+      "date": "2026-10-13"
+    }
+  ]
+}

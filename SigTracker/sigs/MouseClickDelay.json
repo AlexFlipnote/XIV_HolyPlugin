@@ -28,6 +28,13 @@
       "bytes_at_rva": "EB 3F B8 09 00 00 00 48 8B D7 49 8B CE 66 89 07 E8 8F 8F FD FF 0B F0 B9 01 00 00 00 0F B6 47 02",
       "exe_hash": "e0880bea",
       "date": "2026-09-17"
+    },
+    {
+      "pattern": "EB 3F B8 ?? ?? ?? ?? 48 8B D7",
+      "rva": "0x68665c",
+      "bytes_at_rva": "EB 3F B8 09 00 00 00 48 8B D7 49 8B CE 66 89 07 E8 8F 8F FD FF 0B F0 B9 01 00 00 00 0F B6 47 02",
+      "exe_hash": "5dbf8603",
+      "date": "2026-10-13"
     }
   ]
 }

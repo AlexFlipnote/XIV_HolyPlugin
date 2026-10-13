@@ -1,0 +1,12 @@
+{
+  "name": "RMIWalkIsInputEnabled1",
+  "history": [
+    {
+      "pattern": "E8 ?? ?? ?? ?? 84 C0 75 10 38 43 3C",
+      "rva": "0x182ac40",
+      "bytes_at_rva": "E8 FB 55 00 00 84 C0 75 10 38 43 3C 74 08 48 8B CB E8 AA F2 FF FF 45 32 F6 48 8B CB E8 6F 57 00",
+      "exe_hash": "5dbf8603",
+      "date": "2026-10-13"
+    }
+  ]
+}
