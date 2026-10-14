@@ -404,6 +404,13 @@ public sealed unsafe class ApartmentSweepHandler : IDisposable
 
     private void HandleClickTravel()
     {
+        // Something else (YesAlready, TextAdvance, Lifestream's own yes handling) may confirm the
+        // travel prompt before it's ever seen here, so the zone change starting counts as confirmed.
+        if (IsBetweenAreas())
+        {
+            AwaitArrival(Stage.ApproachShard, apartmentAethernetId, Stage.ApproachEntrance);
+            return;
+        }
         if (StageTimedOut(StepTimeout)) { FailRoute("could not press Travel on the ward menu"); return; }
         if (GetAddon(YesnoAddonName) != null) { EnterStage(Stage.ConfirmTravel); return; }
 
