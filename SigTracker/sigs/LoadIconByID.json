@@ -35,6 +35,13 @@
       "bytes_at_rva": "E8 C7 0F 30 FF 41 8D 45 3E 48 8B CF 41 03 C6 48 63 D0 49 8B 47 28 83 3C 90 00 0F 9F C2 E8 2A 13",
       "exe_hash": "5dbf8603",
       "date": "2026-10-13"
+    },
+    {
+      "pattern": "E8 ?? ?? ?? ?? 41 8D 45 3E",
+      "rva": "0x13ceb74",
+      "bytes_at_rva": "E8 E7 08 30 FF 41 8D 45 3E 48 8B CF 41 03 C6 48 63 D0 49 8B 47 28 83 3C 90 00 0F 9F C2 E8 4A 0C",
+      "exe_hash": "8e9decf7",
+      "date": "2026-10-20"
     }
   ]
 }
