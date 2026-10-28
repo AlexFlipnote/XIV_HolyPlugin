@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.14",
+        "AssemblyVersion": "0.12.15",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.14/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.14/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.14/latest.zip",
-        "Changelog": "New optional setting (Client): show what is playing on your PC (Spotify, browser, etc.) on the experience bar, with song progress on the gauge, and/or as an entry in the server info bar. Click either one to open a small media player window, also available with /media.",
-        "DownloadCount": 316,
-        "LastUpdate": 1793223362
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.15/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.15/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.15/latest.zip",
+        "Changelog": "Media player fixes for Firefox: the progress bar no longer glitches, disappears or drifts out of sync, and hovering over YouTube thumbnails no longer swaps the song name and cover to the previewed video. Firefox now also shows as Firefox instead of a random ID.",
+        "DownloadCount": 317,
+        "LastUpdate": 1793226181
     }
 ]
