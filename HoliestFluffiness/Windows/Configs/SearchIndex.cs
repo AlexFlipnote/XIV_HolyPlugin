@@ -56,7 +56,7 @@ public partial class ConfigWindow
         static SearchIndex()
         {
             Seed(ConfigSection.Client, "Settings that change client/application behaviour.",
-                "window title taskbar flash physics fps anti-afk no-kill mouse");
+                "window title taskbar flash physics fps anti-afk no-kill mouse media music spotify song");
             Seed(ConfigSection.Login, "Settings for what happens when you log in with a character.",
                 "welcome message fashion accessory glamour");
             Seed(ConfigSection.Indicators, "Settings for in-game indicators and HUD additions.",

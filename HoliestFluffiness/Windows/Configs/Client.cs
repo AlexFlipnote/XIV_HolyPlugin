@@ -1,6 +1,6 @@
 using System;
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
-
 using HoliestFluffiness.Handlers;
 
 namespace HoliestFluffiness.Windows;
@@ -9,6 +9,9 @@ public partial class ConfigWindow
 {
     private ClientTweaksHandler clientTweaksHandler = null!;
     internal void SetClientTweaksHandler(ClientTweaksHandler handler) => clientTweaksHandler = handler;
+
+    private MediaHandler? mediaHandler;
+    internal void SetMediaHandler(MediaHandler handler) => mediaHandler = handler;
 
     private void DrawClientSection()
     {
@@ -101,6 +104,58 @@ public partial class ConfigWindow
             "In combat##clientflashcombat",
             configuration.ClientFlashOnCombat,
             v => configuration.ClientFlashOnCombat = v);
+
+        SubsectionLabel("Media controls", "Control what is playing on your PC, like Spotify or a browser.");
+
+        ConfigCheckbox(
+            "Enable media controls##mediaenabled",
+            configuration.MediaEnabled,
+            v => configuration.MediaEnabled = v,
+            "Adds /media for a small player window. /media next, prev, toggle and now also work in macros.");
+
+        if (configuration.MediaEnabled && mediaHandler is { IsAvailable: false })
+            Common.DimmedTextWrapped("Windows media sessions are not available here (for example under Wine).");
+
+        ImGui.BeginDisabled(!configuration.MediaEnabled);
+        ConfigCheckbox(
+            "Show song on the experience bar##mediaexpbar",
+            configuration.MediaExpBarEnabled,
+            v => configuration.MediaExpBarEnabled = v,
+            "The bar shows song progress and title while something plays.");
+
+        ImGui.BeginDisabled(!configuration.MediaExpBarEnabled);
+        var textModes = new[] { "Replace chain EXP", "Replace job and EXP" };
+        ConfigCombo("Song text##mediaexpbartext", (int)configuration.MediaExpBarText, textModes,
+            v => configuration.MediaExpBarText = (MediaBarText)v, width: 180,
+            desc: "Where the song text goes on the experience bar.");
+        ImGui.EndDisabled();
+
+        ImGui.Dummy(new Vector2(0, 4));
+
+        ConfigCheckbox(
+            "Show song in the server info bar##mediadtr",
+            configuration.MediaDtrEnabled,
+            v => configuration.MediaDtrEnabled = v,
+            "Next to ping and FPS. Click it to open the player.");
+
+        ImGui.BeginDisabled(!configuration.MediaDtrEnabled);
+        ConfigInputText("Server info text##mediadtrformat", configuration.MediaDtrFormat,
+            v => configuration.MediaDtrFormat = v, width: 240,
+            hint: $"(empty = {Configuration.DefaultMediaDtrFormat})",
+            desc: "Format of the server info entry, using <song>, <artist>, <app> and <time>.");
+        RowGap(0);
+
+        var tagsHelper = "Tags: <song> | <artist> | <app> | <time>";
+        if (mediaHandler?.Current is { Title.Length: > 0 } song)
+        {
+            Common.DimmedText($"{tagsHelper}\nPreview: {MediaDtrHandler.Format(configuration.MediaDtrFormat, song)}");
+        }
+        else {
+            Common.DimmedText($"{tagsHelper}");
+        }
+
+        ImGui.EndDisabled();
+        ImGui.EndDisabled();
 
         SubsectionLabel("No-kill",
             "Intercepts lobby errors and converts them to a reconnect attempt instead of closing the game.");

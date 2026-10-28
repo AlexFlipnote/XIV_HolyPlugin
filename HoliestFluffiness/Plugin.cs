@@ -44,6 +44,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string NotesCommand         = "/notes";
     private const string WardInfoCommand      = "/wardinfo";
     private const string WardInfoAliasCommand = "/wi";
+    private const string MediaCommand         = "/media";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -118,6 +119,10 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LoginEnhancementHandler loginEnhancementHandler;
     private readonly FoodCheckHandler foodCheckHandler;
     private readonly FoodCheckOverlay foodCheckOverlay;
+    private readonly MediaHandler mediaHandler;
+    private readonly MediaWindow mediaWindow;
+    private readonly MediaExpBarHandler mediaExpBarHandler;
+    private readonly MediaDtrHandler mediaDtrHandler;
     private readonly IFontHandle titleFont;
     private IReadOnlyTitleScreenMenuEntry? titleMenuEntry;
     private ISharedImmediateTexture? titleMenuIcon;
@@ -229,6 +234,11 @@ public sealed class Plugin : IDalamudPlugin
         loginEnhancementHandler = new LoginEnhancementHandler(configuration, GameInterop, AddonLifecycle, DataManager, Log);
         foodCheckHandler       = new FoodCheckHandler(configuration, PartyList, ObjectTable, ClientState, ChatGui, DataManager, Framework, GameInterop, Log, PluginInterface.AssemblyLocation.DirectoryName!);
         foodCheckOverlay       = new FoodCheckOverlay(configuration, foodCheckHandler, GameGui);
+        mediaHandler           = new MediaHandler(configuration, Log);
+        mediaWindow            = new MediaWindow(mediaHandler, TextureProvider);
+        mediaExpBarHandler     = new MediaExpBarHandler(configuration, mediaHandler, AddonLifecycle, GameGui);
+        mediaDtrHandler        = new MediaDtrHandler(configuration, mediaHandler, DtrBar, Framework, ClientState);
+        mediaDtrHandler.SetClickAction(() => CommandManager.ProcessCommand(MediaCommand));
         titleFont              = PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamily.Axis, 32f));
         doorbellHandler.OnEntered     += OnDoorbellEntered;
         doorbellHandler.OnLeft        += OnDoorbellLeft;
@@ -250,6 +260,7 @@ public sealed class Plugin : IDalamudPlugin
         configWindow.SetDoorbellTest(TestDoorbell);
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
         configWindow.SetHideMpBarsHandler(hideMpBarsHandler);
+        configWindow.SetMediaHandler(mediaHandler);
 
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
@@ -265,6 +276,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(notePreviewWindow);
         windowSystem.AddWindow(wardInfoWindow);
         windowSystem.AddWindow(apartmentSweepWindow);
+        windowSystem.AddWindow(mediaWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -306,6 +318,10 @@ public sealed class Plugin : IDalamudPlugin
         {
             HelpMessage = "Alias for /wardinfo.",
             ShowInHelp = false,
+        });
+        CommandManager.AddHandler(MediaCommand, new CommandInfo(OnMediaCommand)
+        {
+            HelpMessage = "Open the media controls window for what is playing on your PC. /media toggle, play, pause, next, prev or now (prints the current song) work directly."
         });
 
         // Snapshot before anything draws, so a mid-frame toggle cannot desync the colour stack
@@ -446,6 +462,60 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
         wardInfoWindow.ShowStandalone();
+    }
+
+    private void OnMediaCommand(string command, string args)
+    {
+        if (!configuration.MediaEnabled)
+        {
+            ChatGui.PrintError("[HF] Media controls are disabled - enable \"Enable media controls\" under Settings > Client first.");
+            return;
+        }
+        if (!mediaHandler.IsAvailable)
+        {
+            ChatGui.PrintError("[HF] Windows media sessions are not available on this system.");
+            return;
+        }
+
+        var sub = args.Trim().ToLowerInvariant();
+        if (sub.Length == 0)
+        {
+            mediaWindow.IsOpen = !mediaWindow.IsOpen;
+            return;
+        }
+
+        var song = mediaHandler.Current;
+        if (song == null && sub is not ("help" or "?"))
+        {
+            ChatGui.PrintError("[HF] Nothing is playing right now.");
+            return;
+        }
+
+        switch (sub)
+        {
+            case "toggle" or "pp":
+                mediaHandler.Send(MediaAction.TogglePlayPause);
+                break;
+            case "play":
+                mediaHandler.Send(MediaAction.Play);
+                break;
+            case "pause" or "stop":
+                mediaHandler.Send(MediaAction.Pause);
+                break;
+            case "next" or "skip":
+                mediaHandler.Send(MediaAction.Next);
+                break;
+            case "prev" or "previous" or "back":
+                mediaHandler.Send(MediaAction.Previous);
+                break;
+            case "now" or "np" or "song":
+                var time = song!.HasTimeline ? $" [{song.TimeText}]" : "";
+                ChatGui.Print($"[HF] {(song.IsPlaying ? "Now playing" : "Paused")}: {song.Display}{time} ({song.AppName})");
+                break;
+            default:
+                ChatGui.Print("[HF] Usage: /media [toggle|play|pause|next|prev|now], or just /media for the controls window");
+                break;
+        }
     }
 
     private void OnRequestShowNotePreview(List<NoteRecord> notes) => notePreviewWindow.Show(notes);
@@ -1016,6 +1086,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(NotesCommand);
         CommandManager.RemoveHandler(WardInfoCommand);
         CommandManager.RemoveHandler(WardInfoAliasCommand);
+        CommandManager.RemoveHandler(MediaCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
@@ -1072,6 +1143,10 @@ public sealed class Plugin : IDalamudPlugin
         foodCheckHandler.CountdownStarted -= OnCountdownStartedFlash;
         foodCheckHandler.Dispose();
         foodCheckOverlay.Dispose();
+        mediaDtrHandler.Dispose();
+        mediaWindow.Dispose();
+        mediaExpBarHandler.Dispose();
+        mediaHandler.Dispose();
         titleFont.Dispose();
         characterDb.Dispose();
     }
