@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Plugin.Services;
@@ -12,6 +13,8 @@ namespace HoliestFluffiness.Handlers;
 // song progress, and two text nodes of our own (styled as a copy of the EXP text) show the song on the
 // left and the time on the right, in place of either the chain EXP line or the job/level/EXP line.
 // When nothing is playing the addon is asked to redraw from the game's data, which restores the gauge.
+// _Exp ignores the mouse, so clicks go to a borderless ImGui window laid over the song row instead;
+// it runs the same action as the server info bar entry.
 public sealed unsafe class MediaExpBarHandler : IDisposable
 {
     private const string AddonName   = "_Exp";
@@ -23,11 +26,17 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     // the job line lands on the bar; tuned in game until the gap matches the one under the bar
     private const float  ChainLift   = 6f;
 
+    private const ImGuiWindowFlags ClickAreaFlags =
+        ImGuiWindowFlags.NoDecoration       | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoSavedSettings |
+        ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNav        | ImGuiWindowFlags.NoBringToFrontOnFocus;
+
     private readonly Configuration   config;
     private readonly MediaHandler    media;
     private readonly IAddonLifecycle addonLifecycle;
     private readonly IGameGui        gameGui;
     private readonly nint[]          hiddenText = new nint[MaxHidden];
+
+    private Action? clickAction;
 
     private AtkTextNode* labelNode;
     private AtkTextNode* timeNode;
@@ -49,6 +58,34 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         addonLifecycle.RegisterListener(AddonEvent.PostUpdate,          AddonName, OnUpdate);
         addonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnRequestedUpdate);
         addonLifecycle.RegisterListener(AddonEvent.PreFinalize,         AddonName, OnFinalize);
+    }
+
+    public void SetClickAction(Action action) => clickAction = action;
+
+    // Called from UiBuilder.Draw. The time node spans the whole row, so it doubles as the click area.
+    public void DrawClickArea()
+    {
+        if (!overriding || clickAction == null || timeNode == null || !timeNode->AtkResNode.IsVisible()) return;
+        var addon = (AtkUnitBase*)gameGui.GetAddonByName(AddonName).Address;
+        if (addon == null || !Common.IsAddonVisible(addon)) return;
+
+        var node = &timeNode->AtkResNode;
+        var pos  = Common.GetNodePosition(node) + ImGui.GetMainViewport().Pos;
+        var size = new Vector2(node->Width, node->Height) * addon->Scale;
+        if (size.X < 1 || size.Y < 1) return;
+
+        ImGui.SetNextWindowPos(pos);
+        ImGui.SetNextWindowSize(size);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,    Vector2.Zero);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowMinSize,    Vector2.One);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0f);
+        if (ImGui.Begin("##HFMediaExpBarClick", ClickAreaFlags))
+        {
+            if (ImGui.InvisibleButton("##hfmediaexpbarclick", size)) clickAction();
+            if (ImGui.IsItemHovered()) ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
+        }
+        ImGui.End();
+        ImGui.PopStyleVar(3);
     }
 
     private MediaSnapshot? Song =>

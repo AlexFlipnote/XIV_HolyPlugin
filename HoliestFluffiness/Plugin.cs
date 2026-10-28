@@ -237,6 +237,7 @@ public sealed class Plugin : IDalamudPlugin
         mediaHandler           = new MediaHandler(configuration, Log);
         mediaWindow            = new MediaWindow(mediaHandler, TextureProvider);
         mediaExpBarHandler     = new MediaExpBarHandler(configuration, mediaHandler, AddonLifecycle, GameGui);
+        mediaExpBarHandler.SetClickAction(() => CommandManager.ProcessCommand(MediaCommand));
         mediaDtrHandler        = new MediaDtrHandler(configuration, mediaHandler, DtrBar, Framework, ClientState);
         mediaDtrHandler.SetClickAction(() => CommandManager.ProcessCommand(MediaCommand));
         titleFont              = PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamily.Axis, 32f));
@@ -328,6 +329,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += Theme.Sync;
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.Draw += nearbyWindow.DrawMarkers;
+        PluginInterface.UiBuilder.Draw += mediaExpBarHandler.DrawClickArea;
         PluginInterface.UiBuilder.Draw += () => Common.DrawToasts();
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
@@ -1089,6 +1091,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(MediaCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
+        PluginInterface.UiBuilder.Draw -= mediaExpBarHandler.DrawClickArea;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;
