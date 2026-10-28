@@ -1,8 +1,13 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using Dalamud.Plugin.Services;
+using Microsoft.Win32;
 
 namespace HoliestFluffiness.Handlers;
 
@@ -89,6 +94,9 @@ public sealed class MediaHandler : IDisposable
     private const int ControlsSeekSlot     = 20;
 
     private const int PollMs            = 1000;
+    private const int TimelineSampleMs  = 15;
+    private static readonly TimeSpan CachedTimelineGrace = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan SeekMarkerWindow    = TimeSpan.FromMilliseconds(500);
     private const int AfterCommandMs    = 150;
     private const int DisabledMs        = 2000;
     private const int RequestTimeoutMs  = 5000;
@@ -114,11 +122,17 @@ public sealed class MediaHandler : IDisposable
     private long timelineStartTicks;
     private TimeSpan lastPosition;
     private DateTime lastPositionAt;
+    private string   timelineAppId = "";
+    private bool     timelineMissing;
+    private (TimeSpan Position, TimeSpan Duration, DateTime UpdatedUtc, bool Playing)? lastTimeline;
     private byte[]?  artwork;
     private string   artworkTrackKey = "";
     private int      artworkRetries;
     private bool     artworkConfirmed;
     private long     artworkNextFetch;
+    private readonly Dictionary<string, string?> mozillaProducts = new();
+    private string   verifiedAppId = "";
+    private (string Title, string Artist, byte[]? Artwork)? verifiedTrack;
 
     public MediaHandler(Configuration config, IPluginLog log)
     {
@@ -196,7 +210,10 @@ public sealed class MediaHandler : IDisposable
         {
             var commanded = session != 0 && RunCommands(session);
             current = session == 0 ? null : Read(session);
-            return commanded ? AfterCommandMs : PollMs;
+            if (commanded) return AfterCommandMs;
+            if (!timelineMissing) return PollMs;
+            WatchTimeline(session);
+            return 0;
         }
         finally
         {
@@ -291,6 +308,24 @@ public sealed class MediaHandler : IDisposable
         return 0;
     }
 
+    // Firefox only holds a real timeline for 30-100ms (on track start, pause/play and seek) before clearing
+    // it again, so while it is missing, sample just the timeline every TimelineSampleMs for one poll
+    // interval instead of sleeping. Returns early when a command wakes us.
+    private void WatchTimeline(nint session)
+    {
+        var until = Environment.TickCount64 + PollMs;
+        while (Environment.TickCount64 < until)
+        {
+            if (wake.WaitOne(TimelineSampleMs) || stopping) return;
+            if (current is not { } snap) return;
+
+            var status = ReadStatus(session);
+            var (position, duration, updatedUtc) = StableTimeline(ReadTimeline(session), status, timelineAppId);
+            if (status != snap.Status || position != snap.Position || duration != snap.Duration)
+                current = snap with { Status = status, Position = position, Duration = duration, PositionUpdatedUtc = updatedUtc };
+        }
+    }
+
     private bool IsOwnProcess(string appId) =>
         appId.Length > 0 && string.Equals(Path.GetFileNameWithoutExtension(appId), ownExe, StringComparison.OrdinalIgnoreCase);
 
@@ -351,9 +386,58 @@ public sealed class MediaHandler : IDisposable
             WinRt.Release(operation);
         }
 
-        var (position, duration, updatedUtc) = ReadTimeline(session);
-        return new MediaSnapshot(AppName(appId), title, artist, status, position, duration, updatedUtc, canSeek, artwork);
+        var (position, duration, updatedUtc) = StableTimeline(ReadTimeline(session), status, appId);
+        var (shownTitle, shownArtist, shownArtwork) = VerifiedTrack(appId, title, artist);
+        return new MediaSnapshot(AppName(appId), shownTitle, shownArtist, status, position, duration, updatedUtc, canSeek, shownArtwork);
     }
+
+    // YouTube's hover previews rewrite Firefox's title, artist and cover, and never put the playing video
+    // back afterwards. The window title still names the real tab, so for Mozilla apps only trust metadata
+    // that matches an open window and otherwise keep showing the last one that did.
+    private (string Title, string Artist, byte[]? Artwork) VerifiedTrack(string appId, string title, string artist)
+    {
+        if (appId != verifiedAppId)
+        {
+            verifiedAppId = appId;
+            verifiedTrack = null;
+        }
+        if (MozillaProduct(BaseName(appId)) == null) return (title, artist, artwork);
+
+        if (title.Length > 0 && MozillaWindowTitles().Any(w => w.Contains(title, StringComparison.Ordinal)))
+        {
+            verifiedTrack = (title, artist, artwork);
+            return (title, artist, artwork);
+        }
+        return verifiedTrack ?? (title, artist, artwork);
+    }
+
+    private static List<string> MozillaWindowTitles()
+    {
+        var titles = new List<string>();
+        var buffer = new StringBuilder(512);
+        EnumWindows((hwnd, _) =>
+        {
+            if (!IsWindowVisible(hwnd)) return true;
+            if (GetClassName(hwnd, buffer, buffer.Capacity) == 0 || buffer.ToString() != "MozillaWindowClass") return true;
+            if (GetWindowText(hwnd, buffer, buffer.Capacity) > 0) titles.Add(buffer.ToString());
+            return true;
+        }, 0);
+        return titles;
+    }
+
+    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(nint hwnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(nint hwnd, StringBuilder name, int maxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(nint hwnd, StringBuilder text, int maxCount);
 
     // Players often publish the new title before the new cover, so a track change fetches right away,
     // checks once more shortly after, and retries a few times while nothing comes back
@@ -408,6 +492,52 @@ public sealed class MediaHandler : IDisposable
         }
     }
 
+    // Firefox clears the timeline to 0/0 30-100ms after every real one (track start, pause/play, seek), so
+    // keep extrapolating the last good one. Keyed on the app, not the title: YouTube's hover previews
+    // rewrite Firefox's title/artist without touching the playing video. A play/pause flip while on the
+    // cached copy re-anchors it at its live position so the bar freezes or resumes in place, and it is
+    // dropped once it runs past the end without a fresh report.
+    private (TimeSpan Position, TimeSpan Duration, DateTime UpdatedUtc) StableTimeline(
+        (TimeSpan Position, TimeSpan Duration, DateTime UpdatedUtc) read, MediaStatus status, string appId)
+    {
+        var playing = status == MediaStatus.Playing;
+        if (appId != timelineAppId)
+        {
+            timelineAppId = appId;
+            lastTimeline  = null;
+        }
+
+        timelineMissing = read.Duration <= TimeSpan.Zero && (playing || status == MediaStatus.Paused);
+        if (!timelineMissing)
+        {
+            lastTimeline = read.Duration > TimeSpan.Zero ? (read.Position, read.Duration, read.UpdatedUtc, playing) : null;
+            return read;
+        }
+        if (lastTimeline is not { } cached) return read;
+
+        var now  = DateTime.UtcNow;
+        var live = cached.Playing ? cached.Position + (now - cached.UpdatedUtc) : cached.Position;
+        if (live > cached.Duration + CachedTimelineGrace)
+        {
+            lastTimeline = null;
+            return read;
+        }
+        if (cached.Playing != playing)
+        {
+            // Firefox announces a seek as Paused at the old position, then Playing at the new one for
+            // ~30ms, and sometimes skips that second report. Paused flipping straight back to an empty
+            // Playing means the position is unknown until the next real report, so show none.
+            if (playing && now - cached.UpdatedUtc < SeekMarkerWindow)
+            {
+                lastTimeline = null;
+                return read;
+            }
+            cached       = (live > cached.Duration ? cached.Duration : live, cached.Duration, now, playing);
+            lastTimeline = cached;
+        }
+        return (cached.Position, cached.Duration, cached.UpdatedUtc);
+    }
+
     private (TimeSpan Position, TimeSpan Duration, DateTime UpdatedUtc) ReadTimeline(nint session)
     {
         if (!WinRt.Succeeded(WinRt.GetPointer(session, SessionTimelineSlot, out var timeline)) || timeline == 0)
@@ -419,7 +549,7 @@ public sealed class MediaHandler : IDisposable
             WinRt.GetInt64(timeline, TimelineEndSlot,      out var end);
             WinRt.GetInt64(timeline, TimelinePositionSlot, out var position);
             WinRt.GetInt64(timeline, TimelineUpdatedSlot,  out var updated);
-            timelineStartTicks = start;
+            if (end > start) timelineStartTicks = start;
 
             var relative = TimeSpan.FromTicks(Math.Max(0, position - start));
             var duration = TimeSpan.FromTicks(Math.Max(0, end - start));
@@ -478,11 +608,12 @@ public sealed class MediaHandler : IDisposable
         }
     }
 
-    // "Spotify.exe" -> "Spotify", "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify" -> "Spotify"
-    private static string AppName(string appId)
+    // "Spotify.exe" -> "Spotify", "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify" -> "Spotify",
+    // "308046B0AF4A39CB" -> "Firefox"
+    private string AppName(string appId)
     {
-        var bang = appId.LastIndexOf('!');
-        var name = bang >= 0 ? appId[(bang + 1)..] : Path.GetFileNameWithoutExtension(appId);
+        var name = BaseName(appId);
+        name = MozillaProduct(name) ?? name;
         return name switch
         {
             "" => "Media",
@@ -490,6 +621,50 @@ public sealed class MediaHandler : IDisposable
             _ when name.Length > 1 && char.IsLower(name[0]) => char.ToUpperInvariant(name[0]) + name[1..],
             _ => name,
         };
+    }
+
+    private static string BaseName(string appId)
+    {
+        var bang = appId.LastIndexOf('!');
+        return bang >= 0 ? appId[(bang + 1)..] : Path.GetFileNameWithoutExtension(appId);
+    }
+
+    // Product name ("Firefox") when the id belongs to a Mozilla app, else null; cached per id
+    private string? MozillaProduct(string name)
+    {
+        if (!mozillaProducts.TryGetValue(name, out var product))
+            mozillaProducts[name] = product = MozillaAppName(name);
+        return product;
+    }
+
+    // Firefox (and Thunderbird, forks) publish a hash of the install path as their app id and list it
+    // under SOFTWARE\Mozilla\<Product>\TaskBarIDs as "<install dir>" = "<hash>"
+    private static string? MozillaAppName(string appId)
+    {
+        if (appId.Length != 16 || !appId.All(Uri.IsHexDigit)) return null;
+        foreach (var root in new[] { Registry.CurrentUser, Registry.LocalMachine })
+        {
+            try
+            {
+                using var mozilla = root.OpenSubKey(@"SOFTWARE\Mozilla");
+                if (mozilla == null) continue;
+                foreach (var product in mozilla.GetSubKeyNames())
+                {
+                    using var ids = mozilla.OpenSubKey($@"{product}\TaskBarIDs");
+                    if (ids == null) continue;
+                    foreach (var dir in ids.GetValueNames())
+                    {
+                        if (string.Equals(ids.GetValue(dir) as string, appId, StringComparison.OrdinalIgnoreCase))
+                            return product;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Unreadable hive; fall back to the raw id
+            }
+        }
+        return null;
     }
 
     public void Dispose()
