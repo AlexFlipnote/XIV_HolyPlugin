@@ -9,7 +9,7 @@ namespace HoliestFluffiness;
 
 public enum LoginInfoDisplay { Echo = 0, Popup = 1, Toast = 2 }
 public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
-public enum MediaBarText { Chain = 0, JobLine = 1 }
+public enum MediaBarSlot { TopLeft = 0, TopRight = 1, BottomLeft = 2, BottomRight = 3 }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -69,11 +69,19 @@ public class Configuration : IPluginConfiguration
 
     // "<song>", "<artist>", "<app>" and "<time>" are filled in for the server info bar entry
     public const string DefaultMediaDtrFormat = "<song>";
-    public bool         MediaEnabled          { get; set; } = false;
-    public bool         MediaExpBarEnabled    { get; set; } = false;
-    public MediaBarText MediaExpBarText       { get; set; } = MediaBarText.Chain;
-    public bool         MediaDtrEnabled       { get; set; } = false;
-    public string       MediaDtrFormat        { get; set; } = DefaultMediaDtrFormat;
+    public bool   MediaEnabled       { get; set; } = false;
+    public bool   MediaExpBarEnabled { get; set; } = false;
+    // What the experience bar shows, and in which corner around the bar
+    public bool         MediaBarShowSong     { get; set; } = true;
+    public MediaBarSlot MediaBarSongSlot     { get; set; } = MediaBarSlot.TopLeft;
+    public bool         MediaBarShowTime     { get; set; } = true;
+    public MediaBarSlot MediaBarTimeSlot     { get; set; } = MediaBarSlot.TopRight;
+    public bool         MediaBarShowVolume   { get; set; } = true;
+    public MediaBarSlot MediaBarVolumeSlot   { get; set; } = MediaBarSlot.BottomLeft;
+    public bool         MediaBarShowControls { get; set; } = true;
+    public MediaBarSlot MediaBarControlsSlot { get; set; } = MediaBarSlot.BottomRight;
+    public bool   MediaDtrEnabled    { get; set; } = false;
+    public string MediaDtrFormat     { get; set; } = DefaultMediaDtrFormat;
 
     public bool NoKillEnabled { get; set; } = false;
     public bool NoKillDisablePopup { get; set; } = false;

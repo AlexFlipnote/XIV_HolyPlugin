@@ -116,18 +116,24 @@ public partial class ConfigWindow
         if (configuration.MediaEnabled && mediaHandler is { IsAvailable: false })
             Common.DimmedTextWrapped("Windows media sessions are not available here (for example under Wine).");
 
+        ImGui.Dummy(new Vector2(0, 4));
+
         ImGui.BeginDisabled(!configuration.MediaEnabled);
         ConfigCheckbox(
             "Show song on the experience bar##mediaexpbar",
             configuration.MediaExpBarEnabled,
             v => configuration.MediaExpBarEnabled = v,
-            "The bar shows song progress and title while something plays. Click the bar to seek, with previous, play/pause and next buttons by the time.");
+            "Turns the bar into a small player while something plays. Click or drag the bar to seek.");
 
         ImGui.BeginDisabled(!configuration.MediaExpBarEnabled);
-        var textModes = new[] { "Replace chain EXP", "Replace job and EXP" };
-        ConfigCombo("Song text##mediaexpbartext", (int)configuration.MediaExpBarText, textModes,
-            v => configuration.MediaExpBarText = (MediaBarText)v, width: 180,
-            desc: "Where the song text goes on the experience bar.");
+        MediaBarItemRow("Song##mediabarsong", configuration.MediaBarShowSong, v => configuration.MediaBarShowSong = v,
+            configuration.MediaBarSongSlot, v => configuration.MediaBarSongSlot = v);
+        MediaBarItemRow("Time##mediabartime", configuration.MediaBarShowTime, v => configuration.MediaBarShowTime = v,
+            configuration.MediaBarTimeSlot, v => configuration.MediaBarTimeSlot = v);
+        MediaBarItemRow("Volume##mediabarvolume", configuration.MediaBarShowVolume, v => configuration.MediaBarShowVolume = v,
+            configuration.MediaBarVolumeSlot, v => configuration.MediaBarVolumeSlot = v);
+        MediaBarItemRow("Media buttons##mediabarcontrols", configuration.MediaBarShowControls, v => configuration.MediaBarShowControls = v,
+            configuration.MediaBarControlsSlot, v => configuration.MediaBarControlsSlot = v);
         ImGui.EndDisabled();
 
         ImGui.Dummy(new Vector2(0, 4));
@@ -209,5 +215,19 @@ public partial class ConfigWindow
             hint: "(default 30)");
 
         EndSection(10);
+    }
+
+    private static readonly string[] MediaBarSlots = ["Top left", "Top right", "Bottom left", "Bottom right"];
+
+    // A show checkbox with its corner picker beside it; the pickers line up in one column
+    private void MediaBarItemRow(string label, bool shown, Action<bool> setShown, MediaBarSlot slot, Action<MediaBarSlot> setSlot)
+    {
+        var column = ImGui.GetCursorPosX() + 150f;
+        ConfigCheckbox(label, shown, setShown);
+        ImGui.SameLine(column);
+        ImGui.BeginDisabled(!shown);
+        ConfigCombo($"##{label[(label.IndexOf("##", StringComparison.Ordinal) + 2)..]}slot", (int)slot, MediaBarSlots,
+            v => setSlot((MediaBarSlot)v), width: 130, padding: false);
+        ImGui.EndDisabled();
     }
 }

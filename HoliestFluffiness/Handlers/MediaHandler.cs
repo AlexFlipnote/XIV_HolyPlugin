@@ -13,7 +13,7 @@ namespace HoliestFluffiness.Handlers;
 
 public enum MediaStatus { Closed = 0, Opened = 1, Changing = 2, Stopped = 3, Playing = 4, Paused = 5 }
 
-public enum MediaAction { TogglePlayPause, Play, Pause, Next, Previous, Seek }
+public enum MediaAction { TogglePlayPause, Play, Pause, Next, Previous, Seek, Volume }
 
 public sealed record MediaSnapshot(
     string AppName,
@@ -24,7 +24,8 @@ public sealed record MediaSnapshot(
     TimeSpan Duration,
     DateTime PositionUpdatedUtc,
     bool CanSeek,
-    byte[]? Artwork)
+    byte[]? Artwork,
+    float? Volume)
 {
     public bool IsPlaying => Status == MediaStatus.Playing;
     public bool HasTimeline => Duration > TimeSpan.Zero;
@@ -107,6 +108,8 @@ public sealed class MediaHandler : IDisposable
     private const int ArtworkConfirmMs  = 2000;
     private const int ArtworkRetryMs    = 1500;
     private const int ArtworkMaxRetries = 3;
+    // Volume commands carry the level in thousandths
+    private const float VolumeScale     = 1000f;
 
     private readonly Configuration config;
     private readonly IPluginLog log;
@@ -131,6 +134,7 @@ public sealed class MediaHandler : IDisposable
     private bool     artworkConfirmed;
     private long     artworkNextFetch;
     private readonly Dictionary<string, string?> mozillaProducts = new();
+    private readonly AppVolume appVolume = new();
     private string   verifiedAppId = "";
     private (string Title, string Artist, byte[]? Artwork)? verifiedTrack;
 
@@ -160,6 +164,10 @@ public sealed class MediaHandler : IDisposable
 
     public void Seek(TimeSpan position) => Send(MediaAction.Seek, Math.Max(0, position.Ticks));
 
+    // 0..1 of the playing app's own volume, as in the Windows Volume Mixer
+    public void SetVolume(float volume) =>
+        Send(MediaAction.Volume, (long)MathF.Round(Math.Clamp(volume, 0f, 1f) * VolumeScale));
+
     private void Run()
     {
         var entered = WinRt.EnterMta();
@@ -183,6 +191,7 @@ public sealed class MediaHandler : IDisposable
         }
         finally
         {
+            appVolume.Dispose();
             WinRt.Release(ref manager);
             if (entered) WinRt.LeaveMta();
         }
@@ -334,6 +343,10 @@ public sealed class MediaHandler : IDisposable
         var ran = false;
         while (commands.TryDequeue(out var entry))
         {
+            // A drag queues a volume per step; only the last one still waiting matters
+            if (entry.Command == MediaAction.Volume && commands.TryPeek(out var next) && next.Command == MediaAction.Volume)
+                continue;
+
             ran |= entry.Command switch
             {
                 MediaAction.Play     => WinRt.Fire(session, SessionPlaySlot),
@@ -341,6 +354,7 @@ public sealed class MediaHandler : IDisposable
                 MediaAction.Next     => WinRt.Fire(session, SessionNextSlot),
                 MediaAction.Previous => WinRt.Fire(session, SessionPreviousSlot),
                 MediaAction.Seek     => FireSeek(session, entry.Arg),
+                MediaAction.Volume   => appVolume.Write(ProcessName(WinRt.GetString(session, SessionAppIdSlot)), entry.Arg / VolumeScale),
                 _                     => TogglePlayPause(session),
             };
         }
@@ -388,7 +402,16 @@ public sealed class MediaHandler : IDisposable
 
         var (position, duration, updatedUtc) = StableTimeline(ReadTimeline(session), status, appId);
         var (shownTitle, shownArtist, shownArtwork) = VerifiedTrack(appId, title, artist);
-        return new MediaSnapshot(AppName(appId), shownTitle, shownArtist, status, position, duration, updatedUtc, canSeek, shownArtwork);
+        var volume = appVolume.Read(ProcessName(appId));
+        return new MediaSnapshot(AppName(appId), shownTitle, shownArtist, status, position, duration, updatedUtc, canSeek, shownArtwork, volume);
+    }
+
+    // The process behind a media session: "Spotify.exe" and Spotify's store id both give "Spotify",
+    // Firefox's install hash gives "Firefox", and process names compare without case
+    private string ProcessName(string appId)
+    {
+        var name = BaseName(appId);
+        return MozillaProduct(name) ?? name;
     }
 
     // YouTube's hover previews rewrite Firefox's title, artist and cover, and never put the playing video

@@ -11,20 +11,31 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 namespace HoliestFluffiness.Handlers;
 
 // Borrows the game's own experience bar (_Exp) while something is playing on the PC. The gauge shows
-// song progress, and two text nodes of our own (styled as a copy of the EXP text) show the song on the
-// left and the time on the right, in place of either the chain EXP line or the job/level/EXP line.
-// When nothing is playing the addon is asked to redraw from the game's data, which restores the gauge.
+// song progress, and text nodes of our own (styled as a copy of the EXP text) put the song, the time,
+// the volume and previous, play/pause and next in the corners the settings pick: the top row takes the
+// chain EXP line's place and the bottom row the job/level/EXP line's. A row only hides the game's own
+// text while it holds something of ours; the rested EXP moon is hidden throughout. When nothing is
+// playing the addon is asked to redraw from the game's data, which restores everything.
 // _Exp ignores the mouse, so clicks go to a borderless ImGui window laid over the bar instead: the song
-// row runs the same action as the server info bar entry, the bar itself seeks, and three more
-// text nodes on the other row act as previous, play/pause and next buttons, with the rested EXP moon hidden.
+// and time run the same action as the server info bar entry, the bar itself seeks, the buttons act, and
+// the volume track (drawn by that window) takes drags and the mouse wheel.
 public sealed unsafe class MediaExpBarHandler : IDisposable
 {
     private const string AddonName    = "_Exp";
     private const uint   LabelNodeId  = 0x48460001;
     private const uint   TimeNodeId   = 0x48460002;
     private const uint   ButtonNodeId = 0x48460003;
+    private const uint   VolumeNodeId = 0x48460006;
+    private const uint   LastNodeId   = VolumeNodeId;
     private const int    MaxHidden   = 8;
-    private const float  TimeGap     = 12f;
+    // Space between neighbouring items in a row
+    private const float  ItemGap     = 12f;
+    // Indexes into the per-item spans, in left-to-right reading order within a corner
+    private const int    SongItem     = 0;
+    private const int    TimeItem     = 1;
+    private const int    VolumeItem   = 2;
+    private const int    ControlsItem = 3;
+    private const int    ItemCount    = 4;
     // The game's text boxes carry more empty space above the glyphs than below, so a plain mirror of
     // the job line lands on the bar; tuned in game until the gap matches the one under the bar
     private const float  ChainLift   = 6f;
@@ -36,10 +47,22 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     // Space between the media buttons; each one's click area reaches halfway into it
     private const float  ButtonSpacing = 8f;
     private static readonly MediaAction[] Buttons = [MediaAction.Previous, MediaAction.TogglePlayPause, MediaAction.Next];
+    // The percentage, right-aligned in a box as wide as "100%" so the track never moves, then a track
+    // this wide VolumeGap after it
+    private const float  VolumeWidth       = 80f;
+    private const float  VolumeGap         = 6f;
+    private const float  VolumeTrackHeight = 2f;
+    // Half-width and half-height of the diamond handle
+    private static readonly Vector2 VolumeHandle = new(4f, 5f);
+    // How far past either end of the track a press still counts as grabbing it
+    private const float  VolumeGrabSlack   = 4f;
+    private const float  VolumeWheelStep   = 0.05f;
 
     // How long a released scrub keeps showing its target, so the bar does not snap back
     // to the old position before the player reports the new one
     private static readonly TimeSpan SeekHold = TimeSpan.FromSeconds(1.5);
+    // The same for volume, which the worker only reads back once a second
+    private static readonly TimeSpan VolumeHold = TimeSpan.FromSeconds(1.5);
 
     private const ImGuiWindowFlags ClickAreaFlags =
         ImGuiWindowFlags.NoDecoration       | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoSavedSettings |
@@ -56,14 +79,20 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
 
     private AtkTextNode* labelNode;
     private AtkTextNode* timeNode;
+    private AtkTextNode* volumeNode;
     private int          hiddenCount;
-    private MediaBarText hiddenMode;
+    // Which rows' game text is hidden: 1 for the top row, 2 for the bottom
+    private int          hiddenRows;
     private bool         overriding;
     private int          lastGauge = -1;
     private string       lastTime  = "";
     private string       lastLabel = "";
     private float        lastLabelWidth;
-    // Distance from the time row's right edge to the "/" in the time, in node units
+    private float        songWidth;
+    // The time's width, its width without " (Paused)", and how far left of that plain text's end the
+    // middle of its "/" sits, all in node units
+    private float        timeWidth;
+    private float        timePlainWidth;
     private float        timeAnchor;
     private AtkResNode*  moonNode;
     private bool         moonHidden;
@@ -74,6 +103,12 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     private bool     scrubbing;
     private float    scrubFraction;
     private DateTime seekShownUntil;
+
+    private bool     volumeDragging;
+    private bool     volumeGrabbed;
+    private float    volumeTarget;
+    private string   lastVolumeText = "";
+    private DateTime volumeShownUntil;
 
     public MediaExpBarHandler(Configuration config, MediaHandler media, IAddonLifecycle addonLifecycle, IGameGui gameGui)
     {
@@ -94,25 +129,31 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     public void DrawOverlay()
     {
         if (TryDrawOverlay()) return;
-        scrubbing     = false;
-        hoveredButton = -1;
+        scrubbing      = false;
+        volumeDragging = false;
+        hoveredButton  = -1;
     }
 
-    // One window spans the song row, the bar and the button. ImGui gives an overlap to the item submitted
-    // first, so the bar and button go in before the row.
+    // One window spans everything clickable. ImGui gives an overlap to the item submitted first, so the
+    // bar, buttons and volume go in before the song and time.
     private bool TryDrawOverlay()
     {
-        if (!overriding || timeNode == null || !timeNode->AtkResNode.IsVisible() || Song is not { } song) return false;
+        if (!overriding || timeNode == null || Song is not { } song) return false;
         var addon = (AtkUnitBase*)gameGui.GetAddonByName(AddonName).Address;
         if (addon == null || !Common.IsAddonVisible(addon)) return false;
 
         var scale    = addon->Scale;
         var viewport = ImGui.GetMainViewport().Pos;
 
-        // The time node spans the whole row, so it doubles as the click area
-        var row    = &timeNode->AtkResNode;
-        var rowMin = Common.GetNodePosition(row) + viewport;
-        var rowMax = rowMin + new Vector2(row->Width, row->Height) * scale;
+        // The song and time each open the player, wherever they sit
+        Span<(Vector2 Min, Vector2 Max)> textRects = stackalloc (Vector2, Vector2)[2];
+        Span<bool> textShown = [labelNode->AtkResNode.IsVisible(), timeNode->AtkResNode.IsVisible()];
+        for (var i = 0; i < textRects.Length; i++)
+        {
+            var node = i == 0 ? &labelNode->AtkResNode : &timeNode->AtkResNode;
+            var tMin = Common.GetNodePosition(node) + viewport;
+            textRects[i] = (tMin, tMin + new Vector2(node->Width, node->Height) * scale);
+        }
 
         var gauge = FindGauge(addon);
         var track = gauge == null ? null : FindTrack(gauge);
@@ -134,9 +175,15 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         var showButtons = ButtonsVisible();
         var buttonPad   = new Vector2(ButtonSpacing / 2f * scale, 0);
 
-        var min = rowMin;
-        var max = rowMax;
+        var min = new Vector2(float.MaxValue);
+        var max = new Vector2(float.MinValue);
         if (canSeek) { min = Vector2.Min(min, seekMin); max = Vector2.Max(max, seekMax); }
+        for (var i = 0; i < textRects.Length; i++)
+        {
+            if (!textShown[i]) continue;
+            min = Vector2.Min(min, textRects[i].Min);
+            max = Vector2.Max(max, textRects[i].Max);
+        }
         for (var i = 0; showButtons && i < Buttons.Length; i++)
         {
             var node   = &((AtkTextNode*)buttonNodes[i])->AtkResNode;
@@ -145,6 +192,19 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
             buttonRects[i] = (bMin, bMax);
             min = Vector2.Min(min, bMin);
             max = Vector2.Max(max, bMax);
+        }
+
+        // The track runs from just past the percentage, on the row's middle line
+        var showVolume = volumeNode != null && volumeNode->AtkResNode.IsVisible();
+        Vector2 volumeMin = default, volumeMax = default, trackStart = default;
+        if (showVolume)
+        {
+            var valueRes = &volumeNode->AtkResNode;
+            volumeMin  = Common.GetNodePosition(valueRes) + viewport;
+            trackStart = new Vector2(volumeMin.X + (valueRes->Width + VolumeGap) * scale, volumeMin.Y + valueRes->Height * scale / 2f);
+            volumeMax  = new Vector2(trackStart.X + (VolumeWidth + VolumeHandle.X) * scale, volumeMin.Y + valueRes->Height * scale);
+            min = Vector2.Min(min, volumeMin);
+            max = Vector2.Max(max, volumeMax);
         }
         if (max.X - min.X < 1 || max.Y - min.Y < 1) return false;
 
@@ -166,7 +226,11 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
                 if (hovered) hoveredButton = i;
             }
 
-            if (clickAction != null && HitArea("##hfmediaexpbarclick", rowMin, rowMax, out _)) clickAction();
+            if (showVolume) DrawVolume(song, volumeMin, volumeMax, trackStart, scale);
+            else volumeDragging = false;
+
+            for (var i = 0; clickAction != null && i < textRects.Length; i++)
+                if (textShown[i] && HitArea($"##hfmediaexpbarclick{i}", textRects[i].Min, textRects[i].Max, out _)) clickAction();
         }
         ImGui.End();
         ImGui.PopStyleVar(3);
@@ -198,6 +262,78 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
             media.Seek(song.Duration * scrubFraction);
         }
     }
+
+    // Drag along the track to set the volume, or scroll anywhere over the percentage or the track.
+    // A drag sends each whole percent as it passes, so the music follows the knob.
+    private void DrawVolume(MediaSnapshot song, Vector2 min, Vector2 max, Vector2 trackStart, float scale)
+    {
+        var trackWidth = VolumeWidth * scale;
+        var shown      = ShownVolume(song) ?? 0f;
+
+        // Only a press that starts on the track drags, so clicking the percentage never mutes
+        var slack  = VolumeGrabSlack * scale;
+        HitArea("##hfmediaexpbarvolume", min, max, out var hovered);
+        if (ImGui.IsItemActivated())
+        {
+            var mouseX = ImGui.GetMousePos().X;
+            volumeGrabbed = mouseX >= trackStart.X - slack && mouseX <= trackStart.X + trackWidth + slack;
+        }
+        if (ImGui.IsItemActive() && volumeGrabbed)
+        {
+            var target = Math.Clamp((ImGui.GetMousePos().X - trackStart.X) / trackWidth, 0f, 1f);
+            if (!volumeDragging || MathF.Round(target * 100) != MathF.Round(volumeTarget * 100))
+                media.SetVolume(target);
+            volumeDragging = true;
+            volumeTarget   = target;
+            shown          = target;
+        }
+        else if (volumeDragging)
+        {
+            volumeDragging   = false;
+            volumeShownUntil = DateTime.UtcNow + VolumeHold;
+        }
+        else if (hovered && ImGui.GetIO().MouseWheel is var wheel and not 0f)
+        {
+            volumeTarget     = Math.Clamp(MathF.Round((shown + wheel * VolumeWheelStep) * 20f) / 20f, 0f, 1f);
+            volumeShownUntil = DateTime.UtcNow + VolumeHold;
+            shown            = volumeTarget;
+            media.SetVolume(volumeTarget);
+        }
+
+        // Like the game's own settings sliders: a thin line, light up to the handle and dim after it, with
+        // a white diamond handle. Outlined dark so it holds up over any scenery, and pixel-snapped so the
+        // line stays sharp; the handle turns gold while hovered or held.
+        var dl     = ImGui.GetWindowDrawList();
+        var half   = VolumeTrackHeight * scale / 2f;
+        var border = MathF.Round(Math.Max(1f, scale));
+        var a      = Vector2.Round(new Vector2(trackStart.X, trackStart.Y - half));
+        var b      = Vector2.Round(new Vector2(trackStart.X + trackWidth, trackStart.Y + half));
+        var knobX  = MathF.Round(a.X + (b.X - a.X) * shown);
+        var edge   = Rgb(0f, 0f, 0f, 0.8f);
+
+        dl.AddRectFilled(a - new Vector2(border), b + new Vector2(border), edge);
+        dl.AddRectFilled(a, b, Rgb(0.42f, 0.42f, 0.42f));
+        if (knobX > a.X) dl.AddRectFilled(a, new Vector2(knobX, b.Y), Rgb(0.85f, 0.85f, 0.85f));
+
+        // Corners listed clockwise, which ImGui needs to anti-alias a filled shape cleanly
+        var size  = VolumeHandle * scale;
+        var mid   = new Vector2(knobX, MathF.Round(trackStart.Y));
+        var top   = mid - new Vector2(0, size.Y);
+        var right = mid + new Vector2(size.X, 0);
+        var low   = mid + new Vector2(0, size.Y);
+        var left  = mid - new Vector2(size.X, 0);
+        dl.AddQuadFilled(top + new Vector2(0, -border), right + new Vector2(border, 0), low + new Vector2(0, border), left - new Vector2(border, 0), edge);
+        dl.AddQuadFilled(top, right, low, left, hovered || volumeDragging ? Rgb(Theme.ColGold) : Rgb(1f, 1f, 1f));
+    }
+
+    private static uint Rgb(float r, float g, float b, float a = 1f) =>
+        ImGui.ColorConvertFloat4ToU32(new Vector4(r, g, b, a));
+
+    private static uint Rgb(Vector4 color) => ImGui.ColorConvertFloat4ToU32(color);
+
+    // While dragging, and briefly after a drag or scroll, the target instead of the last reading
+    private float? ShownVolume(MediaSnapshot song) =>
+        volumeDragging || DateTime.UtcNow < volumeShownUntil ? volumeTarget : song.Volume;
 
     private static bool HitArea(string id, Vector2 min, Vector2 max, out bool hovered)
     {
@@ -236,7 +372,6 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         var gaugeNode = gauge->OwnerNode;
         var gaugePos  = PositionInRoot(addon, (AtkResNode*)gaugeNode);
         var gaugeMid  = gaugePos.Y + gaugeNode->AtkResNode.Height / 2f;
-        var mode      = config.MediaExpBarText;
 
         var template = FindVanillaText(addon, gaugeMid, above: false);
         if (template == null) return;
@@ -248,81 +383,196 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
 
         if (labelNode == null) CreateNodes(addon, template);
 
-        if (hiddenCount > 0 && hiddenMode != mode)
-        {
-            // Switched modes: put the other line back and let the game re-apply its own visibility
-            ShowHiddenText();
-            RequestRefresh(addon);
-        }
-        hiddenMode = mode;
-        HideVanillaText(addon, gaugeMid, above: mode == MediaBarText.Chain);
-
         // The gauge component is much taller than the thin bar it draws, so measure the bar itself and
-        // mirror the job line: the song sits as far above the bar as the job line sits below it
+        // mirror the job line: the top row sits as far above the bar as the job line sits below it
         var height   = template->AtkResNode.Height;
-        var jobY     = PositionInRoot(addon, &template->AtkResNode).Y;
+        var bottomY  = PositionInRoot(addon, &template->AtkResNode).Y;
         var (barTop, barBottom) = VisibleBar(addon, gauge, gaugePos.Y, gaugeNode->AtkResNode.Height);
         ushort drawW = 0, drawH = 0;
         template->GetTextDrawSize(&drawW, &drawH);
-        var chainY = barTop - (jobY - barBottom) - drawH - ChainLift;
-        var y      = mode == MediaBarText.Chain ? chainY : jobY;
+        var topY  = barTop - (bottomY - barBottom) - drawH - ChainLift;
         var x     = gaugePos.X;
-        var width = gaugeNode->AtkResNode.Width;
+        var width = (float)gaugeNode->AtkResNode.Width;
 
-        // The buttons anchor on the time without " (Paused)", so pausing does not slide them sideways
         var plainTime = BuildTime(song, preview);
         var time      = WithPaused(plainTime, song);
         if (time != lastTime)
         {
-            timeAnchor = MeasureAnchor(timeNode, plainTime);
+            (timePlainWidth, timeAnchor) = MeasureAnchor(timeNode, plainTime);
             timeNode->SetText(time);
-            lastTime = time;
+            timeWidth = time.Length > 0 ? Measure(timeNode) : 0f;
+            lastTime  = time;
         }
-        timeNode->AtkResNode.SetPositionFloat(x, y);
-        timeNode->AtkResNode.SetWidth(width);
-        timeNode->AtkResNode.SetHeight(height);
+        var volume = ShownVolume(song);
+        UpdateVolumeText(volume);
+        UpdateButtonTexts(song);
 
-        ushort timeWidth = 0, unused = 0;
-        if (time.Length > 0) timeNode->GetTextDrawSize(&timeWidth, &unused);
-        var labelWidth = Math.Max(0f, width - timeWidth - (time.Length > 0 ? TimeGap : 0));
-        if (song.Display != lastLabel || Math.Abs(labelWidth - lastLabelWidth) > 0.5f)
-        {
-            FitText(labelNode, song.Display, labelWidth);
-            lastLabel      = song.Display;
-            lastLabelWidth = labelWidth;
-        }
-        labelNode->AtkResNode.SetPositionFloat(x, y);
-        labelNode->AtkResNode.SetWidth((ushort)labelWidth);
-        labelNode->AtkResNode.SetHeight(height);
+        Span<bool> shown =
+        [
+            config.MediaBarShowSong,
+            config.MediaBarShowTime && time.Length > 0,
+            config.MediaBarShowVolume && volume != null,
+            config.MediaBarShowControls,
+        ];
+        Span<float> widths = [0f, timeWidth, VolumeItemWidth(), ControlsWidth()];
+        Span<float> xs     = stackalloc float[ItemCount];
 
-        labelNode->AtkResNode.ToggleVisibility(true);
-        timeNode->AtkResNode.ToggleVisibility(true);
+        HideVanillaText(addon, gaugeMid, RowUsed(shown, top: true), RowUsed(shown, top: false));
+        LayoutRow(song.Display, shown, widths, xs, x, width, top: true);
+        LayoutRow(song.Display, shown, widths, xs, x, width, top: false);
+        AnchorControls(shown, widths, xs, x, width);
 
-        // The buttons take the row the song text left free, under or over the time's "/"
-        UpdateButtons(song, template, x + width - timeAnchor, mode == MediaBarText.Chain ? jobY : chainY, height);
+        float RowY(int item) => IsTop(Slot(item)) ? topY : bottomY;
+        Place(&labelNode->AtkResNode,  shown[SongItem],   xs[SongItem],   RowY(SongItem),   widths[SongItem], height);
+        Place(&timeNode->AtkResNode,   shown[TimeItem],   xs[TimeItem],   RowY(TimeItem),   widths[TimeItem], height);
+        Place(&volumeNode->AtkResNode, shown[VolumeItem], xs[VolumeItem], RowY(VolumeItem), volumeNode->AtkResNode.Width, height);
+        PlaceButtons(template, shown[ControlsItem], xs[ControlsItem], RowY(ControlsItem), height);
     }
 
-    // Play/pause sits centred on the anchor with previous and next either side of it, so the group
-    // does not shift when the middle one flips between "II" and ">"
-    private void UpdateButtons(MediaSnapshot song, AtkTextNode* template, float centerX, float y, ushort height)
+    private MediaBarSlot Slot(int item) => item switch
     {
-        var playing = song.IsPlaying ? 1 : 0;
-        if (playing != buttonsPlaying)
+        SongItem   => config.MediaBarSongSlot,
+        TimeItem   => config.MediaBarTimeSlot,
+        VolumeItem => config.MediaBarVolumeSlot,
+        _          => config.MediaBarControlsSlot,
+    };
+
+    private static bool IsTop(MediaBarSlot slot)  => slot is MediaBarSlot.TopLeft or MediaBarSlot.TopRight;
+    private static bool IsLeft(MediaBarSlot slot) => slot is MediaBarSlot.TopLeft or MediaBarSlot.BottomLeft;
+
+    private bool RowUsed(Span<bool> shown, bool top)
+    {
+        for (var i = 0; i < ItemCount; i++)
+            if (shown[i] && IsTop(Slot(i)) == top) return true;
+        return false;
+    }
+
+    // Left-corner items run from the row's left edge and right-corner items from its right edge, both in
+    // the order song, time, volume, buttons as read left to right. The song gets whatever width the rest
+    // of the row leaves, cut with "..." to fit, and then only as much as its text needs.
+    private void LayoutRow(string display, Span<bool> shown, Span<float> widths, Span<float> xs, float x, float width, bool top)
+    {
+        var count  = 0;
+        var fixedW = 0f;
+        for (var i = 0; i < ItemCount; i++)
         {
-            for (var i = 0; i < Buttons.Length; i++)
+            if (!shown[i] || IsTop(Slot(i)) != top) continue;
+            count++;
+            if (i != SongItem) fixedW += widths[i];
+        }
+        if (count == 0) return;
+
+        if (shown[SongItem] && IsTop(Slot(SongItem)) == top)
+        {
+            var available = Math.Max(0f, width - fixedW - ItemGap * (count - 1));
+            if (display != lastLabel || Math.Abs(available - lastLabelWidth) > 0.5f)
             {
-                var node = (AtkTextNode*)buttonNodes[i];
-                node->SetText(ButtonText(Buttons[i], song.IsPlaying));
-                node->AtkResNode.SetWidth((ushort)Math.Ceiling(Measure(node)));
+                FitText(labelNode, display, available);
+                lastLabel      = display;
+                lastLabelWidth = available;
+                songWidth      = Measure(labelNode);
             }
-            buttonsPlaying = playing;
+            widths[SongItem] = songWidth;
         }
 
-        var prev = &((AtkTextNode*)buttonNodes[0])->AtkResNode;
-        var mid  = &((AtkTextNode*)buttonNodes[1])->AtkResNode;
-        var midX = centerX - mid->Width / 2f;
-        Span<float> xs = [midX - ButtonSpacing - prev->Width, midX, midX + mid->Width + ButtonSpacing];
+        var left = x;
+        for (var i = 0; i < ItemCount; i++)
+        {
+            if (!shown[i] || IsTop(Slot(i)) != top || !IsLeft(Slot(i))) continue;
+            xs[i] = left;
+            left += widths[i] + ItemGap;
+        }
 
+        var right = x + width;
+        for (var i = ItemCount - 1; i >= 0; i--)
+        {
+            if (!shown[i] || IsTop(Slot(i)) != top || IsLeft(Slot(i))) continue;
+            right -= widths[i];
+            xs[i]  = right;
+            right -= ItemGap;
+        }
+    }
+
+    // Buttons alone in their corner sit with play/pause centred on the time's "/" when the time is on the
+    // same side of the other row, as in the default layout. Right-aligned time grows leftwards when
+    // " (Paused)" is added, so there the "/" is found from its right end and the buttons hold still.
+    private void AnchorControls(Span<bool> shown, Span<float> widths, Span<float> xs, float x, float width)
+    {
+        if (!shown[ControlsItem] || !shown[TimeItem]) return;
+        var controls = Slot(ControlsItem);
+        var timeSlot = Slot(TimeItem);
+        if (IsTop(controls) == IsTop(timeSlot) || IsLeft(controls) != IsLeft(timeSlot)) return;
+        for (var i = 0; i < ItemCount; i++)
+            if (i != ControlsItem && shown[i] && Slot(i) == controls) return;
+
+        var slashX = IsLeft(timeSlot)
+            ? xs[TimeItem] + timePlainWidth - timeAnchor
+            : xs[TimeItem] + widths[TimeItem] - timeAnchor;
+        var start = slashX - ButtonNode(1)->Width / 2f - ButtonSpacing - ButtonNode(0)->Width;
+        xs[ControlsItem] = Math.Clamp(start, x, Math.Max(x, x + width - widths[ControlsItem]));
+    }
+
+    private static void Place(AtkResNode* node, bool shown, float x, float y, float width, ushort height)
+    {
+        node->ToggleVisibility(shown);
+        if (!shown) return;
+        node->SetPositionFloat(x, y);
+        node->SetWidth((ushort)Math.Ceiling(width));
+        node->SetHeight(height);
+    }
+
+    private AtkResNode* ButtonNode(int i) => &((AtkTextNode*)buttonNodes[i])->AtkResNode;
+
+    // The number box, the gap, the track and the half of the handle that overhangs its end
+    private float VolumeItemWidth() => volumeNode->AtkResNode.Width + VolumeGap + VolumeWidth + VolumeHandle.X;
+
+    private float ControlsWidth() =>
+        ButtonNode(0)->Width + ButtonNode(1)->Width + ButtonNode(2)->Width + ButtonSpacing * 2;
+
+    // Sized once to the widest it can read; the text is right-aligned in it, so the track never moves
+    private void UpdateVolumeText(float? volume)
+    {
+        var value = &volumeNode->AtkResNode;
+        if (value->Width == 0)
+        {
+            volumeNode->SetText("100%");
+            value->SetWidth((ushort)Math.Ceiling(Measure(volumeNode)));
+            lastVolumeText = "";
+        }
+        if (volume is not { } level) return;
+
+        var text = $"{MathF.Round(level * 100)}%";
+        if (text == lastVolumeText) return;
+        volumeNode->SetText(text);
+        lastVolumeText = text;
+    }
+
+    // Play/pause is as wide as the wider of "II" and ">" with its text centred, so the group keeps its
+    // size and nothing beside it shifts when it flips
+    private void UpdateButtonTexts(MediaSnapshot song)
+    {
+        var playing = song.IsPlaying ? 1 : 0;
+        if (playing == buttonsPlaying) return;
+        for (var i = 0; i < Buttons.Length; i++)
+        {
+            var node  = (AtkTextNode*)buttonNodes[i];
+            var width = 0f;
+            if (Buttons[i] == MediaAction.TogglePlayPause)
+            {
+                node->SetText(ButtonText(Buttons[i], true));
+                width = Measure(node);
+                node->SetText(ButtonText(Buttons[i], false));
+                width = Math.Max(width, Measure(node));
+            }
+            node->SetText(ButtonText(Buttons[i], song.IsPlaying));
+            if (width == 0f) width = Measure(node);
+            node->AtkResNode.SetWidth((ushort)Math.Ceiling(width));
+        }
+        buttonsPlaying = playing;
+    }
+
+    private void PlaceButtons(AtkTextNode* template, bool shown, float x, float y, ushort height)
+    {
         var hover = new ByteColor
         {
             R = (byte)(Theme.ColGold.X * 255), G = (byte)(Theme.ColGold.Y * 255),
@@ -331,10 +581,12 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         for (var i = 0; i < Buttons.Length; i++)
         {
             var node = (AtkTextNode*)buttonNodes[i];
-            node->AtkResNode.SetPositionFloat(xs[i], y);
+            node->AtkResNode.ToggleVisibility(shown);
+            if (!shown) continue;
+            node->AtkResNode.SetPositionFloat(x, y);
             node->AtkResNode.SetHeight(height);
             node->TextColor = i == hoveredButton ? hover : template->TextColor;
-            node->AtkResNode.ToggleVisibility(true);
+            x += node->AtkResNode.Width + ButtonSpacing;
         }
     }
 
@@ -397,6 +649,7 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         if (addon != null) DestroyNodes(addon);
         overriding  = false;
         hiddenCount = 0;
+        hiddenRows  = 0;
         lastGauge   = -1;
         moonNode    = null;
         moonHidden  = false;
@@ -408,8 +661,9 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         lastGauge  = -1;
         ShowHiddenText();
         ShowMoon();
-        if (labelNode != null) labelNode->AtkResNode.ToggleVisibility(false);
-        if (timeNode  != null) timeNode->AtkResNode.ToggleVisibility(false);
+        if (labelNode       != null) labelNode->AtkResNode.ToggleVisibility(false);
+        if (timeNode        != null) timeNode->AtkResNode.ToggleVisibility(false);
+        if (volumeNode      != null) volumeNode->AtkResNode.ToggleVisibility(false);
         foreach (var button in buttonNodes)
             if (button != 0) ((AtkResNode*)button)->ToggleVisibility(false);
         RequestRefresh(addon);
@@ -449,22 +703,22 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         node->SetText(lo > 0 ? text[..lo].TrimEnd() + "..." : "");
     }
 
-    // How far left of the right-aligned text's end the middle of its "/" sits, measured with the game's
+    // The text's width, and how far left of its end the middle of its "/" sits, measured with the game's
     // own font by trying the text up to either side of it; the middle of the text when there is none.
     // Leaves other text in the node, so the caller sets the real text afterwards.
-    private static float MeasureAnchor(AtkTextNode* node, string time)
+    private static (float Width, float Anchor) MeasureAnchor(AtkTextNode* node, string time)
     {
-        if (time.Length == 0) return 0f;
+        if (time.Length == 0) return (0f, 0f);
         node->SetText(time);
         var full  = Measure(node);
         var slash = time.IndexOf('/');
-        if (slash < 0) return full / 2f;
+        if (slash < 0) return (full, full / 2f);
 
         node->SetText(time[..slash]);
         var before = Measure(node);
         node->SetText(time[..(slash + 1)]);
         var after = Measure(node);
-        return full - (before + after) / 2f;
+        return (full, full - (before + after) / 2f);
     }
 
     private static float Measure(AtkTextNode* node)
@@ -474,13 +728,24 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         return w;
     }
 
-    // Runs every update, since the game shows the chain line again whenever a chain starts
-    private void HideVanillaText(AtkUnitBase* addon, float gaugeMid, bool above)
+    // Only the rows holding something of ours; runs every update, since the game shows the chain line
+    // again whenever a chain starts. When the rows change, everything is shown again and the game
+    // re-applies its own visibility before the new rows are hidden.
+    private void HideVanillaText(AtkUnitBase* addon, float gaugeMid, bool top, bool bottom)
     {
+        var rows = (top ? 1 : 0) | (bottom ? 2 : 0);
+        if (hiddenCount > 0 && rows != hiddenRows)
+        {
+            ShowHiddenText();
+            RequestRefresh(addon);
+        }
+        hiddenRows = rows;
+
         for (var i = 0; i < addon->UldManager.NodeListCount && hiddenCount < MaxHidden; i++)
         {
             var node = addon->UldManager.NodeList[i];
-            if (!IsVanillaText(node) || !node->IsVisible() || IsAbove(addon, node, gaugeMid) != above) continue;
+            if (!IsVanillaText(node) || !node->IsVisible()) continue;
+            if (!(IsAbove(addon, node, gaugeMid) ? top : bottom)) continue;
             node->ToggleVisibility(false);
             hiddenText[hiddenCount++] = (nint)node;
         }
@@ -499,11 +764,14 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     private void CreateNodes(AtkUnitBase* addon, AtkTextNode* template)
     {
         labelNode = CreateTextNode(addon, template, LabelNodeId, AlignmentType.Left);
-        timeNode  = CreateTextNode(addon, template, TimeNodeId,  AlignmentType.Right);
+        timeNode  = CreateTextNode(addon, template, TimeNodeId,  AlignmentType.Left);
         for (var i = 0; i < Buttons.Length; i++)
-            buttonNodes[i] = (nint)CreateTextNode(addon, template, ButtonNodeId + (uint)i, AlignmentType.Left);
+            buttonNodes[i] = (nint)CreateTextNode(addon, template, ButtonNodeId + (uint)i,
+                Buttons[i] == MediaAction.TogglePlayPause ? AlignmentType.Center : AlignmentType.Left);
+        volumeNode = CreateTextNode(addon, template, VolumeNodeId, AlignmentType.Right);
         addon->UldManager.UpdateDrawNodeList();
-        lastLabel = lastTime = "";
+        lastLabel = lastTime = lastVolumeText = "";
+        lastLabelWidth = -1;
         buttonsPlaying = -1;
     }
 
@@ -545,6 +813,7 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     {
         DestroyTextNode(addon, ref labelNode);
         DestroyTextNode(addon, ref timeNode);
+        DestroyTextNode(addon, ref volumeNode);
         for (var i = 0; i < Buttons.Length; i++)
         {
             var button = (AtkTextNode*)buttonNodes[i];
@@ -626,7 +895,7 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
     }
 
     private static bool IsVanillaText(AtkResNode* node) =>
-        node != null && node->Type == NodeType.Text && node->NodeId is not (>= LabelNodeId and < ButtonNodeId + 3);
+        node != null && node->Type == NodeType.Text && node->NodeId is not (>= LabelNodeId and <= LastNodeId);
 
     public void Dispose()
     {
