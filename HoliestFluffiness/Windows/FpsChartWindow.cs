@@ -55,7 +55,7 @@ public sealed class FpsChartWindow : Window, IDisposable
         var plotSize = ImGui.GetContentRegionAvail();
         var scaleMax = cachedMax > 0 ? cachedMax * 1.15f : 60f;
 
-        ImGui.PushStyleColor(ImGuiCol.PlotLines, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.PlotLines, Theme.ColPlot);
         ImGui.PlotLines("##fps", data, data.Length, "", 0f, scaleMax, plotSize);
         ImGui.PopStyleColor(1);
     }

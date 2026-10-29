@@ -74,7 +74,7 @@ public sealed class PingChartWindow : Window, IDisposable
         var plotSize = ImGui.GetContentRegionAvail();
         var scaleMax = max > 0 ? max * 1.3f : 200f;
 
-        ImGui.PushStyleColor(ImGuiCol.PlotLines, Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.PlotLines, Theme.ColPlot);
         ImGui.PlotLines("##ping", data, data.Length, "", 0f, scaleMax, plotSize);
         ImGui.PopStyleColor(1);
     }

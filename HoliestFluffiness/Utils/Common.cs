@@ -223,19 +223,19 @@ internal static class Common
 
     internal static void PushGoldButton()
     {
-        ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGoldSub, ImGuiCol.Button));
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, T(Theme.ColGoldMid, ImGuiCol.ButtonHovered));
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  T(Theme.ColGold,    ImGuiCol.ButtonActive));
-        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColGold,    ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGoldSub);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGoldMid);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGold);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
     }
     internal static void PopGoldButton() => ImGui.PopStyleColor(4);
 
     internal static void PushGreenButton()
     {
-        ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGreenSub, ImGuiCol.Button));
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, T(Theme.ColGreenMid, ImGuiCol.ButtonHovered));
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  T(Theme.ColGreen,    ImGuiCol.ButtonActive));
-        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColGreen,    ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColGreenSub);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColGreenMid);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColGreen);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGreen);
     }
     internal static void PopGreenButton() => ImGui.PopStyleColor(4);
 
@@ -255,7 +255,7 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
-    // Green and red stay themed in both modes; they are semantic, not decorative
+    // Green and red stay coloured in both modes; with the custom theme off they follow Dalamud's style editor
     internal static void GreenText(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGreen);
@@ -273,7 +273,7 @@ internal static class Common
     internal static void PushTableHeader()
     {
         ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, FadeT(Theme.ColPrimary, ImGuiCol.TableHeaderBg));
-        ImGui.PushStyleColor(ImGuiCol.Text,          T(Theme.ColGold,    ImGuiCol.Text));
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColGold);
     }
     internal static void PopTableHeader() => ImGui.PopStyleColor(2);
 

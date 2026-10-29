@@ -80,6 +80,8 @@ public class Configuration : IPluginConfiguration
     public MediaBarSlot MediaBarVolumeSlot   { get; set; } = MediaBarSlot.BottomLeft;
     public bool         MediaBarShowControls { get; set; } = true;
     public MediaBarSlot MediaBarControlsSlot { get; set; } = MediaBarSlot.BottomRight;
+    // The game's own job/level/EXP line keeps its spot under the bar unless hidden
+    public bool         MediaBarShowJob      { get; set; } = true;
     public bool   MediaDtrEnabled    { get; set; } = false;
     public string MediaDtrFormat     { get; set; } = DefaultMediaDtrFormat;
 

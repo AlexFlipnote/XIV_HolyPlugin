@@ -159,8 +159,8 @@ public sealed class FateListWindow : Window, IDisposable
             var cellRight = start.X + ImGui.GetContentRegionAvail().X + padX;
             var frac = Math.Clamp(fate.Progress / 100f, 0f, 1f);
 
-            var fill = fate.Progress >= 90 ? Theme.ColRed  with { W = 0.45f }
-                     : fate.Progress >= 50 ? Theme.ColGold with { W = 0.40f }
+            var fill = fate.Progress >= 90 ? Theme.ColRedBg
+                     : fate.Progress >= 50 ? Theme.ColWarningBg
                      :                       Theme.ColGold with { W = 0.15f };
             ImGui.GetWindowDrawList().AddRectFilled(
                 new Vector2(cellLeft, rowY),
@@ -210,7 +210,7 @@ public sealed class FateListWindow : Window, IDisposable
 
         var text  = TimeSpan.FromSeconds(fate.TimeRemaining).ToString(@"mm\:ss");
         var color = fate.TimeRemaining <= RedSeconds    ? Theme.ColRed
-                  : fate.TimeRemaining <= YellowSeconds ? Theme.ColGold
+                  : fate.TimeRemaining <= YellowSeconds ? Theme.ColWarning
                   : Theme.ColWhite;
         ImGui.PushStyleColor(ImGuiCol.Text, color);
         ImGui.TextUnformatted(text);

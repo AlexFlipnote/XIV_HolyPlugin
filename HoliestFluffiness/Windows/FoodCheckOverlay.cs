@@ -41,7 +41,7 @@ public class FoodCheckOverlay : HfOverlayWindow, IDisposable
         foreach (var entry in handler.GetEntries())
         {
             if (entry.HudSlot is < 0 or > 7) continue;
-            var color = entry.RemainingSeconds == 0 ? Theme.ColRed : Theme.ColGold;
+            var color = entry.RemainingSeconds == 0 ? Theme.ColRed : Theme.ColWarning;
             var label = entry.RemainingSeconds == 0 ? "No food!" : $"Food: {entry.RemainingSeconds / 60}m left";
             DrawMember(entry, pParty, drawList, color, label);
         }

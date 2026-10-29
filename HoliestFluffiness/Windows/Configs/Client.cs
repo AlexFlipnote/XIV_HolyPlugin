@@ -134,6 +134,12 @@ public partial class ConfigWindow
             configuration.MediaBarVolumeSlot, v => configuration.MediaBarVolumeSlot = v);
         MediaBarItemRow("Media buttons##mediabarcontrols", configuration.MediaBarShowControls, v => configuration.MediaBarShowControls = v,
             configuration.MediaBarControlsSlot, v => configuration.MediaBarControlsSlot = v);
+
+        // The game's own line cannot move, so it gets the checkbox and a note where the picker would be
+        var column = ImGui.GetCursorPosX() + 150f;
+        ConfigCheckbox("Job and EXP##mediabarjob", configuration.MediaBarShowJob, v => configuration.MediaBarShowJob = v);
+        ImGui.SameLine(column);
+        Common.DimmedText("Bottom left, the game's own line");
         ImGui.EndDisabled();
 
         ImGui.Dummy(new Vector2(0, 4));

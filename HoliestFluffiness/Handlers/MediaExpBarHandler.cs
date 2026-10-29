@@ -13,8 +13,9 @@ namespace HoliestFluffiness.Handlers;
 // Borrows the game's own experience bar (_Exp) while something is playing on the PC. The gauge shows
 // song progress, and text nodes of our own (styled as a copy of the EXP text) put the song, the time,
 // the volume and previous, play/pause and next in the corners the settings pick: the top row takes the
-// chain EXP line's place and the bottom row the job/level/EXP line's. A row only hides the game's own
-// text while it holds something of ours; the rested EXP moon is hidden throughout. When nothing is
+// chain EXP line's place, hiding it while it holds something of ours, and the bottom row shares the
+// job/level/EXP line's, which keeps showing on the left unless the settings hide it. The rested EXP
+// moon is hidden throughout. When nothing is
 // playing the addon is asked to redraw from the game's data, which restores everything.
 // _Exp ignores the mouse, so clicks go to a borderless ImGui window laid over the bar instead: the song
 // and time run the same action as the server info bar entry, the bar itself seeks, the buttons act, and
@@ -417,9 +418,11 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         Span<float> widths = [0f, timeWidth, VolumeItemWidth(), ControlsWidth()];
         Span<float> xs     = stackalloc float[ItemCount];
 
-        HideVanillaText(addon, gaugeMid, RowUsed(shown, top: true), RowUsed(shown, top: false));
-        LayoutRow(song.Display, shown, widths, xs, x, width, top: true);
-        LayoutRow(song.Display, shown, widths, xs, x, width, top: false);
+        // The job line is only hidden when asked; while it shows, the bottom-left corner starts after it
+        HideVanillaText(addon, gaugeMid, RowUsed(shown, top: true), !config.MediaBarShowJob);
+        var jobWidth = config.MediaBarShowJob ? JobLineWidth(addon, gaugeMid, x, width) : 0f;
+        LayoutRow(song.Display, shown, widths, xs, x, width, top: true,  reserved: 0f);
+        LayoutRow(song.Display, shown, widths, xs, x, width, top: false, reserved: jobWidth > 0 ? jobWidth + ItemGap : 0f);
         AnchorControls(shown, widths, xs, x, width);
 
         float RowY(int item) => IsTop(Slot(item)) ? topY : bottomY;
@@ -449,8 +452,10 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
 
     // Left-corner items run from the row's left edge and right-corner items from its right edge, both in
     // the order song, time, volume, buttons as read left to right. The song gets whatever width the rest
-    // of the row leaves, cut with "..." to fit, and then only as much as its text needs.
-    private void LayoutRow(string display, Span<bool> shown, Span<float> widths, Span<float> xs, float x, float width, bool top)
+    // of the row leaves, cut with "..." to fit, and then only as much as its text needs. The left corner
+    // starts `reserved` in, past the game's own text that still shows there.
+    private void LayoutRow(string display, Span<bool> shown, Span<float> widths, Span<float> xs, float x, float width, bool top,
+        float reserved)
     {
         var count  = 0;
         var fixedW = 0f;
@@ -464,7 +469,7 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
 
         if (shown[SongItem] && IsTop(Slot(SongItem)) == top)
         {
-            var available = Math.Max(0f, width - fixedW - ItemGap * (count - 1));
+            var available = Math.Max(0f, width - reserved - fixedW - ItemGap * (count - 1));
             if (display != lastLabel || Math.Abs(available - lastLabelWidth) > 0.5f)
             {
                 FitText(labelNode, display, available);
@@ -475,7 +480,7 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
             widths[SongItem] = songWidth;
         }
 
-        var left = x;
+        var left = x + reserved;
         for (var i = 0; i < ItemCount; i++)
         {
             if (!shown[i] || IsTop(Slot(i)) != top || !IsLeft(Slot(i))) continue;
@@ -756,6 +761,34 @@ public sealed unsafe class MediaExpBarHandler : IDisposable
         for (var i = 0; i < hiddenCount; i++)
             ((AtkResNode*)hiddenText[i])->ToggleVisibility(true);
         hiddenCount = 0;
+    }
+
+    // How far right of the bar's left edge the game's own job/level/EXP text reaches, going by where each
+    // node draws its text within its box; zero while none of it is drawn. The row also holds empty,
+    // bar-wide text boxes, so empty ones and any whose text starts past the bar's middle are skipped:
+    // the job line always sits on the left.
+    private static float JobLineWidth(AtkUnitBase* addon, float gaugeMid, float x, float width)
+    {
+        var right = x;
+        for (var i = 0; i < addon->UldManager.NodeListCount; i++)
+        {
+            var node = addon->UldManager.NodeList[i];
+            if (!IsVanillaText(node) || !node->IsVisible() || IsAbove(addon, node, gaugeMid)) continue;
+            var text  = node->GetAsAtkTextNode();
+            var drawn = Measure(text);
+            if (drawn < 1f) continue;
+
+            var left  = PositionInRoot(addon, node).X;
+            var start = text->AlignmentType switch
+            {
+                AlignmentType.TopRight or AlignmentType.Right or AlignmentType.BottomRight => left + node->Width - drawn,
+                AlignmentType.Top or AlignmentType.Center or AlignmentType.Bottom          => left + (node->Width - drawn) / 2f,
+                _                                                                          => left,
+            };
+            if (start > x + width / 2f) continue;
+            right = Math.Max(right, start + drawn);
+        }
+        return Math.Min(right - x, width);
     }
 
     private static bool IsAbove(AtkUnitBase* addon, AtkResNode* node, float gaugeMid) =>
