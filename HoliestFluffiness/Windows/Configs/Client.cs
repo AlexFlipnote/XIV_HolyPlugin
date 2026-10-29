@@ -121,7 +121,7 @@ public partial class ConfigWindow
             "Show song on the experience bar##mediaexpbar",
             configuration.MediaExpBarEnabled,
             v => configuration.MediaExpBarEnabled = v,
-            "The bar shows song progress and title while something plays.");
+            "The bar shows song progress and title while something plays. Click the bar to seek, with previous, play/pause and next buttons by the time.");
 
         ImGui.BeginDisabled(!configuration.MediaExpBarEnabled);
         var textModes = new[] { "Replace chain EXP", "Replace job and EXP" };

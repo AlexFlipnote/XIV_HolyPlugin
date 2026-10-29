@@ -329,7 +329,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += Theme.Sync;
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.Draw += nearbyWindow.DrawMarkers;
-        PluginInterface.UiBuilder.Draw += mediaExpBarHandler.DrawClickArea;
+        PluginInterface.UiBuilder.Draw += mediaExpBarHandler.DrawOverlay;
         PluginInterface.UiBuilder.Draw += () => Common.DrawToasts();
         PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   += OpenMainUi;
@@ -1091,7 +1091,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(MediaCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
-        PluginInterface.UiBuilder.Draw -= mediaExpBarHandler.DrawClickArea;
+        PluginInterface.UiBuilder.Draw -= mediaExpBarHandler.DrawOverlay;
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
         PluginInterface.UiBuilder.OpenMainUi   -= OpenMainUi;

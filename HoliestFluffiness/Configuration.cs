@@ -69,11 +69,11 @@ public class Configuration : IPluginConfiguration
 
     // "<song>", "<artist>", "<app>" and "<time>" are filled in for the server info bar entry
     public const string DefaultMediaDtrFormat = "<song>";
-    public bool         MediaEnabled       { get; set; } = false;
-    public bool         MediaExpBarEnabled { get; set; } = false;
-    public MediaBarText MediaExpBarText    { get; set; } = MediaBarText.Chain;
-    public bool         MediaDtrEnabled    { get; set; } = false;
-    public string       MediaDtrFormat     { get; set; } = DefaultMediaDtrFormat;
+    public bool         MediaEnabled          { get; set; } = false;
+    public bool         MediaExpBarEnabled    { get; set; } = false;
+    public MediaBarText MediaExpBarText       { get; set; } = MediaBarText.Chain;
+    public bool         MediaDtrEnabled       { get; set; } = false;
+    public string       MediaDtrFormat        { get; set; } = DefaultMediaDtrFormat;
 
     public bool NoKillEnabled { get; set; } = false;
     public bool NoKillDisablePopup { get; set; } = false;
