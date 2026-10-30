@@ -142,6 +142,33 @@ public partial class ConfigWindow
             title: "Ping display mode");
         ImGui.EndDisabled();
 
+        // Media controls are their own feature under Client, so the song entry only works while they are on
+        var mediaOn = configuration.MediaEnabled;
+        ImGui.BeginDisabled(!mediaOn);
+        ConfigCheckbox(
+            "Show current song##mediadtr",
+            configuration.MediaDtrEnabled,
+            v => configuration.MediaDtrEnabled = v);
+        ImGui.EndDisabled();
+        if (!mediaOn && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Requires media controls to be enabled under Client.");
+        else if (mediaOn && ImGui.IsItemHovered())
+            ImGui.SetTooltip("Click the entry in-game to open the media player.");
+
+        ImGui.BeginDisabled(!mediaOn || !configuration.MediaDtrEnabled);
+        ConfigInputText("Song text##mediadtrformat", configuration.MediaDtrFormat,
+            v => configuration.MediaDtrFormat = v, width: 240,
+            hint: $"(empty = {Configuration.DefaultMediaDtrFormat})",
+            desc: "Format of the song entry, using <song>, <artist>, <app> and <time>.");
+        RowGap(0);
+
+        var tagsHelper = "Tags: <song> | <artist> | <app> | <time>";
+        if (mediaHandler?.Current is { Title.Length: > 0 } song)
+            Common.DimmedText($"{tagsHelper}\nPreview: {MediaDtrHandler.Format(configuration.MediaDtrFormat, song)}");
+        else
+            Common.DimmedText(tagsHelper);
+        ImGui.EndDisabled();
+
         // ── Repair ────────────────────────────────────────────────────────────
         SubsectionLabel("Repair",
             "Adds a debuff icon to Status (Other) when your gear durability drops below a threshold. " +

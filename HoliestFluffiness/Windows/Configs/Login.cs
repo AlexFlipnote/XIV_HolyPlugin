@@ -82,6 +82,39 @@ public partial class ConfigWindow
             v => configuration.PreloadTerritory = v,
             "Starts loading the destination zone in the background while in the login queue");
 
+        ConfigCheckbox(
+            "Disable idle movie##titlemovie",
+            configuration.TitleMovieDisabled,
+            v => configuration.TitleMovieDisabled = v,
+            "Prevents the intro video from playing on the title screen");
+
+        ConfigCheckbox(
+            "Show congestion queue timer##queuetimer",
+            configuration.QueueTimerEnabled,
+            v => configuration.QueueTimerEnabled = v,
+            "Adds a countdown to the \"server is currently congested\" dialog. The refresh rate is measured " +
+            "while you wait, so it shows time since the queue started or last updated until it is known.");
+
+        // ── No-kill ───────────────────────────────────────────────────────────
+        SubsectionLabel("No-kill",
+            "Intercepts lobby errors and converts them to a reconnect attempt instead of closing the game.");
+
+        ConfigCheckbox(
+            "Enable no-kill##nokill",
+            configuration.NoKillEnabled,
+            v =>
+            {
+                configuration.NoKillEnabled = v;
+                noKillHandler.SetEnabled(v);
+            });
+
+        ImGui.BeginDisabled(!configuration.NoKillEnabled);
+        ConfigCheckbox(
+            "Disable popup on lobby error##nokillpopup",
+            configuration.NoKillDisablePopup,
+            v => configuration.NoKillDisablePopup = v);
+        ImGui.EndDisabled();
+
         // ── Fashion accessory ─────────────────────────────────────────────────
         SubsectionLabel("Fashion accessory");
 

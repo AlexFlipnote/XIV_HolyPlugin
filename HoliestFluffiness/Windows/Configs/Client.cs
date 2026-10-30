@@ -18,12 +18,6 @@ public partial class ConfigWindow
         BeginSection("Client", "Settings that change client/application behaviour.");
 
         ConfigCheckbox(
-            "Disable idle movie##titlemovie",
-            configuration.TitleMovieDisabled,
-            v => configuration.TitleMovieDisabled = v,
-            "Prevents the intro video from playing on the title screen");
-
-        ConfigCheckbox(
             "Always yes##alwaysyes",
             configuration.AlwaysYesEnabled,
             v => configuration.AlwaysYesEnabled = v,
@@ -50,13 +44,6 @@ public partial class ConfigWindow
             configuration.DrawSheatheEmoteEnabled,
             v => configuration.DrawSheatheEmoteEnabled = v,
             "Replaces your draw/sheathe weapon keybind with the /draw and /sheathe emotes when possible.");
-
-        ConfigCheckbox(
-            "Show congestion queue timer##queuetimer",
-            configuration.QueueTimerEnabled,
-            v => configuration.QueueTimerEnabled = v,
-            "Adds a countdown to the \"server is currently congested\" dialog. The refresh rate is measured " +
-            "while you wait, so it shows time since the queue started or last updated until it is known.");
 
         SubsectionLabel(
             "Window title",
@@ -141,51 +128,6 @@ public partial class ConfigWindow
         ImGui.SameLine(column);
         Common.DimmedText("Bottom left, the game's own line");
         ImGui.EndDisabled();
-
-        ImGui.Dummy(new Vector2(0, 4));
-
-        ConfigCheckbox(
-            "Show song in the server info bar##mediadtr",
-            configuration.MediaDtrEnabled,
-            v => configuration.MediaDtrEnabled = v,
-            "Next to ping and FPS. Click it to open the player.");
-
-        ImGui.BeginDisabled(!configuration.MediaDtrEnabled);
-        ConfigInputText("Server info text##mediadtrformat", configuration.MediaDtrFormat,
-            v => configuration.MediaDtrFormat = v, width: 240,
-            hint: $"(empty = {Configuration.DefaultMediaDtrFormat})",
-            desc: "Format of the server info entry, using <song>, <artist>, <app> and <time>.");
-        RowGap(0);
-
-        var tagsHelper = "Tags: <song> | <artist> | <app> | <time>";
-        if (mediaHandler?.Current is { Title.Length: > 0 } song)
-        {
-            Common.DimmedText($"{tagsHelper}\nPreview: {MediaDtrHandler.Format(configuration.MediaDtrFormat, song)}");
-        }
-        else {
-            Common.DimmedText($"{tagsHelper}");
-        }
-
-        ImGui.EndDisabled();
-        ImGui.EndDisabled();
-
-        SubsectionLabel("No-kill",
-            "Intercepts lobby errors and converts them to a reconnect attempt instead of closing the game.");
-
-        ConfigCheckbox(
-            "Enable no-kill##nokill",
-            configuration.NoKillEnabled,
-            v =>
-            {
-                configuration.NoKillEnabled = v;
-                noKillHandler.SetEnabled(v);
-            });
-
-        ImGui.BeginDisabled(!configuration.NoKillEnabled);
-        ConfigCheckbox(
-            "Disable popup on lobby error##nokillpopup",
-            configuration.NoKillDisablePopup,
-            v => configuration.NoKillDisablePopup = v);
         ImGui.EndDisabled();
 
         SubsectionLabel("High FPS physics fix");
