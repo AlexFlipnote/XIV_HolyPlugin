@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.18",
+        "AssemblyVersion": "0.12.19",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.18/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.18/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.18/latest.zip",
-        "Changelog": "The game's own job, level and EXP line now stays visible under the experience bar while a song plays, with the media items lining up after it. It can be hidden with the new Job and EXP option in the media settings.",
-        "DownloadCount": 409,
-        "LastUpdate": 1793306013
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.19/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.19/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.19/latest.zip",
+        "Changelog": "Some settings moved to where they make more sense. Disable idle movie, the congestion queue timer and No-kill are now in the Login tab, and the song entry for the server info bar now sits with the other server info options under Indicators. It is greyed out until media controls are enabled under Client, and hovering it explains why.",
+        "DownloadCount": 420,
+        "LastUpdate": 1793395520
     }
 ]
