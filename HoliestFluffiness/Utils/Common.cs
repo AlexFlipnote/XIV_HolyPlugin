@@ -270,6 +270,17 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
+    // Gold track and grab, matching the gold progress bars
+    internal static void PushGoldSlider()
+    {
+        ImGui.PushStyleColor(ImGuiCol.FrameBg,          T(Theme.ColGoldSub, ImGuiCol.FrameBg));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered,   T(Theme.ColGoldSub, ImGuiCol.FrameBgHovered));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgActive,    T(Theme.ColGoldSub, ImGuiCol.FrameBgActive));
+        ImGui.PushStyleColor(ImGuiCol.SliderGrab,       T(Theme.ColGoldMid, ImGuiCol.SliderGrab));
+        ImGui.PushStyleColor(ImGuiCol.SliderGrabActive, T(Theme.ColGold,    ImGuiCol.SliderGrabActive));
+    }
+    internal static void PopGoldSlider() => ImGui.PopStyleColor(5);
+
     internal static void PushTableHeader()
     {
         ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, FadeT(Theme.ColPrimary, ImGuiCol.TableHeaderBg));
@@ -602,14 +613,37 @@ internal static class Common
         }
     }
 
-    internal static void DrawTextShadowed(ImDrawListPtr dl, string text, Vector2 pos)
+    // Thickness above 1 gives a rounded outline: a solid core ring plus a half-faded outer ring, so the
+    // edge looks smooth instead of blocky. The position is pixel-snapped, since text centred on a
+    // half pixel blurs and makes the outline look jagged
+    internal static void DrawTextShadowed(ImDrawListPtr dl, string text, Vector2 pos, int thickness = 1)
     {
-        var shadow = ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 0f, 0f, 1f));
-        var white  = ImGui.ColorConvertFloat4ToU32(Theme.ColWhite);
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dy = -1; dy <= 1; dy++)
-            if (dx != 0 || dy != 0)
-                dl.AddText(pos + new Vector2(dx, dy), shadow, text);
+        pos = Vector2.Round(pos);
+        var white = ImGui.ColorConvertFloat4ToU32(Theme.ColWhite);
+        if (thickness <= 1)
+        {
+            var shadow = ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 0f, 0f, 1f));
+            for (var dx = -1; dx <= 1; dx++)
+            for (var dy = -1; dy <= 1; dy++)
+                if (dx != 0 || dy != 0)
+                    dl.AddText(pos + new Vector2(dx, dy), shadow, text);
+            dl.AddText(pos, white, text);
+            return;
+        }
+
+        var outer  = ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 0f, 0f, 0.5f));
+        var inner  = ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 0f, 0f, 1f));
+        var core   = thickness - 0.5f;
+        var radius = thickness + 0.5f;
+        for (var pass = 0; pass < 2; pass++)
+        for (var dx = -thickness; dx <= thickness; dx++)
+        for (var dy = -thickness; dy <= thickness; dy++)
+        {
+            var dist   = MathF.Sqrt(dx * dx + dy * dy);
+            var isCore = dist <= core;
+            if (dist == 0 || dist > radius || isCore != (pass == 1)) continue;
+            dl.AddText(pos + new Vector2(dx, dy), isCore ? inner : outer, text);
+        }
         dl.AddText(pos, white, text);
     }
 

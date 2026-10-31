@@ -22,12 +22,21 @@ public class MediaWindow : Window, IDisposable
     // to the old position before the player reports the new one
     private static readonly TimeSpan SeekHold = TimeSpan.FromSeconds(1.5);
 
+    // Same idea for the volume: the player reports its level a moment after we set it
+    private static readonly TimeSpan VolumeHold      = TimeSpan.FromSeconds(1.5);
+    private const float              VolumeGap       = 12f;
+    private const float              VolumeWheelStep = 0.05f;
+
     private readonly MediaHandler     media;
     private readonly ITextureProvider textures;
 
     private bool     scrubbing;
     private float    scrubFraction;
     private DateTime seekShownUntil;
+
+    private bool     volumeDragging;
+    private float    volumeTarget;
+    private DateTime volumeShownUntil;
 
     // The cover on screen stays until the next one has finished loading, so skipping never flashes empty
     private byte[]?                    artSource;
@@ -84,8 +93,61 @@ public class MediaWindow : Window, IDisposable
             ImGui.Dummy(new Vector2(0, 4));
         }
 
-        Common.CenterCursorForWidth(BtnW * 3 + 16f);
+        // Volume on the left with the buttons pushed right; without a volume the buttons stay centred
+        var controlsW = BtnW * 3 + 16f;
+        var volume    = ShownVolume(song);
+        if (volume != null)
+        {
+            var start = ImGui.GetCursorScreenPos();
+            DrawVolume(volume.Value, Width - controlsW - VolumeGap);
+            ImGui.SameLine();
+            ImGui.SetCursorScreenPos(new Vector2(start.X + Width - controlsW, start.Y));
+        }
+        else
+        {
+            Common.CenterCursorForWidth(controlsW);
+        }
         DrawControls(song);
+    }
+
+    // While dragging, and briefly after a drag or scroll, the target instead of the last reading
+    private float? ShownVolume(MediaSnapshot song) =>
+        volumeDragging || DateTime.UtcNow < volumeShownUntil ? volumeTarget : song.Volume;
+
+    // Drag to set the volume, or scroll over it. A drag sends each whole percent as it passes,
+    // so the music follows the grab
+    private void DrawVolume(float shown, float width)
+    {
+        var percent = shown * 100f;
+        Common.PushGoldSlider();
+        ImGui.SetNextItemWidth(width);
+        // Empty format hides the slider's own text; the percentage is drawn outlined on top instead,
+        // the same as the timeline
+        var changed = ImGui.SliderFloat("##hfmediavolume", ref percent, 0f, 100f, "", ImGuiSliderFlags.AlwaysClamp);
+        Common.PopGoldSlider();
+
+        var min   = ImGui.GetItemRectMin();
+        var label = $"{MathF.Round(percent)}%";
+        Common.DrawTextShadowed(ImGui.GetWindowDrawList(), label, min + (ImGui.GetItemRectSize() - ImGui.CalcTextSize(label)) / 2f, 2);
+
+        if (changed)
+        {
+            var target = MathF.Round(percent) / 100f;
+            if (!volumeDragging || target != volumeTarget) media.SetVolume(target);
+            volumeDragging = true;
+            volumeTarget   = target;
+        }
+        else if (volumeDragging && !ImGui.IsItemActive())
+        {
+            volumeDragging   = false;
+            volumeShownUntil = DateTime.UtcNow + VolumeHold;
+        }
+        else if (ImGui.IsItemHovered() && ImGui.GetIO().MouseWheel is var wheel and not 0f)
+        {
+            volumeTarget     = Math.Clamp(MathF.Round((shown + wheel * VolumeWheelStep) * 20f) / 20f, 0f, 1f);
+            volumeShownUntil = DateTime.UtcNow + VolumeHold;
+            media.SetVolume(volumeTarget);
+        }
     }
 
     // Cover on the left, song and artist beside it on one line each, cut with "..." when too long
@@ -211,7 +273,7 @@ public class MediaWindow : Window, IDisposable
         if (Theme.UseCustom) ImGui.PopStyleColor(2);
 
         var labelSize = ImGui.CalcTextSize(label);
-        Common.DrawTextShadowed(ImGui.GetWindowDrawList(), label, pos + (size - labelSize) / 2f);
+        Common.DrawTextShadowed(ImGui.GetWindowDrawList(), label, pos + (size - labelSize) / 2f, 2);
 
         if (!song.CanSeek) return;
 
