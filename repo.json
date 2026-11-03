@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.23",
+        "AssemblyVersion": "0.12.24",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.23/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.23/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.23/latest.zip",
-        "Changelog": "The \"Copy sale\" button in the lottery panel now copies more about the plot: the world, size, number of entries and price, for example \"[Phantom] Mist W17 P45 M -> 44 (16,000,000)\". Anything the placard doesn't show is left out.",
-        "DownloadCount": 443,
-        "LastUpdate": 1793713194
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.24/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.24/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.24/latest.zip",
+        "Changelog": "The Database settings page has a new \"Updater\" section. Besides updating all characters, you can now choose \"Update stale characters\" to only log into characters not seen within a set number of days (default 7). Characters only spotted on the character select screen and never logged into also count as stale. A preview shows how many will be logged in and how many will be skipped before you start. The \"Export CSV\" button now sits right below the database checkboxes.",
+        "DownloadCount": 445,
+        "LastUpdate": 1793729813
     }
 ]
