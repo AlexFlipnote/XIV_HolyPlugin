@@ -90,6 +90,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly RepairHandler repairHandler;
     private readonly WardInfoHandler wardInfoHandler;
     private readonly WardInfoWindow wardInfoWindow;
+    private readonly LotterySaleWindow lotterySaleWindow;
     private readonly PointWalker pointWalker;
     private readonly ApartmentSweepHandler apartmentSweepHandler;
     private readonly ApartmentSweepWindow apartmentSweepWindow;
@@ -215,6 +216,7 @@ public sealed class Plugin : IDalamudPlugin
         apartmentSweepHandler  = new ApartmentSweepHandler(configuration, PluginInterface, GameGui, Framework, AddonLifecycle, ClientState, ObjectTable, TargetManager, Condition, DataManager, pointWalker, Log);
         apartmentSweepWindow   = new ApartmentSweepWindow(apartmentSweepHandler);
         wardInfoWindow         = new WardInfoWindow(configuration, wardInfoHandler, apartmentSweepHandler, GameGui, DataManager, InvokeLifestreamTeleport, IsLifestreamBusy);
+        lotterySaleWindow      = new LotterySaleWindow(configuration, characterDb, GameGui, ObjectTable);
         nearbyHandler          = new NearbyHandler(configuration, ObjectTable, Framework, PartyList, TargetManager);
         nearbyHandler.NewTargeter += OnNewTargeter;
         serverInfoHandler.SetNearbyHandler(nearbyHandler);
@@ -276,6 +278,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(notesWindow);
         windowSystem.AddWindow(notePreviewWindow);
         windowSystem.AddWindow(wardInfoWindow);
+        windowSystem.AddWindow(lotterySaleWindow);
         windowSystem.AddWindow(apartmentSweepWindow);
         windowSystem.AddWindow(mediaWindow);
 

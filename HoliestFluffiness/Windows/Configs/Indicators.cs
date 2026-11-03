@@ -51,7 +51,8 @@ public partial class ConfigWindow
             v => configuration.WardInfoWindowEnabled = v,
             "Docks a searchable, sortable plot table (owner/FC, price, availability) to the right of the " +
             "\"Select Residential Ward\" menu, and enables the /wardinfo (alias /wi) command that opens it " +
-            "as its own standalone window. Session-only: never written to disk.");
+            "as its own standalone window. Also docks a lottery panel (entries, odds, \"Copy sale\") next to " +
+            "\"For Sale\" placards that are selling via lottery. Session-only: never written to disk.");
 
         ImGui.BeginDisabled(!configuration.WardInfoWindowEnabled);
         RowGap();
