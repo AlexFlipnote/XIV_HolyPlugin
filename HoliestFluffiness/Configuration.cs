@@ -40,6 +40,7 @@ public class Configuration : IPluginConfiguration
     public List<int> LoginInfoOrder { get; set; } = [0, 1, 2, 3, 4];
     public bool CharactersDbEnabled { get; set; } = false;
     public bool CharactersDbShortenNumbers { get; set; } = false;
+    public int CharactersDbStaleDays { get; set; } = 7;
     public bool FcPointsTrackingEnabled { get; set; } = false;
     public int LastSelectedSection { get; set; } = 0;
 

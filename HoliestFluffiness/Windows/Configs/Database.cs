@@ -56,60 +56,9 @@ public partial class ConfigWindow
 
             ImGui.Dummy(new Vector2(0, 4));
             SectionRow();
-
-            if (bulkUpdateTotal > 0)
-            {
-                Common.DimmedText($"Processing {bulkUpdateProgress}/{bulkUpdateTotal}...");
-                ImGui.SameLine();
-                PushButton();
-                if (ImGui.Button("Cancel##bulkupdate")) bulkUpdateCts?.Cancel();
-                PopButton();
-            }
-            else
-            {
-                PushButton();
-                if (ImGui.Button("Update all characters"))
-                {
-                    bulkUpdateCts?.Cancel();
-                    bulkUpdateCts?.Dispose();
-                    bulkUpdateCts = new CancellationTokenSource();
-                    _ = RunBulkUpdateAsync(bulkUpdateCts.Token);
-                }
-                ImGui.SameLine();
-                if (ImGui.Button("Export CSV##dbexport"))
-                {
-                    var tracked = LoginInfoHandler.TrackedItems.ToList();
-                    var sb = new StringBuilder();
-                    sb.AppendLine(string.Join(",", new[] { "Key", "Name", "World", "DataCenter", "Slot", "FreeCompany", "FcLeader", "SearchInfo",
-                        "PrivateHouse", "FcHouse", "Gil", "Mgp", "FcPoints" }
-                        .Concat(tracked.Select(t => CsvEscape(t.Value)))
-                        .Append("LastSeen")));
-                    foreach (var r in characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))
-                    {
-                        var items = r.Inventory != null
-                            ? JsonSerializer.Deserialize<Dictionary<uint, int>>(r.Inventory) ?? []
-                            : new Dictionary<uint, int>();
-                        sb.AppendLine(string.Join(",", new[]
-                            {
-                                CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
-                                r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany),
-                                string.IsNullOrEmpty(r.FreeCompany) ? "" : r.FcLeader ? "true" : "false",
-                                CsvEscape(r.SearchInfo), CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
-                                r.Gil < 0 ? "" : r.Gil.ToString(),
-                                r.Mgp < 0 ? "" : r.Mgp.ToString(),
-                                r.FcPoints < 0 ? "" : r.FcPoints.ToString(),
-                            }
-                            .Concat(tracked.Select(t => items.TryGetValue(t.Key, out var qty) ? qty.ToString() : ""))
-                            .Append(r.LastSeen.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:sszzz"))));
-                    }
-                    var csv = sb.ToString();
-                    fileDialogManager.SaveFileDialog("Export characters", "CSV{.csv}", "characters_export.csv", ".csv",
-                        // BOM so Excel reads names with accents as UTF-8 instead of the system codepage
-                        (ok, path) => { if (ok) { File.WriteAllText(path, csv, new UTF8Encoding(true)); csvExportMessage = $"Saved: {path}"; } },
-                        pluginInterface.ConfigDirectory.FullName);
-                }
-                PopButton();
-            }
+            PushButton();
+            DrawExportButton();
+            PopButton();
 
             if (csvExportMessage != null)
             {
@@ -117,6 +66,8 @@ public partial class ConfigWindow
                 SectionRow();
                 Common.DimmedText(csvExportMessage);
             }
+
+            DrawUpdater();
 
             ImGui.Dummy(new Vector2(0, 8));
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
@@ -211,11 +162,110 @@ public partial class ConfigWindow
         EndSection(10);
     }
 
-    private async Task RunBulkUpdateAsync(CancellationToken token)
+    private void DrawExportButton()
     {
-        var chars = characterDb.GetAll()
-            .OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot)
-            .ToList();
+        if (ImGui.Button("Export CSV##dbexport"))
+        {
+            var tracked = LoginInfoHandler.TrackedItems.ToList();
+            var sb = new StringBuilder();
+            sb.AppendLine(string.Join(",", new[] { "Key", "Name", "World", "DataCenter", "Slot", "FreeCompany", "FcLeader", "SearchInfo",
+                "PrivateHouse", "FcHouse", "Gil", "Mgp", "FcPoints" }
+                .Concat(tracked.Select(t => CsvEscape(t.Value)))
+                .Append("LastSeen")));
+            foreach (var r in characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))
+            {
+                var items = r.Inventory != null
+                    ? JsonSerializer.Deserialize<Dictionary<uint, int>>(r.Inventory) ?? []
+                    : new Dictionary<uint, int>();
+                sb.AppendLine(string.Join(",", new[]
+                    {
+                        CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
+                        r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany),
+                        string.IsNullOrEmpty(r.FreeCompany) ? "" : r.FcLeader ? "true" : "false",
+                        CsvEscape(r.SearchInfo), CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
+                        r.Gil < 0 ? "" : r.Gil.ToString(),
+                        r.Mgp < 0 ? "" : r.Mgp.ToString(),
+                        r.FcPoints < 0 ? "" : r.FcPoints.ToString(),
+                    }
+                    .Concat(tracked.Select(t => items.TryGetValue(t.Key, out var qty) ? qty.ToString() : ""))
+                    .Append(r.LastSeen.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:sszzz"))));
+            }
+            var csv = sb.ToString();
+            fileDialogManager.SaveFileDialog("Export characters", "CSV{.csv}", "characters_export.csv", ".csv",
+                // BOM so Excel reads names with accents as UTF-8 instead of the system codepage
+                (ok, path) => { if (ok) { File.WriteAllText(path, csv, new UTF8Encoding(true)); csvExportMessage = $"Saved: {path}"; } },
+                pluginInterface.ConfigDirectory.FullName);
+        }
+    }
+
+    private static List<CharacterRecord> OrderForBulkUpdate(IEnumerable<CharacterRecord> chars) =>
+        chars.OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot).ToList();
+
+    // A character is stale if it was last seen more than N days ago, or if it has never been
+    // logged into (only seen on the character select screen, so Gil was never read).
+    private static bool IsStale(CharacterRecord r, DateTime cutoffUtc) => r.Gil < 0 || r.LastSeen < cutoffUtc;
+
+    private void DrawUpdater()
+    {
+        ImGui.Dummy(new Vector2(0, 8));
+        SectionRow();
+        Common.GoldText("Updater");
+        SectionRow();
+        Common.DimmedTextWrapped("Logs into your characters one by one to refresh their info. " +
+            "Stale only picks characters not seen within the set amount of days, plus any that were " +
+            "only spotted on the character select screen and never logged into.");
+        ImGui.Dummy(new Vector2(0, 2));
+
+        if (bulkUpdateTotal > 0)
+        {
+            SectionRow();
+            Common.DimmedText($"Processing {bulkUpdateProgress}/{bulkUpdateTotal}...");
+            ImGui.SameLine();
+            PushButton();
+            if (ImGui.Button("Cancel##bulkupdate")) bulkUpdateCts?.Cancel();
+            PopButton();
+            return;
+        }
+
+        var all     = characterDb.GetAll();
+        var days    = configuration.CharactersDbStaleDays;
+        var cutoff  = DateTime.UtcNow.AddDays(-days);
+        var stale   = OrderForBulkUpdate(all.Where(r => IsStale(r, cutoff)));
+        var skipped = all.Count - stale.Count;
+        var dayWord = days == 1 ? "day" : "days";
+
+        ConfigInputInt("Days##dbstaledays", days, 0, 3650,
+            v => configuration.CharactersDbStaleDays = v, width: 90,
+            desc: "Only characters last seen longer ago than this get logged in");
+        ImGui.SameLine();
+        PushButton();
+        ImGui.BeginDisabled(stale.Count == 0);
+        if (ImGui.Button($"Update stale characters ({stale.Count})##dbupdatestale"))
+            StartBulkUpdate(stale);
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (ImGui.Button($"Update all characters ({all.Count})##dbupdateall"))
+            StartBulkUpdate(OrderForBulkUpdate(all));
+        PopButton();
+
+        ImGui.Dummy(new Vector2(0, 2));
+        SectionRow();
+        Common.DimmedText(stale.Count == 0
+            ? $"All {all.Count} characters were seen within the last {days} {dayWord}, nothing is stale"
+            : $"{stale.Count} will be logged in, {skipped} skipped (seen within the last {days} {dayWord})");
+    }
+
+    private void StartBulkUpdate(List<CharacterRecord> chars)
+    {
+        if (chars.Count == 0) return;
+        bulkUpdateCts?.Cancel();
+        bulkUpdateCts?.Dispose();
+        bulkUpdateCts = new CancellationTokenSource();
+        _ = RunBulkUpdateAsync(chars, bulkUpdateCts.Token);
+    }
+
+    private async Task RunBulkUpdateAsync(List<CharacterRecord> chars, CancellationToken token)
+    {
         bulkUpdateTotal    = chars.Count;
         bulkUpdateProgress = 0;
 
