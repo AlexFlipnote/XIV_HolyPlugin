@@ -122,7 +122,7 @@ public sealed class LotterySaleWindow : Window
         ImGui.Dummy(new Vector2(0, 4));
 
         if (sale.Size  != null) Row("Size",  sale.Size);
-        if (sale.Price != null) Row("Price", sale.Price);
+        if (sale.Price != null) Row("Price", $"{sale.Price} gil");
         Row("Buyers", (sale.FcAllowed, sale.PrivateAllowed) switch
         {
             (true, true)  => "FC + Private",
@@ -146,10 +146,17 @@ public sealed class LotterySaleWindow : Window
         Common.PopGoldButton();
     }
 
+    // "[Phantom] Mist W17 P45 M -> 44 (16,000,000)". Readable without the plugin or site, and the
+    // holy.ffxiv.watch sketch book parses it; any part the placard didn't show is left out.
     private string CopyText(SaleInfo s)
     {
-        var prefix = string.IsNullOrEmpty(world) ? "" : $"{world} ";
-        return $"{prefix}{ShortDistrict(s.District)} W{s.Ward} P{s.Plot} -> {s.Entries}";
+        var sb = new StringBuilder();
+        if (!string.IsNullOrEmpty(world)) sb.Append($"[{world}] ");
+        sb.Append($"{ShortDistrict(s.District)} W{s.Ward} P{s.Plot}");
+        if (s.Size != null) sb.Append($" {s.Size[0]}");
+        sb.Append($" -> {s.Entries}");
+        if (s.Price != null) sb.Append($" ({s.Price})");
+        return sb.ToString();
     }
 
     private static void Row(string label, string value)
@@ -199,7 +206,7 @@ public sealed class LotterySaleWindow : Window
             int.Parse(loc.Groups[1].Value),
             entries,
             deadline.Success ? deadline.Groups[1].Value.Trim() : null,
-            price.Success ? $"{price.Groups[1].Value} gil" : null,
+            price.Success ? price.Groups[1].Value : null,
             size.Success ? size.Groups[1].Value : null,
             text.Contains("Available to free companies", StringComparison.OrdinalIgnoreCase),
             text.Contains("Available to private buyers", StringComparison.OrdinalIgnoreCase));
