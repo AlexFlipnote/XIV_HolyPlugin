@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.20",
+        "AssemblyVersion": "0.12.21",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.20/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.20/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.20/latest.zip",
-        "Changelog": "The media popup now has a volume slider next to the playback buttons. Drag it or scroll over it to change the volume of the playing app. The time on the progress bar and the volume percentage also have a thicker, smoother outline so they are easier to read.",
-        "DownloadCount": 428,
-        "LastUpdate": 1793481033
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.21/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.21/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.21/latest.zip",
+        "Changelog": "The character CSV export now includes your tracked inventory items (Ceruleum and Magitek) and whether each character leads their Free Company. Last seen times are written with their timezone, and the file now opens in Excel with accented names shown correctly. The save file window is also no longer see-through.",
+        "DownloadCount": 442,
+        "LastUpdate": 1793708420
     }
 ]
