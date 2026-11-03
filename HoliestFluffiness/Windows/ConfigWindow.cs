@@ -131,6 +131,9 @@ public partial class ConfigWindow : Window
     {
         PopGlobalStyle();
         ImGui.PopStyleVar();
+
+        // Drawn after the config window's style stack is popped, or the dialog inherits its transparent WindowBg
+        fileDialogManager.Draw();
     }
 
     public override void Draw()
@@ -149,7 +152,6 @@ public partial class ConfigWindow : Window
         DrawMain(avail.Y);
 
         DrawResizeGrip();
-        fileDialogManager.Draw();
     }
 
     // Draws every section once into a hidden child so every Anchor call registers into SearchIndex

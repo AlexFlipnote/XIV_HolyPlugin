@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
@@ -21,7 +22,7 @@ public partial class ConfigWindow
     private static string CsvEscape(string? s)
     {
         if (string.IsNullOrEmpty(s)) return "";
-        return s.Contains(',') || s.Contains('"') || s.Contains('\n')
+        return s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r')
             ? $"\"{s.Replace("\"", "\"\"")}\""
             : s;
     }
@@ -77,19 +78,34 @@ public partial class ConfigWindow
                 ImGui.SameLine();
                 if (ImGui.Button("Export CSV##dbexport"))
                 {
+                    var tracked = LoginInfoHandler.TrackedItems.ToList();
                     var sb = new StringBuilder();
-                    sb.AppendLine("Key,Name,World,DataCenter,Slot,FreeCompany,SearchInfo,PrivateHouse,FcHouse,Gil,Mgp,FcPoints,LastSeen");
+                    sb.AppendLine(string.Join(",", new[] { "Key", "Name", "World", "DataCenter", "Slot", "FreeCompany", "FcLeader", "SearchInfo",
+                        "PrivateHouse", "FcHouse", "Gil", "Mgp", "FcPoints" }
+                        .Concat(tracked.Select(t => CsvEscape(t.Value)))
+                        .Append("LastSeen")));
                     foreach (var r in characterDb.GetAll().OrderBy(r => r.World).ThenBy(r => r.Slot == 0 ? int.MaxValue : r.Slot))
-                        sb.AppendLine(string.Join(",", CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
-                            r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany), CsvEscape(r.SearchInfo),
-                            CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
-                            r.Gil < 0 ? "" : r.Gil.ToString(),
-                            r.Mgp < 0 ? "" : r.Mgp.ToString(),
-                            r.FcPoints < 0 ? "" : r.FcPoints.ToString(),
-                            r.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")));
+                    {
+                        var items = r.Inventory != null
+                            ? JsonSerializer.Deserialize<Dictionary<uint, int>>(r.Inventory) ?? []
+                            : new Dictionary<uint, int>();
+                        sb.AppendLine(string.Join(",", new[]
+                            {
+                                CsvEscape(r.Key), CsvEscape(r.Name), CsvEscape(r.World), CsvEscape(r.DataCenter),
+                                r.Slot > 0 ? r.Slot.ToString() : "", CsvEscape(r.FreeCompany),
+                                string.IsNullOrEmpty(r.FreeCompany) ? "" : r.FcLeader ? "true" : "false",
+                                CsvEscape(r.SearchInfo), CsvEscape(r.PrivateHouse), CsvEscape(r.FcHouse),
+                                r.Gil < 0 ? "" : r.Gil.ToString(),
+                                r.Mgp < 0 ? "" : r.Mgp.ToString(),
+                                r.FcPoints < 0 ? "" : r.FcPoints.ToString(),
+                            }
+                            .Concat(tracked.Select(t => items.TryGetValue(t.Key, out var qty) ? qty.ToString() : ""))
+                            .Append(r.LastSeen.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:sszzz"))));
+                    }
                     var csv = sb.ToString();
                     fileDialogManager.SaveFileDialog("Export characters", "CSV{.csv}", "characters_export.csv", ".csv",
-                        (ok, path) => { if (ok) { File.WriteAllText(path, csv, Encoding.UTF8); csvExportMessage = $"Saved: {path}"; } },
+                        // BOM so Excel reads names with accents as UTF-8 instead of the system codepage
+                        (ok, path) => { if (ok) { File.WriteAllText(path, csv, new UTF8Encoding(true)); csvExportMessage = $"Saved: {path}"; } },
                         pluginInterface.ConfigDirectory.FullName);
                 }
                 PopButton();
