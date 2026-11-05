@@ -193,7 +193,8 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             // by the background task below). Gil falls back to 0, not -1, when there is no record yet.
             var snapshot = new CharacterSnapshot(fc, fcConfirmed, privateHouse, fcHouse, gil, mgp, -1, plate, inventory);
             var fallback = existing ?? new CharacterRecord { Gil = 0, Mgp = -1, FcPoints = -1 };
-            Merge(record, fallback, snapshot);
+            // An instant run is a manual mid-session test, so housing data has long since loaded
+            Merge(record, fallback, snapshot, trustEmptyHouse: instant);
             record.LastSeen = DateTime.UtcNow;
             await Task.Run(() => characterDb.UpsertPreservingSlot(record), token);
         }
@@ -314,7 +315,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                     continue;
                 }
 
-                if (!Merge(existing, existing, snapshot))
+                if (!Merge(existing, existing, snapshot, trustEmptyHouse: true))
                 {
                     log.Debug("Periodic tick for {Key}: no change detected, skipped", charInfo.DbKey);
                     continue;
@@ -380,15 +381,20 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
     // fallback for anything the snapshot did not load confidently. target and fallback are the same
     // record for in-place updates; RunAsync passes a fresh target with a separate fallback source.
     // Returns whether any merged field differs from target's prior value (used to skip no-op writes).
-    private static bool Merge(CharacterRecord target, CharacterRecord fallback, CharacterSnapshot snap)
+    // trustEmptyHouse: housing data may not be loaded yet right after login, so an empty house read
+    // only means "no house" once the session has settled (periodic ticks); otherwise the cache wins.
+    private static bool Merge(CharacterRecord target, CharacterRecord fallback, CharacterSnapshot snap, bool trustEmptyHouse = false)
     {
         var (freeCompany, fcLeader) = ResolveFc(snap.Fc, snap.FcConfirmed, fallback.FreeCompany, fallback.FcLeader);
         var gil          = snap.Gil >= 0 ? snap.Gil : fallback.Gil;
         var mgp          = snap.Mgp >= 0 ? snap.Mgp : fallback.Mgp;
         var fcPoints     = !snap.FcConfirmed ? fallback.FcPoints : (snap.Fc == null ? -1 : (snap.FcPoints >= 0 ? snap.FcPoints : fallback.FcPoints));
         var searchInfo   = snap.Plate?.TextValue ?? fallback.SearchInfo;
-        var privateHouse = snap.PrivateHouse      ?? fallback.PrivateHouse;
-        var fcHouse      = !snap.FcConfirmed ? fallback.FcHouse : (snap.Fc == null ? null : (snap.FcHouse ?? fallback.FcHouse));
+        var privateHouse = trustEmptyHouse ? snap.PrivateHouse : (snap.PrivateHouse ?? fallback.PrivateHouse);
+        var fcHouse      = !snap.FcConfirmed ? fallback.FcHouse
+                         : snap.Fc == null    ? null
+                         : trustEmptyHouse    ? snap.FcHouse
+                         : (snap.FcHouse ?? fallback.FcHouse);
         var inventory    = snap.Inventory         ?? fallback.Inventory;
 
         var changed =
