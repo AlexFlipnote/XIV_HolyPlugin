@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.24",
+        "AssemblyVersion": "0.12.25",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.24/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.24/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.24/latest.zip",
-        "Changelog": "The Database settings page has a new \"Updater\" section. Besides updating all characters, you can now choose \"Update stale characters\" to only log into characters not seen within a set number of days (default 7). Characters only spotted on the character select screen and never logged into also count as stale. A preview shows how many will be logged in and how many will be skipped before you start. The \"Export CSV\" button now sits right below the database checkboxes.",
-        "DownloadCount": 445,
-        "LastUpdate": 1793729813
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.25/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.25/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.25/latest.zip",
+        "Changelog": "Fixed the Characters database keeping an old house after it was lost or sold. Both the private house and the FC house now clear once the game reports no house, either on the regular background update every 2 minutes or right away when pressing the Test button. Right after login the saved house is still kept, since housing data may not have loaded yet.",
+        "DownloadCount": 461,
+        "LastUpdate": 1793922442
     }
 ]
