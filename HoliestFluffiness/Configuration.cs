@@ -19,6 +19,11 @@ public class Configuration : IPluginConfiguration
     public static readonly Vector4 DefaultNearbyColParty   = new(100/255f, 180/255f, 255/255f, 1f);
     public static readonly Vector4 DefaultNearbyColFriend  = new(1f, 127/255f, 0f, 1f);
     public static readonly Vector4 DefaultNearbyColLocalFc = new(220/255f, 200/255f, 80/255f, 1f);
+    // RezPls defaults
+    public static readonly Vector4 DefaultRaiseColRaised    = new(0f, 1f, 210/255f, 1f);
+    public static readonly Vector4 DefaultRaiseColRaising   = new(0f, 1f, 0f, 1f);
+    public static readonly Vector4 DefaultRaiseColRedundant = new(1f, 0f, 0f, 1f);
+    public static readonly Vector4 DefaultRaiseColCleanse   = new(202/255f, 0f, 1f, 1f);
 
     public int Version { get; set; } = 1;
 
@@ -114,6 +119,14 @@ public class Configuration : IPluginConfiguration
     public bool ReadyCheckShowNames { get; set; } = false;
     public bool ReadyCheckDrawOverlay { get; set; } = false;
     public int ReadyCheckClearAfterSeconds { get; set; } = 10;
+
+    public bool RaiseIndicatorEnabled   { get; set; } = false;
+    public bool CleanseIndicatorEnabled { get; set; } = false;
+    public bool RaiseCleanseOwnJobOnly  { get; set; } = false;
+    public Vector4 RaiseColRaised       { get; set; } = DefaultRaiseColRaised;
+    public Vector4 RaiseColRaising      { get; set; } = DefaultRaiseColRaising;
+    public Vector4 RaiseColRedundant    { get; set; } = DefaultRaiseColRedundant;
+    public Vector4 RaiseColCleanse      { get; set; } = DefaultRaiseColCleanse;
 
     public bool WardInfoWindowEnabled { get; set; } = false;
 

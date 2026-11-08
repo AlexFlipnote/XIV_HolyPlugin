@@ -100,6 +100,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly FastMouseClickFixHandler fastMouseClickFixHandler;
     private readonly ReadyCheckHandler readyCheckHandler;
     private readonly ReadyCheckOverlay readyCheckOverlay;
+    private readonly RaiseCleanseOverlay raiseCleanseOverlay;
     private readonly NearbyHandler nearbyHandler;
     private readonly NearbyWindow nearbyWindow;
     private readonly FateListWindow fateListWindow;
@@ -205,6 +206,7 @@ public sealed class Plugin : IDalamudPlugin
         fastMouseClickFixHandler = new FastMouseClickFixHandler(configuration, SigScanner, Log);
         readyCheckHandler      = new ReadyCheckHandler(configuration, GameInterop, ClientState, ChatGui, Framework, ObjectTable, Log);
         readyCheckOverlay      = new ReadyCheckOverlay(configuration, readyCheckHandler, GameGui, TextureProvider, DataManager);
+        raiseCleanseOverlay    = new RaiseCleanseOverlay(configuration, GameGui, ObjectTable, ClientState, DataManager);
         noKillWindow           = new NoKillWindow();
         charPickerWindow       = new CharacterPickerWindow(SwitchToCharacter);
         noKillHandler.OnLobbyError += OnNoKillLobbyError;
@@ -266,6 +268,7 @@ public sealed class Plugin : IDalamudPlugin
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
         configWindow.SetRenderingHandler(renderingHandler);
         configWindow.SetHideMpBarsHandler(hideMpBarsHandler);
+        configWindow.SetRaiseCleanseOverlay(raiseCleanseOverlay);
         configWindow.SetMediaHandler(mediaHandler);
 
         windowSystem.AddWindow(configWindow);
@@ -273,6 +276,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(noKillWindow);
         windowSystem.AddWindow(charPickerWindow);
         windowSystem.AddWindow(readyCheckOverlay);
+        windowSystem.AddWindow(raiseCleanseOverlay);
         windowSystem.AddWindow(nearbyWindow);
         windowSystem.AddWindow(fateListWindow);
         windowSystem.AddWindow(pingChartWindow);

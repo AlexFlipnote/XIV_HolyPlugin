@@ -578,9 +578,19 @@ internal static class Common
     }
 
     internal static void DrawHighlightRect(ImDrawListPtr dl, Vector2 min, Vector2 max,
-        float rounding, Vector4 color, string? text = null, bool pulse = true, float scale = 1f)
+        float rounding, Vector4 color, string? text = null, bool pulse = true, float scale = 1f, float progress = 1f)
     {
-        dl.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32(color with { W = 0.25f }), rounding);
+        if (progress >= 1f)
+        {
+            dl.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32(color with { W = 0.25f }), rounding);
+        }
+        else
+        {
+            // Progress bar fill: full strength up to the split, faint for the rest
+            var split = min.X + (max.X - min.X) * Math.Clamp(progress, 0f, 1f);
+            dl.AddRectFilled(min, new Vector2(split, max.Y), ImGui.ColorConvertFloat4ToU32(color with { W = 0.4f }), rounding, ImDrawFlags.RoundCornersLeft);
+            dl.AddRectFilled(new Vector2(split, min.Y), max, ImGui.ColorConvertFloat4ToU32(color with { W = 0.1f }), rounding, ImDrawFlags.RoundCornersRight);
+        }
         dl.AddRect(min, max, ImGui.ColorConvertFloat4ToU32(color), rounding);
 
         if (pulse)

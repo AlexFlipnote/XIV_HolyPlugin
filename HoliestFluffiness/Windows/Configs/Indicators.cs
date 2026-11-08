@@ -12,6 +12,9 @@ public partial class ConfigWindow
     private CombatHitHandler combatHitHandler = null!;
     internal void SetCombatHitHandler(CombatHitHandler handler) => combatHitHandler = handler;
 
+    private RaiseCleanseOverlay raiseCleanseOverlay = null!;
+    internal void SetRaiseCleanseOverlay(RaiseCleanseOverlay overlay) => raiseCleanseOverlay = overlay;
+
     private HideMpBarsHandler hideMpBarsHandler = null!;
     internal void SetHideMpBarsHandler(HideMpBarsHandler handler) => hideMpBarsHandler = handler;
 
@@ -322,6 +325,67 @@ public partial class ConfigWindow
         ImGui.SameLine();
         Common.DimmedText("Simulates a ready check for 1 second");
         ImGui.EndDisabled();
+
+        // ── Raise and cleanse ─────────────────────────────────────────────────
+        SubsectionLabel("Raise and cleanse",
+            "Highlights party list members who need a raise or a cleanse. A simple take on RezPls.");
+
+        ConfigCheckbox(
+            "Highlight raises##raiseindicator",
+            configuration.RaiseIndicatorEnabled,
+            v => configuration.RaiseIndicatorEnabled = v,
+            "Marks dead members who are already raised or being raised, and warns when your own raise is a redundant cast.");
+
+        ConfigCheckbox(
+            "Highlight cleansable debuffs##cleanseindicator",
+            configuration.CleanseIndicatorEnabled,
+            v => configuration.CleanseIndicatorEnabled = v,
+            "Marks members carrying a debuff that Esuna can remove.");
+
+        ImGui.BeginDisabled(!configuration.RaiseIndicatorEnabled && !configuration.CleanseIndicatorEnabled);
+        ConfigCheckbox(
+            "Only on jobs that can use them##raisecleansejob",
+            configuration.RaiseCleanseOwnJobOnly,
+            v => configuration.RaiseCleanseOwnJobOnly = v,
+            "Hides each highlight unless your current job can raise or cleanse.");
+        ImGui.EndDisabled();
+
+        RowGap(2);
+        Common.DimmedTextWrapped("Colours");
+        SectionRow();
+        ConfigColorEdit4("Already raised##raisecolraised", configuration.RaiseColRaised, v => configuration.RaiseColRaised = v);
+        ImGui.SameLine(0, 20);
+        ConfigColorEdit4("Being raised##raisecolraising", configuration.RaiseColRaising, v => configuration.RaiseColRaising = v);
+        ImGui.SameLine(0, 20);
+        ConfigColorEdit4("Redundant cast##raisecolredundant", configuration.RaiseColRedundant, v => configuration.RaiseColRedundant = v);
+        ImGui.SameLine(0, 20);
+        ConfigColorEdit4("Needs cleanse##raisecolcleanse", configuration.RaiseColCleanse, v => configuration.RaiseColCleanse = v);
+
+        RowGap();
+        PushButton();
+        if (ImGui.Button("Set to default##raisecoldefault"))
+        {
+            configuration.RaiseColRaised    = Configuration.DefaultRaiseColRaised;
+            configuration.RaiseColRaising   = Configuration.DefaultRaiseColRaising;
+            configuration.RaiseColRedundant = Configuration.DefaultRaiseColRedundant;
+            configuration.RaiseColCleanse   = Configuration.DefaultRaiseColCleanse;
+            configuration.Save();
+        }
+        PopButton();
+
+        ImGui.Dummy(new Vector2(0, 4));
+        ConfigCheckbox(
+            "Enable debug##raisecleansedebug",
+            raiseCleanseOverlay.DebugEnabled,
+            v => raiseCleanseOverlay.DebugEnabled = v);
+        ImGui.SameLine(0, 12);
+        ImGui.BeginDisabled(!raiseCleanseOverlay.DebugEnabled);
+        ConfigCombo("##raisecleansedebugstate", (int)raiseCleanseOverlay.DebugState, RaiseCleanseOverlay.StateNames,
+            v => raiseCleanseOverlay.DebugState = (RaiseCleanseState)v, width: 140, padding: false,
+            title: "Raise and cleanse: debug preview");
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        Common.DimmedText("Previews on the top party list row, not saved");
 
         // ── Combat hits ───────────────────────────────────────────────────────
         SubsectionLabel("Combat Hits",
