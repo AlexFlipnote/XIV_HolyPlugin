@@ -39,6 +39,9 @@ public sealed class ServerInfoHandler : IDisposable
     private int recentTimeouts;
     private float[] pendingChartData = [];
     private volatile bool pingDirty;
+    // Set on Framework.Update so the loop never touches game state from its own thread
+    private volatile bool pingWanted;
+    private bool pingPlaceholderSet;
 
     // Updated on Framework.Update, safe to read from Draw
     public float[] PingChartData { get; private set; } = [];
@@ -94,6 +97,7 @@ public sealed class ServerInfoHandler : IDisposable
 
     private unsafe void OnUpdate(IFramework fw)
     {
+        pingWanted = clientState.IsLoggedIn && config.ServerInfoPingEnabled;
         if (!clientState.IsLoggedIn)
         {
             if (dtrPing.Shown)   dtrPing.Shown   = false;
@@ -177,7 +181,11 @@ public sealed class ServerInfoHandler : IDisposable
 
         if (!pingDirty)
         {
-            if (lastRtt == 0) { dtrPing.Text = "0ms"; dtrPing.Tooltip = "0ms"; }
+            if (lastRtt == 0 && !pingPlaceholderSet)
+            {
+                dtrPing.Text = "0ms"; dtrPing.Tooltip = "0ms";
+                pingPlaceholderSet = true;
+            }
             return;
         }
         pingDirty = false;
@@ -215,6 +223,13 @@ public sealed class ServerInfoHandler : IDisposable
     {
         while (!token.IsCancellationRequested)
         {
+            // Nothing shows the result, so skip the TCP table read and the ping entirely
+            if (!pingWanted)
+            {
+                await Task.Delay(1000, token).ConfigureAwait(false);
+                continue;
+            }
+
             var address = DetectRealServerAddress() ?? dcFallbackAddress;
             connectedAddress = address;
 

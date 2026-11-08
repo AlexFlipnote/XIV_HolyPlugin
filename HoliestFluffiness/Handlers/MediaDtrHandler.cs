@@ -17,6 +17,10 @@ public sealed class MediaDtrHandler : IDisposable
 
     private string lastText    = "";
     private string lastTooltip = "";
+    private long   nextRefreshMs;
+
+    // Song info only changes about once a second, so formatting every frame just makes garbage
+    private const int RefreshMs = 250;
 
     public MediaDtrHandler(Configuration config, MediaHandler media, IDtrBar dtrBar, IFramework framework, IClientState clientState)
     {
@@ -39,6 +43,10 @@ public sealed class MediaDtrHandler : IDisposable
         var shown = config.MediaEnabled && config.MediaDtrEnabled && clientState.IsLoggedIn && song is { Title.Length: > 0 };
         if (entry.Shown != shown) entry.Shown = shown;
         if (!shown || song == null) return;
+
+        var now = Environment.TickCount64;
+        if (now < nextRefreshMs) return;
+        nextRefreshMs = now + RefreshMs;
 
         // Note and double bar are both in the game font, so they render like the rest of the bar
         var display = Format(config.MediaDtrFormat, song);

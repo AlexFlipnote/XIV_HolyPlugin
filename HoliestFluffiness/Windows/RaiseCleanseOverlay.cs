@@ -50,7 +50,15 @@ public class RaiseCleanseOverlay : HfOverlayWindow
     private static readonly HashSet<uint> RaiseJobs   = [6, 24, 26, 27, 28, 33, 35, 36, 40];
     private static readonly HashSet<uint> CleanseJobs = [6, 23, 24, 28, 33, 36, 40];
 
-    private readonly record struct Cast(ulong Caster, string Name, float Progress);
+    // One summary per raise target, rebuilt each frame into the same dictionary so drawing allocates nothing
+    private struct TargetCasts
+    {
+        public IPlayerCharacter Lead;
+        public float            LeadProgress;
+        public bool             ByMe;
+        public bool             ByOthers;
+    }
+    private readonly Dictionary<ulong, TargetCasts> casts = new();
 
     public RaiseCleanseOverlay(Configuration config, IGameGui gameGui, IObjectTable objectTable, IClientState clientState, IDataManager dataManager)
         : base("##HFRaiseCleanseOverlay")
@@ -98,8 +106,8 @@ public class RaiseCleanseOverlay : HfOverlayWindow
         }
         if (!showRaise && !showCleanse) return;
 
-        var casts = showRaise ? CollectRaiseCasts() : [];
-        var myTarget = casts.FirstOrDefault(kv => kv.Value.Any(c => c.Caster == me.GameObjectId)).Key;
+        casts.Clear();
+        if (showRaise) CollectRaiseCasts(me.GameObjectId);
 
         for (var i = 0; i < 8; i++)
         {
@@ -110,22 +118,18 @@ public class RaiseCleanseOverlay : HfOverlayWindow
             if (member.IsDead)
             {
                 if (!showRaise) continue;
-                var hasRaise = member.StatusList.Any(s => RaiseStatuses.Contains(s.StatusId));
+                var hasRaise = HasAnyStatus(member, RaiseStatuses);
                 casts.TryGetValue(member.GameObjectId, out var onMember);
 
                 // Your raise is wasted if they already have one, or someone else got there first
-                var mine      = myTarget == member.GameObjectId;
-                var redundant = mine && (hasRaise || onMember!.Any(c => c.Caster != me.GameObjectId));
-                var lead      = onMember?.MaxBy(c => c.Progress);
-
-                if (redundant)
+                if (onMember.ByMe && (hasRaise || onMember.ByOthers))
                     DrawState(drawList, party, i, RaiseCleanseState.Redundant);
-                else if (lead is { } c)
-                    DrawState(drawList, party, i, RaiseCleanseState.Raising, c.Name, c.Progress);
+                else if (onMember.Lead != null)
+                    DrawState(drawList, party, i, RaiseCleanseState.Raising, onMember.Lead.Name.TextValue, onMember.LeadProgress);
                 else if (hasRaise)
                     DrawState(drawList, party, i, RaiseCleanseState.Raised);
             }
-            else if (showCleanse && member.StatusList.Any(s => cleansable.Contains(s.StatusId)))
+            else if (showCleanse && HasAnyStatus(member, cleansable))
             {
                 DrawState(drawList, party, i, RaiseCleanseState.Cleanse);
             }
@@ -133,20 +137,27 @@ public class RaiseCleanseOverlay : HfOverlayWindow
     }
 
     // Raise casts in progress, keyed by the target they are aimed at
-    private Dictionary<ulong, List<Cast>> CollectRaiseCasts()
+    private void CollectRaiseCasts(ulong meId)
     {
-        var result = new Dictionary<ulong, List<Cast>>();
         foreach (var obj in objectTable.PlayerObjects)
         {
             if (obj is not IPlayerCharacter p || !p.IsCasting) continue;
             if (p.CastActionType != (byte)ActionType.Action || !RaiseActions.Contains(p.CastActionId)) continue;
 
             var progress = p.TotalCastTime > 0 ? Math.Clamp(p.CurrentCastTime / p.TotalCastTime, 0f, 1f) : 1f;
-            if (!result.TryGetValue(p.CastTargetObjectId, out var list))
-                result[p.CastTargetObjectId] = list = [];
-            list.Add(new Cast(p.GameObjectId, p.Name.TextValue, progress));
+            casts.TryGetValue(p.CastTargetObjectId, out var t);
+            if (t.Lead == null || progress > t.LeadProgress) { t.Lead = p; t.LeadProgress = progress; }
+            if (p.GameObjectId == meId) t.ByMe = true;
+            else                        t.ByOthers = true;
+            casts[p.CastTargetObjectId] = t;
         }
-        return result;
+    }
+
+    private static bool HasAnyStatus(IBattleChara chara, HashSet<uint> ids)
+    {
+        foreach (var status in chara.StatusList)
+            if (ids.Contains(status.StatusId)) return true;
+        return false;
     }
 
     // Raising shows the caster's name instead of a fixed label; redundant and cleanse pulse for attention
