@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.25",
+        "AssemblyVersion": "0.12.26",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.25/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.25/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.25/latest.zip",
-        "Changelog": "Fixed the Characters database keeping an old house after it was lost or sold. Both the private house and the FC house now clear once the game reports no house, either on the regular background update every 2 minutes or right away when pressing the Test button. Right after login the saved house is still kept, since housing data may not have loaded yet.",
-        "DownloadCount": 461,
-        "LastUpdate": 1793922442
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.26/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.26/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.26/latest.zip",
+        "Changelog": "New \"Raise and cleanse\" section under Indicators, a simple take on RezPls. Party list members get highlighted when they are already raised, being raised (with the caster's name and cast progress), or carry a debuff that Esuna can remove. If your own raise would be a redundant cast, the row turns red. Colours can be changed and default to the RezPls ones, and an \"Enable debug\" option lets you preview each state on your party list.\n\nThe Client page has a new \"Rendering\" section. \"Skip fade\" removes the black fade when changing zones, and \"Disable 3D rendering\" stops drawing the world to lower GPU load while keeping the UI, either only when the game is unfocused (default) or always. \"Force render state\" keeps other plugins from changing it.\n\nThe Login info list is now a box where you drag rows to reorder them, with the checkbox on the right. Also fixed the Character line sticking to the line before it in echo and toast messages when it was not first.",
+        "DownloadCount": 473,
+        "LastUpdate": 1794176103
     }
 ]
