@@ -10,6 +10,7 @@ namespace HoliestFluffiness;
 public enum LoginInfoDisplay { Echo = 0, Popup = 1, Toast = 2 }
 public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
 public enum MediaBarSlot { TopLeft = 0, TopRight = 1, BottomLeft = 2, BottomRight = 3 }
+public enum DisableRenderMode { Unfocused = 0, Always = 1 }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -66,6 +67,10 @@ public class Configuration : IPluginConfiguration
     public bool HotbarLockHidden { get; set; } = false;
     public bool FastMouseClickFixEnabled { get; set; } = false;
     public bool DrawSheatheEmoteEnabled { get; set; } = false;
+    public bool SkipFadeEnabled { get; set; } = false;
+    public bool DisableRenderEnabled { get; set; } = false;
+    public DisableRenderMode DisableRenderMode { get; set; } = DisableRenderMode.Unfocused;
+    public bool DisableRenderForce { get; set; } = false;
     public bool CharacterPickerOnMainMenu { get; set; } = false;
 
     // "<song>", "<artist>", "<app>" and "<time>" are filled in for the server info bar entry

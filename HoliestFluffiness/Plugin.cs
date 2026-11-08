@@ -110,6 +110,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly CombatHitHandler combatHitHandler;
     private readonly DynamicTravelerHandler  dynamicTravelerHandler;
     private readonly ClientTweaksHandler     clientTweaksHandler;
+    private readonly RenderingHandler        renderingHandler;
     private readonly DrawSheatheHandler       drawSheatheHandler;
     private readonly LootFadeHandler          lootFadeHandler;
     private readonly BlacklistMenuHandler     blacklistMenuHandler;
@@ -226,6 +227,7 @@ public sealed class Plugin : IDalamudPlugin
         combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, GameInterop, Log);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework, windowHandle);
+        renderingHandler        = new RenderingHandler(configuration, Framework, GameInterop, PluginInterface, Log);
         drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
         blacklistMenuHandler    = new BlacklistMenuHandler(configuration, ContextMenu, ObjectTable, TargetManager);
@@ -262,6 +264,7 @@ public sealed class Plugin : IDalamudPlugin
         configWindow.SetCombatHitHandler(combatHitHandler);
         configWindow.SetDoorbellTest(TestDoorbell);
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
+        configWindow.SetRenderingHandler(renderingHandler);
         configWindow.SetHideMpBarsHandler(hideMpBarsHandler);
         configWindow.SetMediaHandler(mediaHandler);
 
@@ -1138,6 +1141,7 @@ public sealed class Plugin : IDalamudPlugin
         combatHitHandler.Dispose();
         dynamicTravelerHandler.Dispose();
         clientTweaksHandler.Dispose();
+        renderingHandler.Dispose();
         drawSheatheHandler.Dispose();
         lootFadeHandler.Dispose();
         blacklistMenuHandler.Dispose();

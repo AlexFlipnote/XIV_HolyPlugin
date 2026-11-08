@@ -10,6 +10,9 @@ public partial class ConfigWindow
     private ClientTweaksHandler clientTweaksHandler = null!;
     internal void SetClientTweaksHandler(ClientTweaksHandler handler) => clientTweaksHandler = handler;
 
+    private RenderingHandler renderingHandler = null!;
+    internal void SetRenderingHandler(RenderingHandler handler) => renderingHandler = handler;
+
     private MediaHandler? mediaHandler;
     internal void SetMediaHandler(MediaHandler handler) => mediaHandler = handler;
 
@@ -62,6 +65,44 @@ public partial class ConfigWindow
                 onClientSettingsChanged();
             },
             "Shows \"PREFIX / NAME @ WORLD\" while logged in");
+
+        SubsectionLabel("Rendering");
+
+        ImGui.BeginDisabled(!renderingHandler.IsSkipFadeAvailable);
+        ConfigCheckbox(
+            "Skip fade##skipfade",
+            configuration.SkipFadeEnabled,
+            v =>
+            {
+                configuration.SkipFadeEnabled = v;
+                renderingHandler.SetSkipFade(v);
+            },
+            renderingHandler.IsSkipFadeAvailable
+                ? "Skips the black fade transitions, such as when changing zones. Plugins that wait on the fade may behave oddly."
+                : "Unavailable: the memory signature for this tweak could not be found on your current game version.");
+        ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "Disable 3D rendering##disablerender",
+            configuration.DisableRenderEnabled,
+            v => configuration.DisableRenderEnabled = v,
+            "Stops drawing the 3D world to lower GPU load while keeping the UI. Pairs well with an FPS limit.",
+            trailing: () =>
+            {
+                ImGui.BeginDisabled(!configuration.DisableRenderEnabled);
+                ConfigCombo("##disablerendermode", (int)configuration.DisableRenderMode, DisableRenderModes,
+                    v => configuration.DisableRenderMode = (DisableRenderMode)v, width: 140, padding: false,
+                    title: "Disable 3D rendering mode");
+                ImGui.EndDisabled();
+            });
+
+        ImGui.BeginDisabled(!configuration.DisableRenderEnabled);
+        ConfigCheckbox(
+            "Force render state##disablerenderforce",
+            configuration.DisableRenderForce,
+            v => configuration.DisableRenderForce = v,
+            "Reapplies the render state every frame so other plugins cannot change it.");
+        ImGui.EndDisabled();
 
         SubsectionLabel("Flash taskbar on...",
             "Flashes the FFXIV taskbar icon when you are alt-tabbed. Useful if you have " +
@@ -164,6 +205,8 @@ public partial class ConfigWindow
 
         EndSection(10);
     }
+
+    private static readonly string[] DisableRenderModes = ["When unfocused", "Always"];
 
     private static readonly string[] MediaBarSlots = ["Top left", "Top right", "Bottom left", "Bottom right"];
 

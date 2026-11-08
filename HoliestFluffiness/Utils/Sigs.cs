@@ -13,6 +13,8 @@ namespace HoliestFluffiness;
 public static class Sigs
 {
     public const string AddToScreenLog         = "E8 ?? ?? ?? ?? BF ?? ?? ?? ?? EB 39";
+    // AddonFadeMiddleBack draw; skipping it removes the black zone change fade (from Henchman)
+    public const string FadeMiddleBackDraw     = "48 83 EC 28 80 B9 ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ??";
     public const string CountdownTimer         = "40 53 48 83 EC 40 80 79 38 00";
     public const string LoadIconByID           = "E8 ?? ?? ?? ?? 41 8D 45 3E";
     public const string LobbyError             = "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0";

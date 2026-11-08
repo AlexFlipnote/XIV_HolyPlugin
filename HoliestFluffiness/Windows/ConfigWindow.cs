@@ -742,7 +742,8 @@ public partial class ConfigWindow : Window
         ImGui.PopStyleVar();
     }
 
-    private void ConfigCheckbox(string label, bool current, Action<bool> setter, string? desc = null)
+    // `trailing` draws extra controls on the same line, right after the checkbox title
+    private void ConfigCheckbox(string label, bool current, Action<bool> setter, string? desc = null, Action? trailing = null)
     {
         SectionRow();
         ImGui.BeginGroup();
@@ -756,6 +757,7 @@ public partial class ConfigWindow : Window
                 configuration.Save();
             }
             PopCheckbox();
+            if (trailing != null) { ImGui.SameLine(); trailing(); }
         }
         else
         {
@@ -778,6 +780,14 @@ public partial class ConfigWindow : Window
 
             ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y - 5f));
             ImGui.TextUnformatted(text);
+            if (trailing != null)
+            {
+                // Zero vertical padding keeps the control on the title's line height, clear of the description
+                ImGui.SameLine();
+                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(ImGui.GetStyle().FramePadding.X, 0f));
+                trailing();
+                ImGui.PopStyleVar();
+            }
 
             ImGui.SetCursorScreenPos(new Vector2(textX, boxMin.Y + 10f));
             Common.DimmedTextWrapped(desc);

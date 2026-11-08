@@ -1,0 +1,12 @@
+{
+  "name": "FadeMiddleBackDraw",
+  "history": [
+    {
+      "pattern": "48 83 EC 28 80 B9 ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ??",
+      "rva": "0x111c850",
+      "bytes_at_rva": "48 83 EC 28 80 B9 2B 03 00 00 00 0F 84 B9 00 00 00 80 B9 4A 03 00 00 00 0F 84 AC 00 00 00 F3 0F",
+      "exe_hash": "8e9decf7",
+      "date": "2026-11-08"
+    }
+  ]
+}
