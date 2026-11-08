@@ -459,26 +459,35 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
             spacer = "    ";
         }
 
+        // Every line but the first gets a break, wherever each item sits in the user's order
+        var first = true;
+        string Prefix()
+        {
+            var prefix = first ? $"{spacer}》 " : $"\n{spacer}》 ";
+            first = false;
+            return prefix;
+        }
+
         foreach (var slot in configuration.LoginInfoOrder)
         {
             switch (slot)
             {
                 case 0 when character != null:
-                    builder.AddText($"{spacer}》 {character}");
+                    builder.AddText($"{Prefix()}{character}");
                     break;
                 case 1 when plate != null:
-                    builder.AddText($"\n{spacer}》 Search info: ");
+                    builder.AddText($"{Prefix()}Search info: ");
                     foreach (var payload in plate.Payloads)
                         builder.Add(payload);
                     break;
                 case 2 when privateHouse != null:
-                    builder.AddText($"\n{spacer}》 Private house: {privateHouse}");
+                    builder.AddText($"{Prefix()}Private house: {privateHouse}");
                     break;
                 case 3 when fc != null:
-                    builder.AddText($"\n{spacer}》 Free Company: {fc}");
+                    builder.AddText($"{Prefix()}Free Company: {fc}");
                     break;
                 case 4 when fcHouse != null:
-                    builder.AddText($"\n{spacer}》 FC house: {fcHouse}");
+                    builder.AddText($"{Prefix()}FC house: {fcHouse}");
                     break;
             }
         }

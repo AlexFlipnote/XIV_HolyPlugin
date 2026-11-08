@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -145,37 +146,68 @@ public partial class ConfigWindow
         EndSection(10);
     }
 
+    private bool loginOrderDirty;
+
+    // A framed list: grip and name on the left drag the row to a new position, checkbox on the right
     private void DrawInfoOrderList()
     {
         var order = configuration.LoginInfoOrder;
-        const float btnW = 22f;
+        const float boxW = 260f;
+        const float pad  = 6f;
+        var frameH = ImGui.GetFrameHeight();
+        var rowH   = frameH + 4f;
+        var boxH   = order.Count * rowH + pad * 2;
+
+        SectionRow();
+        var origin = ImGui.GetCursorScreenPos();
+        var dl     = ImGui.GetWindowDrawList();
+        // Faded like the window's own backgrounds so the theme opacity setting applies here too
+        var boxBg     = ImGui.GetColorU32(Theme.Fade(Theme.UseCustom ? Theme.ColHighlight : ImGui.GetStyle().Colors[(int)ImGuiCol.FrameBg]));
+        var boxBorder = Theme.UseCustom ? ImGui.GetColorU32(Theme.ColGold)      : ImGui.GetColorU32(ImGuiCol.Border);
+        dl.AddRectFilled(origin, origin + new Vector2(boxW, boxH), boxBg, 4f);
+        dl.AddRect(origin, origin + new Vector2(boxW, boxH), boxBorder, 4f);
+
+        int moveFrom = -1, moveTo = -1;
 
         for (int i = 0; i < order.Count; i++)
         {
-            int slot = order[i];
+            int slot   = order[i];
+            var rowMin = origin + new Vector2(0, pad + i * rowH);
+            var checkX = origin.X + boxW - pad - frameH;
 
-            SectionRow();
+            ImGui.SetCursorScreenPos(rowMin + new Vector2(pad, 0));
             ImGui.BeginGroup();
 
-            PushButton();
-            ImGui.BeginDisabled(i == 0);
-            if (ImGui.Button($"^##{slot}u", new Vector2(btnW, 0)))
-            {
-                (order[i - 1], order[i]) = (order[i], order[i - 1]);
-                configuration.Save();
-            }
-            ImGui.EndDisabled();
-            ImGui.SameLine(0, 2);
-            ImGui.BeginDisabled(i == order.Count - 1);
-            if (ImGui.Button($"v##{slot}d", new Vector2(btnW, 0)))
-            {
-                (order[i + 1], order[i]) = (order[i], order[i + 1]);
-                configuration.Save();
-            }
-            ImGui.EndDisabled();
-            PopButton();
+            // The id follows the slot, not the index, so the drag stays active as the row moves
+            ImGui.InvisibleButton($"##logininfodrag{slot}", new Vector2(checkX - rowMin.X - pad * 2, rowH));
+            var hovered = ImGui.IsItemHovered();
+            var active  = ImGui.IsItemActive();
 
-            ImGui.SameLine(0, 6);
+            if (hovered || active)
+            {
+                ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNs);
+                dl.AddRectFilled(rowMin + new Vector2(2, 0), rowMin + new Vector2(boxW - 2, rowH),
+                    ImGui.GetColorU32(active ? Theme.ColGoldSub : Theme.ColGrey with { W = 0.5f }), 3f);
+            }
+
+            if (active)
+            {
+                var target = (int)MathF.Floor((ImGui.GetIO().MousePos.Y - origin.Y - pad) / rowH);
+                target = Math.Clamp(target, 0, order.Count - 1);
+                if (target != i) { moveFrom = i; moveTo = target; }
+            }
+            if (ImGui.IsItemDeactivated() && loginOrderDirty)
+            {
+                loginOrderDirty = false;
+                configuration.Save();
+            }
+
+            // Grip: two columns of three dots
+            var gripColor = ImGui.GetColorU32(hovered || active ? Theme.ColWhite : Theme.ColWhiteDim);
+            var midY      = rowMin.Y + rowH / 2;
+            for (int gx = 0; gx < 2; gx++)
+                for (int gy = -1; gy <= 1; gy++)
+                    dl.AddCircleFilled(new Vector2(rowMin.X + pad + 4 + gx * 5, midY + gy * 5), 1.6f, gripColor);
 
             bool enabled = slot switch
             {
@@ -186,9 +218,14 @@ public partial class ConfigWindow
                 4 => configuration.ShowFcHouseLocation,
                 _ => false,
             };
+            var label = InfoItemLabels[slot];
+            dl.AddText(new Vector2(rowMin.X + pad + 18, midY - ImGui.GetTextLineHeight() / 2),
+                ImGui.GetColorU32(enabled ? Theme.ColWhite : Theme.ColWhiteDim), label);
+
+            ImGui.SetCursorScreenPos(new Vector2(checkX, rowMin.Y + (rowH - frameH) / 2));
             PushCheckbox();
             bool newEnabled = enabled;
-            if (ImGui.Checkbox($"{InfoItemLabels[slot]}##{slot}", ref newEnabled) && newEnabled != enabled)
+            if (ImGui.Checkbox($"##logininfocheck{slot}", ref newEnabled) && newEnabled != enabled)
             {
                 switch (slot)
                 {
@@ -203,9 +240,21 @@ public partial class ConfigWindow
             PopCheckbox();
 
             ImGui.EndGroup();
-            Anchor($"logininfo{slot}", $"Login info: {InfoItemLabels[slot]}", "Shown when logging in with a character");
+            Anchor($"logininfo{slot}", $"Login info: {label}", "Shown when logging in with a character");
         }
 
+        // Applied after the loop so the list is not mutated mid-draw; saved once the drag is released
+        if (moveFrom >= 0)
+        {
+            var moved = order[moveFrom];
+            order.RemoveAt(moveFrom);
+            order.Insert(moveTo, moved);
+            loginOrderDirty = true;
+        }
+
+        // Claim the box's full area in the layout
+        ImGui.SetCursorScreenPos(origin);
+        ImGui.Dummy(new Vector2(boxW, boxH));
         ImGui.Dummy(new Vector2(0, 4));
     }
 
