@@ -229,7 +229,7 @@ public sealed class Plugin : IDalamudPlugin
         combatHitHandler       = new CombatHitHandler(configuration, FlyTextGui, PluginInterface, ObjectTable, GameInterop, Log);
         dynamicTravelerHandler  = new DynamicTravelerHandler(configuration, NamePlateGui, DataManager);
         clientTweaksHandler     = new ClientTweaksHandler(configuration, AddonLifecycle, Framework, windowHandle);
-        renderingHandler        = new RenderingHandler(configuration, Framework, GameInterop, PluginInterface, Log);
+        renderingHandler        = new RenderingHandler(configuration, Framework, Condition, GameInterop, PluginInterface, Log);
         drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
         blacklistMenuHandler    = new BlacklistMenuHandler(configuration, ContextMenu, ObjectTable, TargetManager);
