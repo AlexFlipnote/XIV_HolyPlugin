@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.27",
+        "AssemblyVersion": "0.12.28",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.27/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.27/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.27/latest.zip",
-        "Changelog": "Lowered background CPU usage. The ping check no longer runs in the background when the ping display is turned off or you are logged out, the song shown on the server info bar refreshes a few times a second instead of every frame, and the raise and cleanse highlights do less work each frame.",
-        "DownloadCount": 474,
-        "LastUpdate": 1794178053
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.28/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.28/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.28/latest.zip",
+        "Changelog": "Fixed a game crash when alt-tabbing with \"Disable render\" turned on. Rendering now only turns off after the game has been unfocused for a second, and it is never switched on or off during loading screens or cutscenes.",
+        "DownloadCount": 477,
+        "LastUpdate": 1794184422
     }
 ]
