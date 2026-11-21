@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.35",
+        "AssemblyVersion": "0.12.36",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.35/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.35/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.35/latest.zip",
-        "Changelog": "In /hdebug, hovering a column title in the Plugins tab now shows the total for that column across all your plugins: how many are loaded out of how many are installed, their combined share of the frame, total hooks and texture memory, the worst spike and how much texture memory has grown since the window opened.\n\nThere is also a new \"Hide self\" checkbox to leave Holiest Fluffiness out of the list, since its draw time includes the hdebug window itself.",
-        "DownloadCount": 514,
-        "LastUpdate": 1795277199
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.36/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.36/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.36/latest.zip",
+        "Changelog": "/hdebug has a new Sources tab that shows where every installed plugin came from, to help clean up your plugin list. Plugins are split into Official, Third-party and Dev, sorted by name, with author, version, whether each one is enabled, and the full repo URL for third-party plugins. Tags point out testing builds and plugins that are outdated, orphaned or removed.\n\nFurther down are three clean-up sections: Duplicates (plugins installed from more than one repo), Overlapping (plugins offered by more than one of your repos, including repos that only offer plugins another repo already has) and Unused third-party repos (custom repos none of your plugins came from). Everything is read from what Dalamud already has, so nothing is downloaded.\n\nThe Plugins tab has a new Freeze button that holds the table still so the numbers stop jumping while you read them. It turns light blue while frozen.\n\nhdebug now remembers its options between restarts: the Hide idle and Hide self checkboxes, the spike threshold, Ignore loading screens and which Sources sections are open.",
+        "DownloadCount": 517,
+        "LastUpdate": 1795280985
     }
 ]
