@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.31",
+        "AssemblyVersion": "0.12.32",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.31/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.31/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.31/latest.zip",
-        "Changelog": "The FPS entry on the server info bar no longer needs a setting to pick what clicking it does. Left click opens the FPS chart and right click toggles the FPS limit, with a toast like \"60 FPS (Locked)\" or \"Unlocked\". The \"On click\" option under Client > FPS is gone.",
-        "DownloadCount": 502,
-        "LastUpdate": 1795271726
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.32/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.32/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.32/latest.zip",
+        "Changelog": "The ping chart now always shows the timeout count next to the server address, written out as \"TimeOut\" instead of \"TO\". It turns red once there is at least one, with the T and O highlighted to show what the server bar's \"TO\" stands for. The server address is gold to match the average line.\n\nBoth the ping and FPS charts now keep the main numbers on the left and push the extra info (timeouts, min and max) to the right edge of the window.",
+        "DownloadCount": 505,
+        "LastUpdate": 1795272369
     }
 ]
