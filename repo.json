@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.29",
+        "AssemblyVersion": "0.12.30",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.29/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.29/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.29/latest.zip",
-        "Changelog": "New \"FPS\" section under Client. \"Limit FPS\" caps the frame rate to any value from 30 to 360 (default 60), not just the game's 30 or 60; set the game's own limit to none for it to work. \"Limit FPS when unfocused\" has its own cap from 1 to 60 for while the game is alt-tabbed. The FPS entry on the server info bar turns green while the limit is holding, and \"Live FPS\" updates the number four times a second instead of once, without changing the chart. The high FPS physics fix now lives in this section too.\n\nThe old \"Server info\" settings under Indicators are split up so each sits with what it belongs to. \"Show ping in server bar\" is now at the top of Client, \"Show nearby player count in server bar\" is under Social > Nearby players, and \"Show current song in server bar\" is under Client > Media controls.",
-        "DownloadCount": 499,
-        "LastUpdate": 1795267419
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.30/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.30/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.30/latest.zip",
+        "Changelog": "Clicking the FPS entry on the server info bar can now toggle the FPS limit instead of opening the chart. Pick the behaviour with \"On click\" under Client > FPS. A toast confirms the change, like \"60 FPS (Locked)\" or \"Unlocked\".\n\nNew \"Limit FPS when AFK\" option with its own cap from 1 to 60, applied while you are /afk. It sits next to \"Limit FPS when unfocused\", and when both apply the lower one wins. Turn off the game's own AFK limit for it to take effect.\n\nServer info bar tooltips (ping, FPS and nearby players) now update while you hover them instead of staying stale until the cursor leaves. The FPS tooltip also shows the cap actually in effect.",
+        "DownloadCount": 502,
+        "LastUpdate": 1795271431
     }
 ]
