@@ -214,7 +214,7 @@ public sealed class Plugin : IDalamudPlugin
         charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, Log, noKillHandler, SwitchToCharacter);
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
-        fpsLimiterHandler      = new FpsLimiterHandler(configuration, Framework);
+        fpsLimiterHandler      = new FpsLimiterHandler(configuration, Framework, ObjectTable);
         serverInfoHandler.SetFpsLimiter(fpsLimiterHandler);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition, ClientState);
@@ -262,7 +262,20 @@ public sealed class Plugin : IDalamudPlugin
         fpsChartWindow         = new FpsChartWindow(serverInfoHandler);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
-        serverInfoHandler.SetFpsClickAction(() => fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen);
+        serverInfoHandler.SetFpsClickAction(() =>
+        {
+            if (configuration.ServerInfoFpsClick != FpsClickAction.ToggleLimit)
+            {
+                fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen;
+                return;
+            }
+
+            configuration.FpsLimitEnabled = !configuration.FpsLimitEnabled;
+            configuration.Save();
+            Common.ShowToast("FPS limit", configuration.FpsLimitEnabled
+                ? $"{configuration.FpsLimitTarget} FPS (Locked)"
+                : "Unlocked", 3f);
+        });
         configWindow = new ConfigWindow(configuration, loginInfoHandler, accessoryHandler, repairHandler, noKillHandler, physicsHandler, antiAfkHandler, fastMouseClickFixHandler, readyCheckHandler, ObjectTable, PluginInterface, characterDb, ClientState, SwitchToCharacter, GoToBid, UpdateClientTitle);
         configWindow.SetTitleFont(titleFont);
         configWindow.SetFoodCheckHandler(foodCheckHandler);

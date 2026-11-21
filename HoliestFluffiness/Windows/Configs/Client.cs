@@ -211,21 +211,24 @@ public partial class ConfigWindow
             "Show FPS in server bar##serverinfofps",
             configuration.ServerInfoFpsEnabled,
             v => configuration.ServerInfoFpsEnabled = v,
-            "Click the entry in-game to open the FPS history chart. Turns green while the FPS limit below is holding.");
+            "Turns green while an FPS limit is holding.");
 
         ImGui.BeginDisabled(!configuration.ServerInfoFpsEnabled);
+        ConfigCombo("On click##serverinfofpsclick", (int)configuration.ServerInfoFpsClick, FpsClickActions,
+            v => configuration.ServerInfoFpsClick = (FpsClickAction)v, width: 180,
+            desc: "Open the FPS chart, or toggle the FPS limit.");
         ConfigCheckbox(
             "Live FPS##serverinfofpslive",
             configuration.ServerInfoFpsLive,
             v => configuration.ServerInfoFpsLive = v,
-            "Updates the number four times a second instead of once. The chart keeps its normal pace. Returns to normal while alt-tabbed.");
+            "Updates four times a second instead of once.");
         ImGui.EndDisabled();
 
         ConfigCheckbox(
             "Limit FPS##fpslimit",
             configuration.FpsLimitEnabled,
             v => configuration.FpsLimitEnabled = v,
-            "Caps the frame rate to any value, not just the game's 30 or 60. Set the game's own limit to none for this to work.");
+            "Any cap, not just 30 or 60. Set the game's own limit to none.");
 
         ImGui.BeginDisabled(!configuration.FpsLimitEnabled);
         ConfigSliderInt("Target FPS##fpslimittarget", configuration.FpsLimitTarget, FpsLimiterHandler.MinFps, FpsLimiterHandler.MaxFps,
@@ -237,11 +240,23 @@ public partial class ConfigWindow
             "Limit FPS when unfocused##fpslimitbg",
             configuration.FpsLimitBackgroundEnabled,
             v => configuration.FpsLimitBackgroundEnabled = v,
-            "Caps the frame rate while the game is alt-tabbed. Turn off the game's own background limit for this to take effect.");
+            "While alt-tabbed. Turn off the game's own background limit.");
 
         ImGui.BeginDisabled(!configuration.FpsLimitBackgroundEnabled);
         ConfigSliderInt("Unfocused FPS##fpslimitbgtarget", configuration.FpsLimitBackgroundTarget, FpsLimiterHandler.MinBackgroundFps, FpsLimiterHandler.MaxBackgroundFps,
             v => configuration.FpsLimitBackgroundTarget = Math.Clamp(v, FpsLimiterHandler.MinBackgroundFps, FpsLimiterHandler.MaxBackgroundFps),
+            hint: "(default 15)");
+        ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "Limit FPS when AFK##fpslimitafk",
+            configuration.FpsLimitAfkEnabled,
+            v => configuration.FpsLimitAfkEnabled = v,
+            "While /afk. Turn off the game's own AFK limit.");
+
+        ImGui.BeginDisabled(!configuration.FpsLimitAfkEnabled);
+        ConfigSliderInt("AFK FPS##fpslimitafktarget", configuration.FpsLimitAfkTarget, FpsLimiterHandler.MinBackgroundFps, FpsLimiterHandler.MaxBackgroundFps,
+            v => configuration.FpsLimitAfkTarget = Math.Clamp(v, FpsLimiterHandler.MinBackgroundFps, FpsLimiterHandler.MaxBackgroundFps),
             hint: "(default 15)");
         ImGui.EndDisabled();
 
@@ -284,6 +299,8 @@ public partial class ConfigWindow
     private static readonly string[] PingDisplayModes = ["Last ping", "Average ping", "Both"];
 
     private static readonly string[] DisableRenderModes = ["When unfocused", "Always"];
+
+    private static readonly string[] FpsClickActions = ["Open chart", "Toggle limit"];
 
     private static readonly string[] MediaBarSlots = ["Top left", "Top right", "Bottom left", "Bottom right"];
 

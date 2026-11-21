@@ -12,6 +12,8 @@ using Dalamud.Game.Gui.Dtr;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Bindings.ImGui;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using GameFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework;
 
 namespace HoliestFluffiness.Handlers;
@@ -27,6 +29,10 @@ public sealed class ServerInfoHandler : IDisposable
     private readonly IDtrBarEntry dtrPing;
     private readonly IDtrBarEntry dtrFps;
     private readonly IDtrBarEntry dtrNearby;
+
+    // Native string for re-shown tooltips; the game may read it after ShowTooltip returns
+    private const int TooltipBufferSize = 256;
+    private readonly nint tooltipBuffer = Marshal.AllocHGlobal(TooltipBufferSize);
 
     private NearbyHandler? nearbyHandler;
 
@@ -138,7 +144,7 @@ public sealed class ServerInfoHandler : IDisposable
         if (count == lastNearbyCount) return;
         lastNearbyCount = count;
         dtrNearby.Text    = $"\U0000e033 {count}";
-        dtrNearby.Tooltip = $"{count} nearby";
+        SetTooltip(dtrNearby, $"{count} nearby");
     }
 
     private void UpdateDcAddress()
@@ -201,7 +207,7 @@ public sealed class ServerInfoHandler : IDisposable
             ? new Lumina.Text.SeStringBuilder().PushColorRgba(FpsLimitGreen).Append(text).PopColor()
                 .ToReadOnlySeString().ToDalamudString()
             : text;
-        dtrFps.Tooltip = green ? $"{text} (limited to {config.FpsLimitTarget})" : text;
+        SetTooltip(dtrFps, green ? $"{text} (limited to {fpsLimiter!.ActiveTarget})" : text);
     }
 
     private int SampleLiveFps(int fallback)
@@ -236,7 +242,7 @@ public sealed class ServerInfoHandler : IDisposable
         {
             if (lastRtt == 0 && !pingPlaceholderSet)
             {
-                dtrPing.Text = "0ms"; dtrPing.Tooltip = "0ms";
+                dtrPing.Text = "0ms"; SetTooltip(dtrPing, "0ms");
                 pingPlaceholderSet = true;
             }
             return;
@@ -255,7 +261,43 @@ public sealed class ServerInfoHandler : IDisposable
             pingText += $" / {recentTimeouts}TO";
 
         dtrPing.Text    = pingText;
-        dtrPing.Tooltip = pingText;
+        SetTooltip(dtrPing, pingText);
+    }
+
+    // Dalamud only pushes a DTR tooltip to the game on mouse over, so a tooltip that changes while
+    // hovered stays stale until the cursor leaves and comes back. When the cursor is over the entry,
+    // re-show the tooltip ourselves on the entry's text node so the open tooltip follows the text.
+    private unsafe void SetTooltip(IDtrBarEntry entry, string text)
+    {
+        if (entry.Tooltip?.TextValue == text) return;
+        entry.Tooltip = text;
+
+        var (min, max) = entry.ScreenBounds;
+        var mouse = ImGui.GetIO().MousePos;
+        if (mouse.X < min.X || mouse.X > max.X || mouse.Y < min.Y || mouse.Y > max.Y) return;
+
+        var stage = AtkStage.Instance();
+        if (stage == null) return;
+        var addon = stage->RaptureAtkUnitManager->GetAddonByName("_DTR");
+        if (addon == null || !addon->IsVisible) return;
+
+        // The entry's text node is the one sitting at the left edge of its bounds
+        AtkResNode* target = null;
+        for (var i = 0; i < addon->UldManager.NodeListCount; i++)
+        {
+            var node = addon->UldManager.NodeList[i];
+            if (node == null || node->Type != NodeType.Text || !node->IsVisible()) continue;
+            if (Math.Abs(node->ScreenX - min.X) > 1f || node->ScreenY < min.Y - 1f || node->ScreenY > max.Y) continue;
+            target = node;
+            break;
+        }
+        if (target == null) return;
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+        var len   = Math.Min(bytes.Length, TooltipBufferSize - 1);
+        Marshal.Copy(bytes, 0, tooltipBuffer, len);
+        Marshal.WriteByte(tooltipBuffer + len, 0);
+        stage->TooltipManager.ShowTooltip(addon->Id, target, (byte*)tooltipBuffer);
     }
 
     // Called only from the background PingLoop thread
@@ -394,5 +436,6 @@ public sealed class ServerInfoHandler : IDisposable
         dtrPing.Remove();
         dtrFps.Remove();
         dtrNearby.Remove();
+        Marshal.FreeHGlobal(tooltipBuffer);
     }
 }

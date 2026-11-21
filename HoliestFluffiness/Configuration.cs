@@ -11,6 +11,7 @@ public enum LoginInfoDisplay { Echo = 0, Popup = 1, Toast = 2 }
 public enum PingDisplay { Last = 0, Average = 1, Both = 2 }
 public enum MediaBarSlot { TopLeft = 0, TopRight = 1, BottomLeft = 2, BottomRight = 3 }
 public enum DisableRenderMode { Unfocused = 0, Always = 1 }
+public enum FpsClickAction { Chart = 0, ToggleLimit = 1 }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -54,10 +55,13 @@ public class Configuration : IPluginConfiguration
     public PingDisplay ServerInfoPingDisplay { get; set; } = PingDisplay.Last;
     public bool ServerInfoFpsEnabled { get; set; } = false;
     public bool ServerInfoFpsLive    { get; set; } = false;
+    public FpsClickAction ServerInfoFpsClick { get; set; } = FpsClickAction.Chart;
     public bool FpsLimitEnabled      { get; set; } = false;
     public int  FpsLimitTarget       { get; set; } = 60;
     public bool FpsLimitBackgroundEnabled { get; set; } = false;
     public int  FpsLimitBackgroundTarget  { get; set; } = 15;
+    public bool FpsLimitAfkEnabled        { get; set; } = false;
+    public int  FpsLimitAfkTarget         { get; set; } = 15;
 
     public bool RepairLowEnabled { get; set; } = false;
     public float RepairLowThreshold { get; set; } = 50f;

@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using GameFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework;
 
@@ -10,8 +11,8 @@ namespace HoliestFluffiness.Handlers;
 // Custom frame rate cap, since the game only offers 30, 60 or none. Holding the main thread on
 // Framework.Update paces the whole frame. Waits on a high resolution waitable timer for the bulk of
 // the gap and spins the last stretch, so the cap lands on target instead of drifting with the 1ms
-// scheduler tick. While the window is inactive a separate background cap applies, or none, leaving
-// the game's own background limit in charge.
+// scheduler tick. While the window is inactive or the player is /afk, separate background and AFK
+// caps apply (the lower wins when both do), or none, leaving the game's own limits in charge.
 public sealed class FpsLimiterHandler : IDisposable
 {
     public const int MinFps = 30;
@@ -26,19 +27,26 @@ public sealed class FpsLimiterHandler : IDisposable
 
     private readonly Configuration config;
     private readonly IFramework framework;
+    private readonly IObjectTable objectTable;
     private readonly nint timer;
 
     private long nextFrame;
     private long lastWaitAt;
-    private bool wasInactive;
+    private int lastTarget;
 
-    // True while the cap is the thing deciding the frame rate: enabled, focused and actually waiting
+    private const uint AfkOnlineStatus = 17;
+
+    // True while a cap is the thing deciding the frame rate: enabled and actually waiting
     public bool IsLimiting { get; private set; }
 
-    public FpsLimiterHandler(Configuration config, IFramework framework)
+    // The cap currently in force (focused or background), 0 when none
+    public int ActiveTarget { get; private set; }
+
+    public FpsLimiterHandler(Configuration config, IFramework framework, IObjectTable objectTable)
     {
-        this.config    = config;
-        this.framework = framework;
+        this.config      = config;
+        this.framework   = framework;
+        this.objectTable = objectTable;
 
         timer = CreateWaitableTimerExW(nint.Zero, null, CreateWaitableTimerHighResolution, TimerAllAccess);
         framework.Update += OnUpdate;
@@ -51,15 +59,21 @@ public sealed class FpsLimiterHandler : IDisposable
         if (gameFw != null)
         {
             var inactive = gameFw->WindowInactive;
+            var afk      = objectTable[0] is IPlayerCharacter pc && pc.OnlineStatus.RowId == AfkOnlineStatus;
+
             if (inactive && config.FpsLimitBackgroundEnabled)
                 target = Math.Clamp(config.FpsLimitBackgroundTarget, MinBackgroundFps, MaxBackgroundFps);
-            else if (!inactive && config.FpsLimitEnabled)
+            if (afk && config.FpsLimitAfkEnabled)
+                target = Math.Min(target ?? int.MaxValue, Math.Clamp(config.FpsLimitAfkTarget, MinBackgroundFps, MaxBackgroundFps));
+            // Focused cap only while focused; AFK without its own cap keeps it
+            if (target == null && !inactive && config.FpsLimitEnabled)
                 target = Math.Clamp(config.FpsLimitTarget, MinFps, MaxFps);
-
-            // Switching between the two caps starts a fresh schedule
-            if (inactive != wasInactive) nextFrame = 0;
-            wasInactive = inactive;
         }
+
+        // Switching between caps starts a fresh schedule
+        ActiveTarget = target ?? 0;
+        if (ActiveTarget != lastTarget) nextFrame = 0;
+        lastTarget = ActiveTarget;
 
         if (target == null)
         {
