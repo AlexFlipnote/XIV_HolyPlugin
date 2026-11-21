@@ -6,6 +6,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using BattleChara = FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara;
 using Character = FFXIVClientStructs.FFXIV.Client.Game.Character.Character;
 
 namespace HoliestFluffiness.Handlers;
@@ -42,10 +43,12 @@ public sealed unsafe class CombatHitHandler : IDisposable
     private bool lastHealWasOwn;
     private bool lastHealTargetedMe;
 
+    // Must match BattleLog.AddToScreenLogWithScreenLogKind exactly; Dalamud verifies hook delegates
+    // against ClientStructs and a mismatch (e.g. a byte where the game passes an int) corrupts the call.
     private delegate void AddToScreenLogDelegate(
-        Character* target, Character* source,
-        FlyTextKind kind, byte option, byte actionKind,
-        int actionId, int val1, int val2, byte damageType);
+        BattleChara* target, BattleChara* source,
+        int kind, byte option, byte actionKind,
+        uint actionId, int val1, int val2, int damageType);
 
     private readonly Hook<AddToScreenLogDelegate>? screenLogHook;
 
@@ -66,16 +69,19 @@ public sealed unsafe class CombatHitHandler : IDisposable
             "[HF] CombatHit: screen-log sig scan failed, damage crits still work but heal-crit ownership will not");
     }
 
-    private void OnScreenLog(Character* target, Character* source, FlyTextKind kind,
-                             byte option, byte actionKind, int actionId, int val1, int val2, byte damageType)
+    private void OnScreenLog(BattleChara* target, BattleChara* source, int kind,
+                             byte option, byte actionKind, uint actionId, int val1, int val2, int damageType)
     {
-        if (HealKinds.Contains(kind) && source != null && target != null)
+        if (HealKinds.Contains((FlyTextKind)kind) && source != null && target != null)
         {
+            // BattleChara starts with its Character base, so the same address reads as either
+            var src = (Character*)source;
+            var tgt = (Character*)target;
             var localId       = objectTable.LocalPlayer?.EntityId ?? 0;
-            lastHealWasOwn    = source->GameObject.GetGameObjectId() == localId ||
-                                (source->GameObject.SubKind == (int)BattleNpcSubKind.Pet &&
-                                 source->CompanionOwnerId   == localId);
-            lastHealTargetedMe = target->GameObject.GetGameObjectId() == localId;
+            lastHealWasOwn    = src->GameObject.GetGameObjectId() == localId ||
+                                (src->GameObject.SubKind == (int)BattleNpcSubKind.Pet &&
+                                 src->CompanionOwnerId   == localId);
+            lastHealTargetedMe = tgt->GameObject.GetGameObjectId() == localId;
         }
         screenLogHook!.Original(target, source, kind, option, actionKind, actionId, val1, val2, damageType);
     }
