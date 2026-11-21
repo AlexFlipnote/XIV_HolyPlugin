@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.39",
+        "AssemblyVersion": "0.12.40",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.39/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.39/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.39/latest.zip",
-        "Changelog": "New: your location in the server info bar. Turn it on under Indicators, Location. It shows where you are, like \"Topmast, Mist Ward 14\", and you can change what it shows with tags such as <subarea>, <area>, <zone>, <ward>, <plot> and <instance>. Hover it to see the full location, and click it to copy the location so you can paste it anywhere.\n\nNew: fade unavailable actions. Hotbar actions you can't use right now are faded out, with a slider for how strong the fade is. It sits in the new Fade group under Indicators, together with the loot button fade (which used to be under Loot).",
-        "DownloadCount": 524,
-        "LastUpdate": 1795286856
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.40/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.40/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.40/latest.zip",
+        "Changelog": "The location entry in the server info bar now has its own tooltip text box, next to the one for the bar itself. It uses the same tags, and you can type \\n to start a new line. Leave it empty to keep the default tooltip.\n\nThe tooltip no longer ends with a \"Click to copy\" line, so it only shows the location. Clicking the entry still copies it.",
+        "DownloadCount": 526,
+        "LastUpdate": 1795289051
     }
 ]
