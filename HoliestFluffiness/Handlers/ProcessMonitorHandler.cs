@@ -122,6 +122,7 @@ internal sealed class ProcessMonitorHandler : IDisposable
     private volatile Dictionary<string, (int TexCount, long TexBytes)> dalamudTex = new();
 
     public List<PluginStatRow> Plugins { get; private set; } = [];
+    public int InstalledCount { get; private set; } // installed, loaded or not; Plugins only holds loaded ones
     private long lastPluginRefresh;
     private readonly Dictionary<string, string?> handlerOwnerCache = new();
 
@@ -384,8 +385,10 @@ internal sealed class ProcessMonitorHandler : IDisposable
             var drawSrc   = new List<(string Name, object Ds)>();
             var names     = new Dictionary<string, string>();
 
+            var installed = 0;
             foreach (var lp in refl.InstalledPlugins())
             {
+                installed++;
                 if (!refl.IsLoaded(lp)) continue;
                 var row = new PluginStatRow
                 {
@@ -461,6 +464,7 @@ internal sealed class ProcessMonitorHandler : IDisposable
             rows.Add(dalamud);
 
             Plugins          = rows;
+            InstalledCount   = installed;
             spikeDrawSources = drawSrc;
             ownerNames       = names;
         }

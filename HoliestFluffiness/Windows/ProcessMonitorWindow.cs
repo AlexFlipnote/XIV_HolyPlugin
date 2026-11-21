@@ -16,6 +16,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
 
     private string pluginSearch = "";
     private bool   hideIdlePlugins;
+    private bool   hideSelf;
     private bool   hideIdleThreads = true;
 
     private const int PCName = 0, PCFrame = 1, PCTotal = 2, PCDraw = 3, PCUpdate = 4, PCPeak = 5, PCHooks = 6, PCTex = 7, PCTrend = 8;
@@ -326,15 +327,17 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         ImGui.SameLine();
         Common.PushGoldCheckbox();
         ImGui.Checkbox("Hide idle", ref hideIdlePlugins);
+        ImGui.SameLine();
+        ImGui.Checkbox("Hide self", ref hideSelf);
         Common.PopGoldCheckbox();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Hides this plugin, whose draw time includes this window itself.");
         ImGui.SameLine();
         Common.PushGreyButton();
         if (ImGui.Button("Reset peaks")) handler.ResetStats();
         Common.PopGreyButton();
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clears Dalamud's draw and update history, so peaks from loading screens or plugin startup drop out.");
-
-        Common.DimmedText("The plugin in gold runs this window; part of its draw time is this window itself.");
 
         var fps     = ImGui.GetIO().Framerate;
         var frameMs = fps > 0 ? 1000.0 / fps : 0;
@@ -344,6 +347,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         {
             if (pluginSearch.Length > 0 && !p.Name.Contains(pluginSearch, StringComparison.OrdinalIgnoreCase)) continue;
             if (hideIdlePlugins && p.TotalAvg < 0.01) continue;
+            if (hideSelf && p.IsSelf) continue;
             pluginBuf.Add(p);
         }
 
@@ -364,13 +368,21 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         ImGui.TableSetupColumn("Trend",    ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.PreferSortDescending, 1.1f);
 
         Common.PushTableHeader();
-        // Manual header row so each header can carry its own tooltip
+        // Manual header row so each header can carry a tooltip with that column's totals
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
-        for (var i = 0; i < PluginTips.Length; i++)
+        PluginTotals? totals = null;
+        for (var i = 0; i <= PCTrend; i++)
         {
             if (!ImGui.TableSetColumnIndex(i)) continue;
             ImGui.TableHeader(ImGui.TableGetColumnName(i));
-            if (PluginTips[i].Length > 0 && ImGui.IsItemHovered()) ImGui.SetTooltip(PluginTips[i]);
+            if (ImGui.IsItemHovered())
+            {
+                totals ??= ComputeTotals(frameMs);
+                // Pop the header text colour for the tooltip so its body is not all gold
+                Common.PopTableHeader();
+                HeaderTooltip(i, totals.Value);
+                Common.PushTableHeader();
+            }
         }
         Common.PopTableHeader();
 
@@ -442,18 +454,69 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         ImGui.EndTable();
     }
 
-    private static readonly string[] PluginTips =
-    [
-        "",
-        "Share of the current frame time this plugin spends drawing and updating, averaged.",
-        "Average ms per frame: draw + all Framework.Update handlers.",
-        "Average ms per frame spent in the plugin's UI draw (last 100 frames).",
-        "Average ms per frame across the plugin's Framework.Update handlers.",
-        "Worst single draw or update since the window opened or the last reset.",
-        "Active function hooks the plugin has placed into the game.",
-        "Textures the plugin created and their estimated size. A shared texture counts for each owner.",
-        "Texture memory while this window has been open, one point every 5 s, with growth since it opened. A line that only climbs is a leak.",
-    ];
+    // Totals across every loaded plugin (not just the filtered rows), for the column header tooltips
+    private readonly record struct PluginTotals(int Loaded, int Installed, int Dev, double Frame, double Draw, double Update,
+                                                string? PeakName, double Peak, int Hooks, int TexCount, long TexBytes, long TexGrowth);
+
+    private PluginTotals ComputeTotals(double frameMs)
+    {
+        int loaded = 0, dev = 0, hooks = 0, texCount = 0;
+        double total = 0, draw = 0, upd = 0, peak = 0;
+        long texBytes = 0, growth = 0;
+        string? peakName = null;
+        foreach (var p in handler.Plugins)
+        {
+            if (p.IsDalamud) continue;
+            loaded++;
+            if (p.IsDev) dev++;
+            total += p.TotalAvg;
+            draw  += Nz(p.DrawAvg);
+            upd   += Nz(p.UpdAvg);
+            hooks += p.Hooks;
+            texCount += p.TexCount;
+            texBytes += p.TexBytes;
+            growth   += p.TexGrowth;
+            if (p.Peak > peak) { peak = p.Peak; peakName = p.Name; }
+        }
+        var framePct = frameMs > 0 ? total / frameMs * 100 : 0;
+        return new PluginTotals(loaded, Math.Max(handler.InstalledCount, loaded), dev, framePct, draw, upd,
+                                peakName, peak, hooks, texCount, texBytes, growth);
+    }
+
+    // Header tooltip: the totals for that column in the accent colour, then what the column means
+    private static void HeaderTooltip(int column, in PluginTotals t)
+    {
+        var (summary, desc) = column switch
+        {
+            PCName   => ($"{t.Loaded} of {t.Installed} plugins loaded" + (t.Dev > 0 ? $", {t.Dev} dev" : ""),
+                         "Names in gold are this plugin, which also draws this window."),
+            PCFrame  => ($"All plugins: {t.Frame:F1}% of the frame",
+                         "Share of the current frame time each plugin spends drawing and updating, averaged."),
+            PCTotal  => ($"All plugins: {t.Draw + t.Update:F2} ms per frame",
+                         "Average ms per frame: draw + all Framework.Update handlers."),
+            PCDraw   => ($"All plugins: {t.Draw:F2} ms",
+                         "Average ms per frame spent in the plugin's UI draw (last 100 frames)."),
+            PCUpdate => ($"All plugins: {t.Update:F2} ms",
+                         "Average ms per frame across the plugin's Framework.Update handlers."),
+            PCPeak   => (t.PeakName != null ? $"Worst: {t.PeakName}, {t.Peak:F2} ms" : "No peaks yet",
+                         "Worst single draw or update since the window opened or the last reset."),
+            PCHooks  => ($"{t.Hooks} hooks across all plugins",
+                         "Active function hooks the plugin has placed into the game."),
+            PCTex    => ($"{Bytes(t.TexBytes)} in {t.TexCount} textures",
+                         "Textures the plugin created and their estimated size. A shared texture counts for each owner."),
+            PCTrend  => ($"All plugins: {(t.TexGrowth >= 0 ? "+" : "-")}{Bytes(Math.Abs(t.TexGrowth))} since the window opened",
+                         "Texture memory while this window has been open, one point every 5 s. A line that only climbs is a leak."),
+            _        => ("", ""),
+        };
+        if (summary.Length == 0) return;
+
+        ImGui.BeginTooltip();
+        Common.GoldText(summary);
+        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 24f);
+        Common.DimmedTextWrapped(desc);
+        ImGui.PopTextWrapPos();
+        ImGui.EndTooltip();
+    }
 
     // Sparkline of texture memory with the growth written over it
     private static void DrawTrend(PluginStatRow p)
