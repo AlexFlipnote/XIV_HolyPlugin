@@ -45,6 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string WardInfoCommand      = "/wardinfo";
     private const string WardInfoAliasCommand = "/wi";
     private const string MediaCommand         = "/media";
+    private const string HdebugCommand        = "/hdebug";
 
     [PluginService] private IDalamudPluginInterface PluginInterface { get; init; } = null!;
     [PluginService] private IClientState ClientState { get; init; } = null!;
@@ -107,6 +108,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly FateListWindow fateListWindow;
     private readonly PingChartWindow pingChartWindow;
     private readonly FpsChartWindow fpsChartWindow;
+    private readonly ProcessMonitorHandler processMonitorHandler;
+    private readonly ProcessMonitorWindow processMonitorWindow;
     private readonly CommendationHandler commendationHandler;
     private readonly DoorbellHandler doorbellHandler;
     private readonly CombatHitHandler combatHitHandler;
@@ -260,6 +263,8 @@ public sealed class Plugin : IDalamudPlugin
         fateListWindow         = new FateListWindow(FateTable, TextureProvider);
         pingChartWindow        = new PingChartWindow(serverInfoHandler);
         fpsChartWindow         = new FpsChartWindow(serverInfoHandler);
+        processMonitorHandler  = new ProcessMonitorHandler(PluginInterface, Condition, Log);
+        processMonitorWindow   = new ProcessMonitorWindow(processMonitorHandler);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
         serverInfoHandler.SetFpsClickAction(() => fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen, () =>
@@ -298,6 +303,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(lotterySaleWindow);
         windowSystem.AddWindow(apartmentSweepWindow);
         windowSystem.AddWindow(mediaWindow);
+        windowSystem.AddWindow(processMonitorWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -343,6 +349,10 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(MediaCommand, new CommandInfo(OnMediaCommand)
         {
             HelpMessage = "Open the media controls window for what is playing on your PC. /media toggle, play, pause, next, prev or now (prints the current song) work directly."
+        });
+        CommandManager.AddHandler(HdebugCommand, new CommandInfo(OnHdebugCommand)
+        {
+            HelpMessage = "Toggle hdebug: per-plugin frame cost, frame spikes, CPU/GPU/VRAM, threads, injected DLLs, disk, network and memory. Also '/hf hdebug'."
         });
 
         // Snapshot before anything draws, so a mid-frame toggle cannot desync the colour stack
@@ -406,6 +416,9 @@ public sealed class Plugin : IDalamudPlugin
                 break;
             case "ping":
                 pingChartWindow.IsOpen = !pingChartWindow.IsOpen;
+                break;
+            case "hdebug":
+                processMonitorWindow.IsOpen = !processMonitorWindow.IsOpen;
                 break;
             case "foodcheck":
                 foodCheckHandler.ForceCheck();
@@ -485,6 +498,9 @@ public sealed class Plugin : IDalamudPlugin
         }
         wardInfoWindow.ShowStandalone();
     }
+
+    private void OnHdebugCommand(string command, string args) =>
+        processMonitorWindow.IsOpen = !processMonitorWindow.IsOpen;
 
     private void OnMediaCommand(string command, string args)
     {
@@ -1109,6 +1125,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(WardInfoCommand);
         CommandManager.RemoveHandler(WardInfoAliasCommand);
         CommandManager.RemoveHandler(MediaCommand);
+        CommandManager.RemoveHandler(HdebugCommand);
         PluginInterface.UiBuilder.Draw -= Theme.Sync;
         PluginInterface.UiBuilder.Draw -= nearbyWindow.DrawMarkers;
         PluginInterface.UiBuilder.Draw -= mediaExpBarHandler.DrawOverlay;
@@ -1130,6 +1147,8 @@ public sealed class Plugin : IDalamudPlugin
         nearbyWindow.Dispose();
         pingChartWindow.Dispose();
         fpsChartWindow.Dispose();
+        processMonitorWindow.Dispose();
+        processMonitorHandler.Dispose();
         charaSelectHandler.Dispose();
         housingLotteryHandler.Dispose();
         serverInfoHandler.Dispose();
