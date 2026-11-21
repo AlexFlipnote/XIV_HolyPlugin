@@ -74,7 +74,7 @@ public partial class ConfigWindow
         var current        = locationDtrHandler.Current;
         var previewText    = LocationDtrHandler.Format(configuration.LocationDtrFormat, current, Configuration.DefaultLocationDtrFormat);
         var previewTooltip = LocationDtrHandler.Format(configuration.LocationDtrTooltipFormat, current, Configuration.DefaultLocationDtrTooltipFormat);
-        var locationHelp   = $"Tags: {LocationInfo.Tags}";
+        var locationHelp   = $"Tags: {LocationInfo.Tags}\n{LocationInfo.ShortHint}";
         if (previewText.Length > 0)
             locationHelp += $"\nPreview: {previewText}\nTooltip: {previewTooltip.Replace("\n", " / ")}";
         Common.DimmedText(locationHelp);

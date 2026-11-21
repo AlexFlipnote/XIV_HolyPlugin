@@ -114,12 +114,20 @@ public sealed class LocationDtrHandler : IDisposable
 
         if (ward >= 0)
         {
-            info.Ward = division == 2 ? $"Ward {ward + 1} Subdivision" : $"Ward {ward + 1}";
+            var sub = division == 2;
+            info.Ward      = sub ? $"Ward {ward + 1} Subdivision" : $"Ward {ward + 1}";
+            info.WardShort = $"W{ward + 1}";
             // Apartment buildings report a negative plot; room 0 there is the lobby
             if (plot < -1)
-                info.Plot = room > 0 ? $"Apartment {room}" : "Apartment Lobby";
+            {
+                info.Plot      = room > 0 ? $"Apartment {room}" : "Apartment Lobby";
+                info.PlotShort = room > 0 ? $"A{room}" : "Lobby";
+            }
             else if (plot >= 0)
-                info.Plot = room > 0 ? $"Plot {plot + 1}, Room {room}" : $"Plot {plot + 1}";
+            {
+                info.Plot      = room > 0 ? $"Plot {plot + 1}, Room {room}" : $"Plot {plot + 1}";
+                info.PlotShort = room > 0 ? $"P{plot + 1} R{room}" : $"P{plot + 1}";
+            }
         }
 
         return info;
@@ -219,22 +227,27 @@ public sealed class LocationInfo
     public string SubArea   { get; set; } = "";
     public string Ward      { get; set; } = "";
     public string Plot      { get; set; } = "";
+    public string WardShort { get; set; } = "";
+    public string PlotShort { get; set; } = "";
     public string Instance  { get; set; } = "";
     public uint   InstanceNumber { get; set; }
 
     public const string Tags = "<subarea> | <area> | <zone> | <region> | <ward> | <plot> | <instance>";
+    public const string ShortHint = "Add :short to <ward> or <plot> for W14 / P23";
 
-    // null means the tag isn't one of ours
+    // null means the tag isn't one of ours. ":short" picks the compact form where one exists
     public string? Get(string tag) => tag.ToLowerInvariant() switch
     {
-        "subarea"  => SubArea,
-        "area"     => Area,
-        "zone"     => Territory,
-        "region"   => Region,
-        "ward"     => Ward,
-        "plot"     => Plot,
-        "instance" => Instance,
-        _          => null,
+        "subarea"    => SubArea,
+        "area"       => Area,
+        "zone"       => Territory,
+        "region"     => Region,
+        "ward"       => Ward,
+        "ward:short" => WardShort,
+        "plot"       => Plot,
+        "plot:short" => PlotShort,
+        "instance"   => Instance,
+        _            => null,
     };
 
     // One line for pasting into chat or Discord
