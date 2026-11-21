@@ -33,20 +33,8 @@ public sealed class PingChartWindow : Window, IDisposable
 
     public override void Draw()
     {
-        var address = handler.ConnectedAddress;
-        if (IPAddress.IsLoopback(address))
-            Common.RedText("Not connected");
-        else
-            Common.DimmedText($"Server: {address}");
-
         var data = handler.PingChartData;
-        if (data.Length == 0)
-        {
-            Common.DimmedText("Waiting for ping data...");
-            return;
-        }
-
-        if (!ReferenceEquals(cachedData, data))
+        if (data.Length > 0 && !ReferenceEquals(cachedData, data))
         {
             cachedData = data;
             var (samples, sAvg, sMin, sMax) = Common.ComputeSampleStats(data);
@@ -55,21 +43,42 @@ public sealed class PingChartWindow : Window, IDisposable
             cachedMin      = sMin;
             cachedMax      = sMax;
         }
+
+        var address = handler.ConnectedAddress;
+        if (IPAddress.IsLoopback(address))
+            Common.RedText("Not connected");
+        else
+            Common.GoldText($"Server: {address}");
+
+        if (data.Length == 0)
+        {
+            Common.DimmedText("Waiting for ping data...");
+            return;
+        }
+
         var avg      = cachedAvg;
         var min      = cachedMin;
         var max      = cachedMax;
         var timeouts = cachedTimeouts;
 
-        Common.GoldText($"avg {avg}ms");
-
-        ImGui.SameLine();
-        Common.DimmedText($"  min {min}ms  max {max}ms");
-
+        var timeoutText = $"{timeouts} TimeOut";
+        Common.SameLineRight(timeoutText);
         if (timeouts > 0)
         {
-            ImGui.SameLine();
-            Common.RedText($"  {timeouts} TO");
+            // Red count, T and O spell out what the server bar's "TO" stands for
+            Common.RedText($"{timeouts} T");
+            ImGui.SameLine(0, 0); Common.DimmedText("ime");
+            ImGui.SameLine(0, 0); Common.RedText("O");
+            ImGui.SameLine(0, 0); Common.DimmedText("ut");
         }
+        else
+            Common.DimmedText(timeoutText);
+
+        Common.GoldText($"avg {avg}ms");
+
+        var rangeText = $"min {min}ms  max {max}ms";
+        Common.SameLineRight(rangeText);
+        Common.DimmedText(rangeText);
 
         var plotSize = ImGui.GetContentRegionAvail();
         var scaleMax = max > 0 ? max * 1.3f : 200f;

@@ -270,6 +270,14 @@ internal static class Common
         ImGui.PopStyleColor();
     }
 
+    // Puts the next item on the current line, pushed to the right edge so `text` ends flush with it
+    internal static void SameLineRight(string text)
+    {
+        ImGui.SameLine();
+        var offset = ImGui.GetContentRegionAvail().X - ImGui.CalcTextSize(text).X;
+        if (offset > 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
+    }
+
     // Gold track and grab, matching the gold progress bars
     internal static void PushGoldSlider()
     {

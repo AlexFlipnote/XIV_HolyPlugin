@@ -49,8 +49,9 @@ public sealed class FpsChartWindow : Window, IDisposable
 
         Common.GoldText($"avg {cachedAvg} fps");
 
-        ImGui.SameLine();
-        Common.DimmedText($"  min {cachedMin}  max {cachedMax}");
+        var rangeText = $"min {cachedMin}  max {cachedMax}";
+        Common.SameLineRight(rangeText);
+        Common.DimmedText(rangeText);
 
         var plotSize = ImGui.GetContentRegionAvail();
         var scaleMax = cachedMax > 0 ? cachedMax * 1.15f : 60f;
