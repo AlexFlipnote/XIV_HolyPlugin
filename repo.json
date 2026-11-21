@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.40",
+        "AssemblyVersion": "0.12.41",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.40/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.40/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.40/latest.zip",
-        "Changelog": "The location entry in the server info bar now has its own tooltip text box, next to the one for the bar itself. It uses the same tags, and you can type \\n to start a new line. Leave it empty to keep the default tooltip.\n\nThe tooltip no longer ends with a \"Click to copy\" line, so it only shows the location. Clicking the entry still copies it.",
-        "DownloadCount": 526,
-        "LastUpdate": 1795289051
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.41/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.41/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.41/latest.zip",
+        "Changelog": "The location entry in the server info bar can now show a short ward and plot. Add :short to the tag, so <ward:short> shows \"W14\" and <plot:short> shows \"P23\" (or \"A5\" for an apartment, \"P23 R3\" for a room). For example, \"<zone> <ward:short> <plot:short>\" shows \"Mist W14 P23\". The full tags still work as before.\n\nThe tooltip text box now has a hint next to it reminding you that \\n starts a new line.",
+        "DownloadCount": 528,
+        "LastUpdate": 1795290091
     }
 ]
