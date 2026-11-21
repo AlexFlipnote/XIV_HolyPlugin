@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.41",
+        "AssemblyVersion": "0.12.42",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.41/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.41/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.41/latest.zip",
-        "Changelog": "The location entry in the server info bar can now show a short ward and plot. Add :short to the tag, so <ward:short> shows \"W14\" and <plot:short> shows \"P23\" (or \"A5\" for an apartment, \"P23 R3\" for a room). For example, \"<zone> <ward:short> <plot:short>\" shows \"Mist W14 P23\". The full tags still work as before.\n\nThe tooltip text box now has a hint next to it reminding you that \\n starts a new line.",
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.42/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.42/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.42/latest.zip",
+        "Changelog": "\"Fade unavailable actions\" is now \"Fade synced down actions\". It only fades hotbar actions that are above your current level, like when you are synced down in a duty, instead of fading anything the game could not use right now. Cooldowns, missing resources and being out of range no longer fade your actions, so the hotbar stays calm during normal play.",
         "DownloadCount": 528,
-        "LastUpdate": 1795290091
+        "LastUpdate": 1795290787
     }
 ]
