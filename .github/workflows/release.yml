@@ -32,13 +32,19 @@ jobs:
           curl -L https://goatcorp.github.io/dalamud-distrib/latest.zip -o /tmp/dalamud.zip
           unzip /tmp/dalamud.zip -d $HOME/.xlcore/dalamud/Hooks/dev
 
-      - name: Build Release
-        run: make release
-
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+
+      # Release notes are embedded into the DLL so the About page can show them without any network access
+      - name: Bundle changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python build.py changelog
+
+      - name: Build Release
+        run: make release
 
       - name: Pack Plugin
         run: |

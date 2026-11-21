@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
 
 namespace HoliestFluffiness.Windows;
@@ -39,6 +41,9 @@ public partial class ConfigWindow
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/AlexFlipnote/XIV_HolyPlugin") { UseShellExecute = true });
         PopButton();
 
+        SubsectionLabel("Changelog", "What changed in the last few releases, and why.");
+        DrawChangelog();
+
         SubsectionLabel("Make it yours",
             "You read all the way down here, so here's your reward: a couple of knobs to make the plugin look how you like.");
 
@@ -54,5 +59,87 @@ public partial class ConfigWindow
             desc: "Fades the window backgrounds so you can see through them. Text and highlights stay solid.");
 
         EndSection(10);
+    }
+
+    // Newest release starts open, the rest collapsed. The installed version is gold, so it is obvious
+    // how far behind (or ahead, on a dev build) the running copy is.
+    private void DrawChangelog()
+    {
+        var entries = Changelog.Entries;
+        if (entries.Count == 0)
+        {
+            SectionRow();
+            Common.DimmedTextWrapped("The changelog is bundled into release builds. Run 'make changelog' before building to include it in a local build.");
+            return;
+        }
+
+        var installed = pluginInterface.Manifest.AssemblyVersion;
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var e           = entries[i];
+            var isInstalled = Changelog.IsVersion(e.Tag, installed);
+
+            SectionRow();
+            var flags = i == 0 ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
+            ImGui.PushStyleColor(ImGuiCol.Text, isInstalled ? Theme.ColGold : Theme.ColWhite);
+            var open = ImGui.TreeNodeEx($"{e.Tag}##changelog_{e.Tag}", flags);
+            ImGui.PopStyleColor();
+
+            if (e.Date is { } date)
+            {
+                ImGui.SameLine();
+                Common.DimmedText(date.ToString("d MMM yyyy", CultureInfo.InvariantCulture));
+            }
+            if (i == 0)
+            {
+                ImGui.SameLine();
+                Common.GoldText("Latest");
+            }
+            if (isInstalled)
+            {
+                ImGui.SameLine();
+                Common.DimmedText("(installed)");
+            }
+
+            if (!open) continue;
+            DrawReleaseNotes(e);
+            ImGui.TreePop();
+        }
+    }
+
+    private static void DrawReleaseNotes(ChangelogEntry e)
+    {
+        if (e.Lines.Count == 0)
+        {
+            SectionRow();
+            Common.DimmedText("No notes for this release.");
+            ImGui.Dummy(new Vector2(0, 4));
+            return;
+        }
+
+        foreach (var (kind, text) in e.Lines)
+        {
+            switch (kind)
+            {
+                case ChangelogLineKind.Gap:
+                    ImGui.Dummy(new Vector2(0, 2));
+                    break;
+                case ChangelogLineKind.Heading:
+                    SectionRow();
+                    Common.GoldText(text);
+                    break;
+                case ChangelogLineKind.Bullet:
+                    SectionRow();
+                    ImGui.Bullet();
+                    ImGui.SameLine();
+                    Common.DimmedTextWrapped(text);
+                    break;
+                default:
+                    SectionRow();
+                    Common.DimmedTextWrapped(text);
+                    break;
+            }
+        }
+        ImGui.Dummy(new Vector2(0, 6));
     }
 }

@@ -4,6 +4,7 @@ packages.lock.json
 /dist
 /repo.json
 /latest.zip
+/HoliestFluffiness/changelog.json
 uv.lock
 
 ## Ignore Visual Studio temporary files, build results, and

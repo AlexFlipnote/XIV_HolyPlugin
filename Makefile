@@ -7,7 +7,7 @@ DIST       := dist/$(PLUGIN)
 # on these, so a package without them silently loses every sound feature.
 RUNTIME_DLLS := NAudio.Core.dll NAudio.Wasapi.dll NAudio.Vorbis.dll NVorbis.dll
 
-.PHONY: all build lint release pack clean scan check
+.PHONY: all build lint release pack clean scan check changelog
 
 # Default target: a lint-enforced build. `make` alone fails on style violations (unused usings, etc.),
 # so the standard stays green without anyone remembering to run a separate step.
@@ -19,6 +19,11 @@ build:
 
 lint:
 	dotnet build $(PROJ) --no-incremental /p:EnforceCodeStyleInBuild=true /p:GenerateDocumentationFile=true /p:NoWarn=1591 /p:WarningsAsErrors=IDE0005
+
+# Pulls the last 10 release notes into HoliestFluffiness/changelog.json so a local build shows them
+# in the About page too. CI runs this before every release build.
+changelog:
+	python build.py changelog
 
 release:
 	dotnet build $(PROJ) -c Release

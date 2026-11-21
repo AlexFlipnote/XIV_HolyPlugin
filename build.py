@@ -100,6 +100,38 @@ def get_last_update(assembly_version, fallback=None):
     return fallback if fallback is not None else int(time())
 
 
+CHANGELOG_PATH = f"{PLUGIN_NAME}/changelog.json"
+CHANGELOG_COUNT = 10
+
+
+def bundle_changelog():
+    """Write the latest release notes to a JSON file that the build embeds into the DLL.
+
+    The plugin shows these in its About page without ever touching the network itself.
+    """
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases?per_page={CHANGELOG_COUNT}"
+    try:
+        releases = _api_get(url)
+    except (urllib.error.URLError, json.JSONDecodeError) as e:
+        print(f"Could not fetch releases for the changelog: {e}")
+        releases = []
+
+    entries = []
+    for release in releases:
+        if release.get("draft"):
+            continue
+        published = get_published_at(release)
+        entries.append({
+            "tag": release.get("tag_name", ""),
+            "date": datetime.fromtimestamp(published, timezone.utc).strftime("%Y-%m-%d") if published else "",
+            "notes": get_changelog(release) or "",
+        })
+
+    with open(CHANGELOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(entries, f, indent=2, ensure_ascii=False)
+    print(f"Bundled {len(entries)} releases into {CHANGELOG_PATH}")
+
+
 def main():
     version = get_version()
     if not version:
@@ -145,4 +177,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "changelog":
+        bundle_changelog()
+    else:
+        main()
