@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.34",
+        "AssemblyVersion": "0.12.35",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.34/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.34/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.34/latest.zip",
-        "Changelog": "The About page now has a Changelog section with the last 10 releases. The newest one starts open, the older ones are collapsed, and the version you have installed is highlighted in gold. The notes are bundled with the plugin, so nothing is downloaded to show them.\n\nFixed a hook error in /xllog (\"Hook verification failed\" for the battle log). The critical heal sounds use this hook to tell your own heals apart from others', and it now matches what the game expects exactly, so it no longer passes a cut-off value back to the game.",
-        "DownloadCount": 510,
-        "LastUpdate": 1795275846
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.35/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.35/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.35/latest.zip",
+        "Changelog": "In /hdebug, hovering a column title in the Plugins tab now shows the total for that column across all your plugins: how many are loaded out of how many are installed, their combined share of the frame, total hooks and texture memory, the worst spike and how much texture memory has grown since the window opened.\n\nThere is also a new \"Hide self\" checkbox to leave Holiest Fluffiness out of the list, since its draw time includes the hdebug window itself.",
+        "DownloadCount": 514,
+        "LastUpdate": 1795277199
     }
 ]
