@@ -21,7 +21,7 @@ public sealed class LocationDtrHandler : IDisposable
     private readonly IDtrBarEntry  entry;
 
     // Everything the text depends on; nothing is looked up or rebuilt until one of these changes
-    private (uint Territory, uint Area, uint SubArea, uint Instance, sbyte Ward, sbyte Plot, short Room, byte Division, string Format) lastKey;
+    private (uint Territory, uint Area, uint SubArea, uint Instance, sbyte Ward, sbyte Plot, short Room, byte Division, string Format, string Tooltip) lastKey;
     private bool dirty = true;
 
     public LocationInfo Current { get; private set; } = new();
@@ -65,7 +65,8 @@ public sealed class LocationDtrHandler : IDisposable
             Plot:      inHousing ? housing->GetCurrentPlot()     : (sbyte)-1,
             Room:      inHousing ? housing->GetCurrentRoom()     : (short)0,
             Division:  inHousing ? housing->GetCurrentDivision() : (byte)0,
-            Format:    config.LocationDtrFormat);
+            Format:    config.LocationDtrFormat,
+            Tooltip:   config.LocationDtrTooltipFormat);
 
         if (!dirty && key == lastKey) return;
         lastKey = key;
@@ -74,15 +75,17 @@ public sealed class LocationDtrHandler : IDisposable
         Current = Resolve(key.Territory, key.Area, key.SubArea, key.Instance, key.Ward, key.Plot, key.Room, key.Division,
             housing != null && housing->IsInside());
 
-        var text = Format(config.LocationDtrFormat, Current);
+        var text = Format(config.LocationDtrFormat, Current, Configuration.DefaultLocationDtrFormat);
         if (text.Length == 0)
         {
             if (entry.Shown) entry.Shown = false;
             return;
         }
 
+        var tooltip = Format(config.LocationDtrTooltipFormat, Current, Configuration.DefaultLocationDtrTooltipFormat);
         entry.Text    = text;
-        entry.Tooltip = Current.Tooltip + "\nClick to copy";
+        if (tooltip.Length > 0) entry.Tooltip = tooltip;
+        else entry.Tooltip = null;
         if (!entry.Shown) entry.Shown = true;
     }
 
@@ -136,9 +139,11 @@ public sealed class LocationDtrHandler : IDisposable
     // Fills the template. A token that comes out empty, or repeats one already shown (the area is often
     // named after the zone), drops out along with the separator in front of it, so "<a>, <b>" never
     // leaves a dangling comma. Text before the first token and after the last one is always kept.
-    internal static string Format(string template, LocationInfo info)
+    // A typed \n becomes a line break, which only makes sense in the tooltip.
+    internal static string Format(string template, LocationInfo info, string fallback)
     {
-        if (string.IsNullOrWhiteSpace(template)) template = Configuration.DefaultLocationDtrFormat;
+        if (string.IsNullOrWhiteSpace(template)) template = fallback;
+        template = template.Replace(@"\n", "\n");
 
         var sb      = new StringBuilder();
         var seen    = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -231,22 +236,6 @@ public sealed class LocationInfo
         "instance" => Instance,
         _          => null,
     };
-
-    // Most specific first, one line each, repeats skipped
-    public string Tooltip
-    {
-        get
-        {
-            var lines = new List<string>();
-            void Add(string s) { if (s.Length > 0 && !lines.Contains(s)) lines.Add(s); }
-            Add(SubArea);
-            Add(Area);
-            Add(InstanceNumber > 0 ? $"{Territory} (instance {InstanceNumber})" : Territory);
-            Add(Region);
-            Add(Plot.Length > 0 ? $"{Ward}, {Plot}" : Ward);
-            return string.Join("\n", lines);
-        }
-    }
 
     // One line for pasting into chat or Discord
     public string CopyText

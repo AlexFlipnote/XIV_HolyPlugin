@@ -62,13 +62,22 @@ public partial class ConfigWindow
         ImGui.BeginDisabled(!configuration.LocationDtrEnabled);
         ConfigInputText("Location text##locationdtrformat", configuration.LocationDtrFormat,
             v => configuration.LocationDtrFormat = v, width: 240,
-            hint: $"(empty = {Configuration.DefaultLocationDtrFormat})",
-            desc: "Empty or repeated tags are left out, along with the separator in front of them.");
+            hint: "(empty = default)",
+            desc: "What the server bar shows. Empty or repeated tags are left out, along with the separator in front of them.");
+
+        ConfigInputText("Tooltip text##locationdtrtooltip", configuration.LocationDtrTooltipFormat,
+            v => configuration.LocationDtrTooltipFormat = v, width: 240,
+            hint: "(empty = default)",
+            desc: "What hovering the entry shows. Type \\n for a new line.");
         RowGap(0);
 
-        var locationTags = $"Tags: {LocationInfo.Tags}";
-        var preview      = LocationDtrHandler.Format(configuration.LocationDtrFormat, locationDtrHandler.Current);
-        Common.DimmedText(preview.Length > 0 ? $"{locationTags}\nPreview: {preview}" : locationTags);
+        var current        = locationDtrHandler.Current;
+        var previewText    = LocationDtrHandler.Format(configuration.LocationDtrFormat, current, Configuration.DefaultLocationDtrFormat);
+        var previewTooltip = LocationDtrHandler.Format(configuration.LocationDtrTooltipFormat, current, Configuration.DefaultLocationDtrTooltipFormat);
+        var locationHelp   = $"Tags: {LocationInfo.Tags}";
+        if (previewText.Length > 0)
+            locationHelp += $"\nPreview: {previewText}\nTooltip: {previewTooltip.Replace("\n", " / ")}";
+        Common.DimmedText(locationHelp);
         ImGui.EndDisabled();
 
         // ── Ward Info ──────────────────────────────────────────────────────────

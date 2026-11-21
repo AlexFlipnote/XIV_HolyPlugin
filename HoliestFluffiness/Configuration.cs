@@ -107,6 +107,9 @@ public class Configuration : IPluginConfiguration
     public const string DefaultLocationDtrFormat = "<area>, <zone> <ward> <instance>";
     public bool   LocationDtrEnabled { get; set; } = false;
     public string LocationDtrFormat  { get; set; } = DefaultLocationDtrFormat;
+    // Same tags; a typed \n starts a new line
+    public const string DefaultLocationDtrTooltipFormat = @"<subarea>\n<area>\n<zone> <instance>\n<region>\n<ward>, <plot>";
+    public string LocationDtrTooltipFormat { get; set; } = DefaultLocationDtrTooltipFormat;
 
     public bool NoKillEnabled { get; set; } = false;
     public bool NoKillDisablePopup { get; set; } = false;
