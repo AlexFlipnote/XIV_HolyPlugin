@@ -648,8 +648,12 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
 
         // Repos in Dalamud's list that no installed copy (loaded or not) was installed from
         var usedUrls = new HashSet<string>(all.Where(s => s.IsThirdParty).Select(s => NormUrl(s.Url)));
-        var unused   = handler.Repos?.Where(r => !usedUrls.Contains(NormUrl(r.Url)))
-                                     .OrderBy(r => r.Url, StringComparer.OrdinalIgnoreCase).ToList();
+        var unused   = handler.Repos?.Where(r => !usedUrls.Contains(NormUrl(r.Url))).ToList();
+
+        repoPos.Clear();
+        if (handler.Repos is { } repoList)
+            for (var i = 0; i < repoList.Count; i++)
+                repoPos.TryAdd(NormUrl(repoList[i].Url), i + 1);
 
         var loaded = primary.Count(s => s.IsLoaded);
         ImGui.SameLine();
@@ -756,7 +760,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
                 SCAuthor  => string.Compare(a.Author, b.Author, StringComparison.OrdinalIgnoreCase),
                 SCVersion => string.Compare(a.Version, b.Version, StringComparison.OrdinalIgnoreCase),
                 SCStatus  => b.IsLoaded.CompareTo(a.IsLoaded),
-                SCRepo    => string.Compare(RepoText(a), RepoText(b), StringComparison.OrdinalIgnoreCase),
+                SCRepo    => CompareRepo(a.IsThirdParty ? a.Url : null, b.IsThirdParty ? b.Url : null),
                 _         => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
             };
             if (!asc) c = -c;
@@ -838,7 +842,8 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         // Third-party repos where every plugin is also offered by another enabled repo
         var covered = listings.Where(r => r.IsEnabled && r.IsThirdParty && r.Plugins.Count > 0 &&
                                           r.Plugins.All(p => offers.TryGetValue(p.InternalName, out var l) && l.Count > 1))
-                              .Select(r => r.Url).OrderBy(u => u, StringComparer.OrdinalIgnoreCase).ToList();
+                              .Select(r => r.Url).ToList();
+        covered.Sort(CompareRepo);
 
         var pluginCount = rows.Select(r => r.InternalName).Distinct().Count();
         ImGui.SetNextItemOpen(open, ImGuiCond.Always);
@@ -862,7 +867,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             Common.GoldText($"{covered.Count} repo{(covered.Count == 1 ? "" : "s")} only offer{(covered.Count == 1 ? "s" : "")} plugins that another repo also has:");
             foreach (var url in covered)
             {
-                Common.DimmedText($"  {url}");
+                Common.DimmedText($"  {RepoLine(url)}");
                 if (ImGui.IsItemHovered()) ImGui.SetTooltip(url);
             }
             ImGui.Spacing();
@@ -901,7 +906,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             {
                 1 => string.Compare(a.Version, b.Version, StringComparison.OrdinalIgnoreCase),
                 2 => Rank(b).CompareTo(Rank(a)),
-                3 => string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase),
+                3 => CompareRepo(a.IsThirdParty ? a.Url : null, b.IsThirdParty ? b.Url : null),
                 _ => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
             };
             if (!asc) c = -c;
@@ -928,7 +933,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             else                      Common.DimmedText("-");
 
             ImGui.TableSetColumnIndex(3);
-            Common.DimmedText(r.IsThirdParty ? r.Url : "official");
+            Common.DimmedText(r.IsThirdParty ? RepoLine(r.Url) : "official");
             if (ImGui.IsItemHovered() && r.IsThirdParty) ImGui.SetTooltip(r.Url);
         }
         ImGui.EndTable();
@@ -965,9 +970,9 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         }
         shown.Sort((a, b) =>
         {
-            var c = col == 1 ? b.Enabled.CompareTo(a.Enabled) : string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase);
+            var c = col == 1 ? b.Enabled.CompareTo(a.Enabled) : CompareRepo(a.Url, b.Url);
             if (!asc) c = -c;
-            if (c == 0) c = string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase);
+            if (c == 0) c = CompareRepo(a.Url, b.Url);
             return c;
         });
 
@@ -975,7 +980,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         {
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
-            Common.DimmedText(url);
+            Common.DimmedText(RepoLine(url));
             if (ImGui.IsItemHovered()) ImGui.SetTooltip(url);
             ImGui.TableSetColumnIndex(1);
             if (enabled) ImGui.TextUnformatted("Enabled"); else Common.DimmedText("Disabled");
@@ -1006,8 +1011,24 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         s.Url.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase);
 
     // Full repo url for third-party copies; the official repo and dev plugins get a plain word instead
-    private static string RepoText(PluginSourceRow s) =>
-        s.IsDev ? "local" : !s.IsThirdParty ? "official" : s.Url.Length > 0 ? s.Url : "-";
+    private string RepoText(PluginSourceRow s) =>
+        s.IsDev ? "local" : !s.IsThirdParty ? "official" : s.Url.Length > 0 ? RepoLine(s.Url) : "-";
+
+    // Position of each custom repo in Dalamud's settings list (1-based, same numbers as the settings page),
+    // keyed by normalised url. Rebuilt every frame the Sources tab draws.
+    private readonly Dictionary<string, int> repoPos = new();
+
+    private int RepoPos(string? url) => url != null && repoPos.TryGetValue(NormUrl(url), out var p) ? p : int.MaxValue;
+
+    // "#3  https://..." so the repo is easy to find in Dalamud's settings; just the url if it is not in the list
+    private string RepoLine(string url) => RepoPos(url) is var p && p != int.MaxValue ? $"#{p}  {url}" : url;
+
+    // Settings order first (official and local before any custom repo, unlisted ones last), then the url
+    private int CompareRepo(string? a, string? b)
+    {
+        var c = (a == null ? 0 : RepoPos(a)).CompareTo(b == null ? 0 : RepoPos(b));
+        return c != 0 ? c : string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+    }
 
     // ---------------------------------------------------------------- threads
 
