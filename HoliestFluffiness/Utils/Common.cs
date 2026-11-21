@@ -239,6 +239,15 @@ internal static class Common
     }
     internal static void PopGreenButton() => ImGui.PopStyleColor(4);
 
+    internal static void PushBlueButton()
+    {
+        ImGui.PushStyleColor(ImGuiCol.Button,        Theme.ColBlueSub);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Theme.ColBlueMid);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Theme.ColBlue);
+        ImGui.PushStyleColor(ImGuiCol.Text,          Theme.ColBlue);
+    }
+    internal static void PopBlueButton() => ImGui.PopStyleColor(4);
+
     internal static void PushGreyButton()
     {
         ImGui.PushStyleColor(ImGuiCol.Button,        T(Theme.ColGrey,    ImGuiCol.Button));

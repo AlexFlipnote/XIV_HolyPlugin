@@ -12,12 +12,19 @@ namespace HoliestFluffiness.Windows;
 // /hdebug: what is eating the frame, the CPU and the memory. Sampling only runs while this window is open.
 public sealed class ProcessMonitorWindow : Window, IDisposable
 {
+    private readonly Configuration         config;
     private readonly ProcessMonitorHandler handler;
 
     private string pluginSearch = "";
+    private string sourceSearch = "";
+    // View options, loaded from and saved to the config so they survive a restart
     private bool   hideIdlePlugins;
     private bool   hideSelf;
-    private bool   hideIdleThreads = true;
+    private bool   hideIdleThreads;
+
+    // Snapshot of the plugin rows while frozen. The handler swaps in a new list on every refresh,
+    // so holding the old reference is enough to stop the table moving.
+    private List<PluginStatRow>? frozenPlugins;
 
     private const int PCName = 0, PCFrame = 1, PCTotal = 2, PCDraw = 3, PCUpdate = 4, PCPeak = 5, PCHooks = 6, PCTex = 7, PCTrend = 8;
     private const int TCTid = 0, TCName = 1, TCStart = 2, TCCpu = 3, TCTime = 4;
@@ -25,9 +32,15 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
     private readonly List<PluginStatRow> pluginBuf = [];
     private readonly List<ThreadStatRow> threadBuf = [];
 
-    internal ProcessMonitorWindow(ProcessMonitorHandler handler) : base("hdebug##HFProcessMonitor")
+    internal ProcessMonitorWindow(Configuration config, ProcessMonitorHandler handler) : base("hdebug##HFProcessMonitor")
     {
+        this.config   = config;
         this.handler  = handler;
+        hideIdlePlugins          = config.HdebugHideIdlePlugins;
+        hideSelf                 = config.HdebugHideSelf;
+        hideIdleThreads          = config.HdebugHideIdleThreads;
+        handler.SpikeThresholdMs = Math.Clamp(config.HdebugSpikeThresholdMs, 10f, 200f);
+        handler.IgnoreLoading    = config.HdebugIgnoreLoading;
         Size          = new Vector2(720, 520);
         SizeCondition = ImGuiCond.FirstUseEver;
     }
@@ -35,7 +48,11 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
     public void Dispose() { }
 
     public override void OnOpen()  => handler.Start();
-    public override void OnClose() => handler.Stop();
+    public override void OnClose()
+    {
+        handler.Stop();
+        frozenPlugins = null;
+    }
 
     public override void PreDraw()
     {
@@ -74,6 +91,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
 
         if (!ImGui.BeginTabBar("##hdbgTabs")) return;
         if (ImGui.BeginTabItem("Plugins"))  { DrawPlugins();  ImGui.EndTabItem(); }
+        if (ImGui.BeginTabItem("Sources"))  { DrawSources();  ImGui.EndTabItem(); }
         if (ImGui.BeginTabItem("Spikes"))   { DrawSpikes();   ImGui.EndTabItem(); }
         if (ImGui.BeginTabItem("Threads"))  { DrawThreads();  ImGui.EndTabItem(); }
         if (ImGui.BeginTabItem("Injected")) { DrawInjected(); ImGui.EndTabItem(); }
@@ -326,9 +344,9 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         Common.PopSearchInput();
         ImGui.SameLine();
         Common.PushGoldCheckbox();
-        ImGui.Checkbox("Hide idle", ref hideIdlePlugins);
+        if (ImGui.Checkbox("Hide idle", ref hideIdlePlugins)) { config.HdebugHideIdlePlugins = hideIdlePlugins; config.Save(); }
         ImGui.SameLine();
-        ImGui.Checkbox("Hide self", ref hideSelf);
+        if (ImGui.Checkbox("Hide self", ref hideSelf)) { config.HdebugHideSelf = hideSelf; config.Save(); }
         Common.PopGoldCheckbox();
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Hides this plugin, whose draw time includes this window itself.");
@@ -339,11 +357,22 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clears Dalamud's draw and update history, so peaks from loading screens or plugin startup drop out.");
 
+        ImGui.SameLine();
+        var frozen = frozenPlugins != null;
+        if (frozen) Common.PushBlueButton(); else Common.PushGreyButton();
+        if (ImGui.Button(frozen ? "Unfreeze##hdbgFreeze" : "Freeze##hdbgFreeze"))
+            frozenPlugins = frozen ? null : handler.Plugins;
+        if (frozen) Common.PopBlueButton(); else Common.PopGreyButton();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(frozen ? "Table is frozen. Click to resume live numbers."
+                                    : "Holds the table still so the numbers stop jumping while you read them.");
+
         var fps     = ImGui.GetIO().Framerate;
         var frameMs = fps > 0 ? 1000.0 / fps : 0;
+        var plugins = frozenPlugins ?? handler.Plugins;
 
         pluginBuf.Clear();
-        foreach (var p in handler.Plugins)
+        foreach (var p in plugins)
         {
             if (pluginSearch.Length > 0 && !p.Name.Contains(pluginSearch, StringComparison.OrdinalIgnoreCase)) continue;
             if (hideIdlePlugins && p.TotalAvg < 0.01) continue;
@@ -377,7 +406,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             ImGui.TableHeader(ImGui.TableGetColumnName(i));
             if (ImGui.IsItemHovered())
             {
-                totals ??= ComputeTotals(frameMs);
+                totals ??= ComputeTotals(plugins, frameMs);
                 // Pop the header text colour for the tooltip so its body is not all gold
                 Common.PopTableHeader();
                 HeaderTooltip(i, totals.Value);
@@ -458,13 +487,13 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
     private readonly record struct PluginTotals(int Loaded, int Installed, int Dev, double Frame, double Draw, double Update,
                                                 string? PeakName, double Peak, int Hooks, int TexCount, long TexBytes, long TexGrowth);
 
-    private PluginTotals ComputeTotals(double frameMs)
+    private PluginTotals ComputeTotals(List<PluginStatRow> plugins, double frameMs)
     {
         int loaded = 0, dev = 0, hooks = 0, texCount = 0;
         double total = 0, draw = 0, upd = 0, peak = 0;
         long texBytes = 0, growth = 0;
         string? peakName = null;
-        foreach (var p in handler.Plugins)
+        foreach (var p in plugins)
         {
             if (p.IsDalamud) continue;
             loaded++;
@@ -589,6 +618,397 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         else                 ImGui.TextUnformatted(text);
     }
 
+    // ---------------------------------------------------------------- sources
+
+    private const int SCName = 0, SCAuthor = 1, SCVersion = 2, SCStatus = 3, SCRepo = 4;
+
+    // Every installed plugin split by where it came from: the official repo, third-party repos and
+    // local dev plugins, A-Z with enabled before disabled on ties. Plugins installed from more than one
+    // repo get one entry above (the loaded copy) and all their copies in a collapsed Duplicates section.
+    // Custom repos that no installed plugin came from are listed last, as clean-up candidates.
+    private void DrawSources()
+    {
+        handler.RefreshSources();
+        var all = handler.Sources;
+        if (all.Count == 0) { Common.DimmedText("Reading installed plugins..."); return; }
+
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+        Common.PushSearchInput();
+        ImGui.InputTextWithHint("##hdbgSrcSearch", "Search name, author or repo", ref sourceSearch, 100);
+        Common.PopSearchInput();
+
+        // One entry per InternalName in the main sections, preferring the loaded copy
+        var groups     = all.GroupBy(s => s.InternalName).ToList();
+        var primary    = groups.Select(g => g.FirstOrDefault(s => s.IsLoaded) ?? g.First()).ToList();
+        var duplicates = groups.Where(g => g.Count() > 1).SelectMany(g => g).ToList();
+
+        var official   = primary.Where(s => !s.IsDev && !s.IsThirdParty).ToList();
+        var thirdParty = primary.Where(s => !s.IsDev && s.IsThirdParty).ToList();
+        var dev        = primary.Where(s => s.IsDev).ToList();
+
+        // Repos in Dalamud's list that no installed copy (loaded or not) was installed from
+        var usedUrls = new HashSet<string>(all.Where(s => s.IsThirdParty).Select(s => NormUrl(s.Url)));
+        var unused   = handler.Repos?.Where(r => !usedUrls.Contains(NormUrl(r.Url)))
+                                     .OrderBy(r => r.Url, StringComparer.OrdinalIgnoreCase).ToList();
+
+        var loaded = primary.Count(s => s.IsLoaded);
+        ImGui.SameLine();
+        Common.DimmedText($"{primary.Count} installed, {loaded} enabled, {thirdParty.Count} third-party");
+
+        if (!ImGui.BeginChild("##hdbgSrcScroll", Vector2.Zero)) { ImGui.EndChild(); return; }
+
+        ImGui.PushStyleColor(ImGuiCol.Header,        Pick(Theme.ColPrimary, ImGuiCol.Header));
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, Pick(Theme.ColGoldSub, ImGuiCol.HeaderHovered));
+        ImGui.PushStyleColor(ImGuiCol.HeaderActive,  Pick(Theme.ColGoldMid, ImGuiCol.HeaderActive));
+
+        var open = config.HdebugSrcOfficialOpen;
+        SourceSection("Official", official, false, ref open,
+                      "Installed from Dalamud's main repo. These go through Dalamud's review.");
+        if (open != config.HdebugSrcOfficialOpen) { config.HdebugSrcOfficialOpen = open; config.Save(); }
+
+        open = config.HdebugSrcThirdPartyOpen;
+        SourceSection("Third-party", thirdParty, true, ref open,
+                      "Installed from custom repos added in Dalamud's settings. Not reviewed by Dalamud.");
+        if (open != config.HdebugSrcThirdPartyOpen) { config.HdebugSrcThirdPartyOpen = open; config.Save(); }
+
+        if (dev.Count > 0)
+        {
+            open = config.HdebugSrcDevOpen;
+            SourceSection("Dev", dev, false, ref open, "Loaded from a local folder (dev plugin locations).");
+            if (open != config.HdebugSrcDevOpen) { config.HdebugSrcDevOpen = open; config.Save(); }
+        }
+
+        if (duplicates.Count > 0)
+        {
+            open = config.HdebugSrcDuplicatesOpen;
+            SourceSection("Duplicates", duplicates, true, ref open,
+                          "Plugins installed from more than one source. Only one copy can be loaded; the rest just take up space.",
+                          duplicates.Select(d => d.InternalName).Distinct().Count());
+            if (open != config.HdebugSrcDuplicatesOpen) { config.HdebugSrcDuplicatesOpen = open; config.Save(); }
+        }
+
+        if (handler.Listings is { } listings)
+        {
+            open = config.HdebugSrcOverlapOpen;
+            OverlapSection(listings, all, ref open);
+            if (open != config.HdebugSrcOverlapOpen) { config.HdebugSrcOverlapOpen = open; config.Save(); }
+        }
+
+        if (unused is { Count: > 0 })
+        {
+            open = config.HdebugSrcUnusedReposOpen;
+            UnusedRepoSection(unused, ref open);
+            if (open != config.HdebugSrcUnusedReposOpen) { config.HdebugSrcUnusedReposOpen = open; config.Save(); }
+        }
+
+        ImGui.PopStyleColor(3);
+        ImGui.EndChild();
+    }
+
+    // Compare repo urls loosely: case, surrounding spaces and a trailing slash do not matter
+    private static string NormUrl(string url) => url.Trim().TrimEnd('/').ToLowerInvariant();
+
+    private static ImGuiTableFlags SourceTableFlags =>
+        ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchProp |
+        ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable;
+
+    // A collapsible header plus its table. `open` is the remembered state going in and the new state coming out.
+    private void SourceSection(string title, List<PluginSourceRow> rows, bool showRepo, ref bool open, string tip, int countOverride = -1)
+    {
+        var shown = rows.Where(MatchesSourceSearch).ToList();
+        var count = countOverride >= 0 ? countOverride : rows.Count;
+
+        ImGui.SetNextItemOpen(open, ImGuiCond.Always);
+        open = ImGui.CollapsingHeader($"{title} ({count})##src{title}");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
+        if (!open) return;
+
+        if (shown.Count == 0)
+        {
+            Common.DimmedText(rows.Count == 0 ? "  None" : "  No matches");
+            ImGui.Spacing();
+            return;
+        }
+
+        if (!ImGui.BeginTable($"##srcTbl{title}", showRepo ? 5 : 4, SourceTableFlags)) return;
+
+        // Repo gets the room; without it the name column takes the slack instead
+        ImGui.TableSetupColumn("Plugin",  ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort, showRepo ? 1.3f : 2.4f);
+        ImGui.TableSetupColumn("Author",  ImGuiTableColumnFlags.WidthStretch, 1f);
+        ImGui.TableSetupColumn("Version", ImGuiTableColumnFlags.WidthStretch, 0.55f);
+        ImGui.TableSetupColumn("Status",  ImGuiTableColumnFlags.WidthStretch, 0.55f);
+        if (showRepo) ImGui.TableSetupColumn("Repo", ImGuiTableColumnFlags.WidthStretch, 3.2f);
+        Common.PushTableHeader();
+        ImGui.TableHeadersRow();
+        Common.PopTableHeader();
+
+        var specs = ImGui.TableGetSortSpecs();
+        int col = SCName; var asc = true;
+        if (!specs.IsNull && specs.SpecsCount > 0)
+        {
+            col = specs.Specs.ColumnIndex;
+            asc = specs.Specs.SortDirection == ImGuiSortDirection.Ascending;
+        }
+        shown.Sort((a, b) =>
+        {
+            var c = col switch
+            {
+                SCAuthor  => string.Compare(a.Author, b.Author, StringComparison.OrdinalIgnoreCase),
+                SCVersion => string.Compare(a.Version, b.Version, StringComparison.OrdinalIgnoreCase),
+                SCStatus  => b.IsLoaded.CompareTo(a.IsLoaded),
+                SCRepo    => string.Compare(RepoText(a), RepoText(b), StringComparison.OrdinalIgnoreCase),
+                _         => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            };
+            if (!asc) c = -c;
+            // Secondary: enabled before disabled, then A-Z
+            if (c == 0) c = b.IsLoaded.CompareTo(a.IsLoaded);
+            if (c == 0) c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            return c;
+        });
+
+        foreach (var s in shown)
+        {
+            ImGui.TableNextRow();
+
+            ImGui.TableSetColumnIndex(SCName);
+            var nameCol = !s.IsLoaded ? Theme.ColWhiteDim : s.IsSelf ? Theme.ColGold : Theme.ColWhite;
+            ImGui.PushStyleColor(ImGuiCol.Text, nameCol);
+            ImGui.TextUnformatted(s.Name);
+            ImGui.PopStyleColor();
+            if (ImGui.IsItemHovered() && s.Name != s.InternalName) ImGui.SetTooltip(s.InternalName);
+            SourceTags(s);
+
+            ImGui.TableSetColumnIndex(SCAuthor);
+            Common.DimmedText(s.Author.Length > 0 ? s.Author : "-");
+
+            ImGui.TableSetColumnIndex(SCVersion);
+            Common.DimmedText(s.Version.Length > 0 ? s.Version : "-");
+
+            ImGui.TableSetColumnIndex(SCStatus);
+            if (s.IsLoaded) ImGui.TextUnformatted("Enabled"); else Common.DimmedText("Disabled");
+
+            if (showRepo && ImGui.TableSetColumnIndex(SCRepo))
+            {
+                Common.DimmedText(RepoText(s));
+                // The column can still be narrower than a long url; the tooltip always has all of it
+                if (ImGui.IsItemHovered() && s.IsThirdParty) ImGui.SetTooltip(s.Url);
+            }
+        }
+        ImGui.EndTable();
+        ImGui.Spacing();
+    }
+
+    private readonly record struct OverlapRow(string Name, string InternalName, string Version, string Url, bool IsThirdParty,
+                                              bool InstalledHere, bool LoadedHere, bool InstalledAnywhere);
+
+    // Plugins that more than one enabled repo offers, one row per (plugin, repo). Shows which copy is
+    // installed, and calls out repos whose whole catalogue is available elsewhere, since those can go.
+    private void OverlapSection(List<RepoListing> listings, List<PluginSourceRow> installed, ref bool open)
+    {
+        // InternalName -> every enabled repo offering it (a repo listing a plugin twice counts once)
+        var offers = new Dictionary<string, List<(RepoListing Repo, string Name, string Version)>>();
+        foreach (var repo in listings)
+        {
+            if (!repo.IsEnabled) continue;
+            foreach (var (iname, name, ver) in repo.Plugins)
+            {
+                if (!offers.TryGetValue(iname, out var list)) offers[iname] = list = [];
+                if (!list.Any(o => ReferenceEquals(o.Repo, repo))) list.Add((repo, name, ver));
+            }
+        }
+
+        bool FromRepo(PluginSourceRow s, RepoListing r) =>
+            !s.IsDev && (r.IsThirdParty ? s.IsThirdParty && NormUrl(s.Url) == NormUrl(r.Url) : !s.IsThirdParty);
+
+        var installedNames = new HashSet<string>(installed.Select(s => s.InternalName));
+        var installedOnly  = config.HdebugSrcOverlapInstalledOnly;
+        var rows = new List<OverlapRow>();
+        foreach (var (iname, list) in offers)
+        {
+            if (list.Count < 2) continue;
+            var anywhere = installedNames.Contains(iname);
+            if (installedOnly && !anywhere) continue;
+            foreach (var (repo, name, ver) in list)
+            {
+                var copy = installed.FirstOrDefault(s => s.InternalName == iname && FromRepo(s, repo));
+                rows.Add(new OverlapRow(name, iname, ver, repo.Url, repo.IsThirdParty, copy != null, copy?.IsLoaded == true, anywhere));
+            }
+        }
+
+        // Third-party repos where every plugin is also offered by another enabled repo
+        var covered = listings.Where(r => r.IsEnabled && r.IsThirdParty && r.Plugins.Count > 0 &&
+                                          r.Plugins.All(p => offers.TryGetValue(p.InternalName, out var l) && l.Count > 1))
+                              .Select(r => r.Url).OrderBy(u => u, StringComparer.OrdinalIgnoreCase).ToList();
+
+        var pluginCount = rows.Select(r => r.InternalName).Distinct().Count();
+        ImGui.SetNextItemOpen(open, ImGuiCond.Always);
+        open = ImGui.CollapsingHeader($"Overlapping ({pluginCount})##srcOverlap");
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Plugins offered by more than one of your enabled repos, from the lists Dalamud's installer already downloaded.\n" +
+                             "Handy for spotting repos that only mirror what another repo has.");
+        if (!open) return;
+
+        Common.PushGoldCheckbox();
+        if (ImGui.Checkbox("Installed only##srcOverlapInst", ref installedOnly))
+        {
+            config.HdebugSrcOverlapInstalledOnly = installedOnly;
+            config.Save();
+        }
+        Common.PopGoldCheckbox();
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Only show overlaps for plugins you have installed.");
+
+        if (covered.Count > 0)
+        {
+            Common.GoldText($"{covered.Count} repo{(covered.Count == 1 ? "" : "s")} only offer{(covered.Count == 1 ? "s" : "")} plugins that another repo also has:");
+            foreach (var url in covered)
+            {
+                Common.DimmedText($"  {url}");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip(url);
+            }
+            ImGui.Spacing();
+        }
+
+        var shown = rows.Where(r => sourceSearch.Length == 0 ||
+                                    r.Name.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase) ||
+                                    r.Url.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (shown.Count == 0)
+        {
+            Common.DimmedText(rows.Count == 0 ? "  None" : "  No matches");
+            ImGui.Spacing();
+            return;
+        }
+
+        if (!ImGui.BeginTable("##srcTblOverlap", 4, SourceTableFlags)) return;
+        ImGui.TableSetupColumn("Plugin",    ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort, 1.3f);
+        ImGui.TableSetupColumn("Version",   ImGuiTableColumnFlags.WidthStretch, 0.55f);
+        ImGui.TableSetupColumn("Installed", ImGuiTableColumnFlags.WidthStretch, 0.6f);
+        ImGui.TableSetupColumn("Repo",      ImGuiTableColumnFlags.WidthStretch, 3.2f);
+        Common.PushTableHeader();
+        ImGui.TableHeadersRow();
+        Common.PopTableHeader();
+
+        var specs = ImGui.TableGetSortSpecs();
+        int col = 0; var asc = true;
+        if (!specs.IsNull && specs.SpecsCount > 0)
+        {
+            col = specs.Specs.ColumnIndex;
+            asc = specs.Specs.SortDirection == ImGuiSortDirection.Ascending;
+        }
+        static int Rank(OverlapRow r) => r.LoadedHere ? 2 : r.InstalledHere ? 1 : 0;
+        shown.Sort((a, b) =>
+        {
+            var c = col switch
+            {
+                1 => string.Compare(a.Version, b.Version, StringComparison.OrdinalIgnoreCase),
+                2 => Rank(b).CompareTo(Rank(a)),
+                3 => string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase),
+                _ => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            };
+            if (!asc) c = -c;
+            // Copies of one plugin stay together, the one you use first
+            if (c == 0) c = string.Compare(a.InternalName, b.InternalName, StringComparison.OrdinalIgnoreCase);
+            if (c == 0) c = Rank(b).CompareTo(Rank(a));
+            if (c == 0) c = a.IsThirdParty.CompareTo(b.IsThirdParty);
+            return c;
+        });
+
+        foreach (var r in shown)
+        {
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            if (r.InstalledAnywhere) ImGui.TextUnformatted(r.Name); else Common.DimmedText(r.Name);
+            if (ImGui.IsItemHovered() && r.Name != r.InternalName) ImGui.SetTooltip(r.InternalName);
+
+            ImGui.TableSetColumnIndex(1);
+            Common.DimmedText(r.Version.Length > 0 ? r.Version : "-");
+
+            ImGui.TableSetColumnIndex(2);
+            if (r.LoadedHere)         ImGui.TextUnformatted("Enabled");
+            else if (r.InstalledHere) Common.DimmedText("Disabled");
+            else                      Common.DimmedText("-");
+
+            ImGui.TableSetColumnIndex(3);
+            Common.DimmedText(r.IsThirdParty ? r.Url : "official");
+            if (ImGui.IsItemHovered() && r.IsThirdParty) ImGui.SetTooltip(r.Url);
+        }
+        ImGui.EndTable();
+        ImGui.Spacing();
+    }
+
+    // Repos added in Dalamud's settings that none of the installed plugins came from
+    private void UnusedRepoSection(List<(string Url, bool Enabled)> repos, ref bool open)
+    {
+        var shown = repos.Where(r => sourceSearch.Length == 0 || r.Url.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        ImGui.SetNextItemOpen(open, ImGuiCond.Always);
+        open = ImGui.CollapsingHeader($"Unused third-party repos ({repos.Count})##srcUnused");
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Custom repos in Dalamud's settings that none of your installed plugins came from.\n" +
+                             "Safe to remove unless you plan to install something from them.");
+        if (!open) return;
+
+        if (shown.Count == 0) { Common.DimmedText("  No matches"); ImGui.Spacing(); return; }
+
+        if (!ImGui.BeginTable("##srcTblUnused", 2, SourceTableFlags)) return;
+        ImGui.TableSetupColumn("Repo",   ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort, 6f);
+        ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthStretch, 0.55f);
+        Common.PushTableHeader();
+        ImGui.TableHeadersRow();
+        Common.PopTableHeader();
+
+        var specs = ImGui.TableGetSortSpecs();
+        int col = 0; var asc = true;
+        if (!specs.IsNull && specs.SpecsCount > 0)
+        {
+            col = specs.Specs.ColumnIndex;
+            asc = specs.Specs.SortDirection == ImGuiSortDirection.Ascending;
+        }
+        shown.Sort((a, b) =>
+        {
+            var c = col == 1 ? b.Enabled.CompareTo(a.Enabled) : string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase);
+            if (!asc) c = -c;
+            if (c == 0) c = string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase);
+            return c;
+        });
+
+        foreach (var (url, enabled) in shown)
+        {
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            Common.DimmedText(url);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(url);
+            ImGui.TableSetColumnIndex(1);
+            if (enabled) ImGui.TextUnformatted("Enabled"); else Common.DimmedText("Disabled");
+        }
+        ImGui.EndTable();
+        ImGui.Spacing();
+    }
+
+    // Small status tags after the name; only the ones that apply
+    private static void SourceTags(PluginSourceRow s)
+    {
+        void Tag(string text, bool bad, string tip)
+        {
+            ImGui.SameLine();
+            if (bad) Common.RedText(text); else Common.DimmedText(text);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
+        }
+        if (s.IsTesting)  Tag("[testing]",  false, "Running the testing build of this plugin.");
+        if (s.IsOutdated) Tag("[outdated]", true,  "Built for an older Dalamud API; it will not load until it is updated.");
+        if (s.IsOrphaned) Tag("[orphaned]", true,  "The repo this came from is no longer in your repo list, so it will not get updates.");
+        if (s.IsBanned)   Tag("[removed]",  true,  "Banned or decommissioned by Dalamud.");
+    }
+
+    private bool MatchesSourceSearch(PluginSourceRow s) =>
+        sourceSearch.Length == 0 ||
+        s.Name.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase) ||
+        s.Author.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase) ||
+        s.Url.Contains(sourceSearch, StringComparison.OrdinalIgnoreCase);
+
+    // Full repo url for third-party copies; the official repo and dev plugins get a plain word instead
+    private static string RepoText(PluginSourceRow s) =>
+        s.IsDev ? "local" : !s.IsThirdParty ? "official" : s.Url.Length > 0 ? s.Url : "-";
+
     // ---------------------------------------------------------------- threads
 
     private void DrawThreads()
@@ -597,7 +1017,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         if (threads.Count == 0) { Common.DimmedText("Sampling threads..."); return; }
 
         Common.PushGoldCheckbox();
-        ImGui.Checkbox("Hide idle", ref hideIdleThreads);
+        if (ImGui.Checkbox("Hide idle", ref hideIdleThreads)) { config.HdebugHideIdleThreads = hideIdleThreads; config.Save(); }
         Common.PopGoldCheckbox();
         ImGui.SameLine();
         Common.DimmedText($"{threads.Count} threads, 100% = one full core");
@@ -679,10 +1099,12 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         ImGui.SetNextItemWidth(170 * ImGuiHelpers.GlobalScale);
         Common.PushGoldSlider();
         ImGui.SliderFloat("##spikeThr", ref handler.SpikeThresholdMs, 10f, 200f, "over %.0f ms");
+        // Save once the drag ends, not on every frame of it
+        if (ImGui.IsItemDeactivatedAfterEdit()) { config.HdebugSpikeThresholdMs = handler.SpikeThresholdMs; config.Save(); }
         Common.PopGoldSlider();
         ImGui.SameLine();
         Common.PushGoldCheckbox();
-        ImGui.Checkbox("Ignore loading screens", ref handler.IgnoreLoading);
+        if (ImGui.Checkbox("Ignore loading screens", ref handler.IgnoreLoading)) { config.HdebugIgnoreLoading = handler.IgnoreLoading; config.Save(); }
         Common.PopGoldCheckbox();
         ImGui.SameLine();
         Common.PushGreyButton();

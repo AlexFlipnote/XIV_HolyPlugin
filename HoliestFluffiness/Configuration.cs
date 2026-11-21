@@ -201,6 +201,21 @@ public class Configuration : IPluginConfiguration
     public string DoorbellLeaveText       { get; set; } = DefaultDoorbellLeaveText;
     public string DoorbellAlreadyHereText { get; set; } = DefaultDoorbellAlreadyHereText;
 
+    // /hdebug view options
+    public bool  HdebugHideIdlePlugins { get; set; } = false;
+    public bool  HdebugHideSelf        { get; set; } = false;
+    public bool  HdebugHideIdleThreads { get; set; } = true;
+    public float HdebugSpikeThresholdMs { get; set; } = 25f;
+    public bool  HdebugIgnoreLoading   { get; set; } = true;
+    // Sources tab: which sections are expanded (all collapsed by default)
+    public bool  HdebugSrcOfficialOpen   { get; set; } = false;
+    public bool  HdebugSrcThirdPartyOpen { get; set; } = false;
+    public bool  HdebugSrcDevOpen        { get; set; } = false;
+    public bool  HdebugSrcDuplicatesOpen { get; set; } = false;
+    public bool  HdebugSrcUnusedReposOpen { get; set; } = false;
+    public bool  HdebugSrcOverlapOpen     { get; set; } = false;
+    public bool  HdebugSrcOverlapInstalledOnly { get; set; } = true;
+
     public bool DynamicTravelerEnabled    { get; set; } = false;
     public bool BlacklistContextMenuEnabled { get; set; } = false;
 

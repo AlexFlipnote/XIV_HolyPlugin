@@ -44,6 +44,26 @@ internal sealed class PluginStatRow
     public double Peak     => Math.Max(Z(DrawMax), Z(UpdMax));
 }
 
+// One installed copy of a plugin, loaded or not. The same InternalName can show up more than once
+// when it is installed from several repos; only one of those copies can be loaded.
+internal sealed class PluginSourceRow
+{
+    public required string Name;
+    public required string InternalName;
+    public string Author  = "";
+    public string Version = "";
+    public string Url     = "";   // InstalledFromUrl: the repo json, or a special marker for dev plugins
+    public bool   IsLoaded, IsDev, IsThirdParty, IsTesting, IsOutdated, IsOrphaned, IsBanned, IsSelf;
+}
+
+// One repo as Dalamud's installer sees it: its url and every plugin it offers
+internal sealed class RepoListing
+{
+    public string Url = "";
+    public bool   IsThirdParty, IsEnabled;
+    public readonly List<(string InternalName, string Name, string Version)> Plugins = [];
+}
+
 internal sealed class ThreadStatRow
 {
     public uint     Tid;
@@ -124,6 +144,9 @@ internal sealed class ProcessMonitorHandler : IDisposable
     public List<PluginStatRow> Plugins { get; private set; } = [];
     public int InstalledCount { get; private set; } // installed, loaded or not; Plugins only holds loaded ones
     private long lastPluginRefresh;
+
+    public List<PluginSourceRow> Sources { get; private set; } = [];
+    private long lastSourceRefresh;
     private readonly Dictionary<string, string?> handlerOwnerCache = new();
 
     // Spike catcher (main thread only)
@@ -475,6 +498,142 @@ internal sealed class ProcessMonitorHandler : IDisposable
     }
 
     private static double Nz(double v) => double.IsNaN(v) ? 0 : v;
+
+    // Where every installed plugin came from. Public API only, so it works even when the stats reflection does not.
+    // Throttled to 1 Hz; install state changes rarely and the list is rebuilt from scratch each time.
+    public void RefreshSources()
+    {
+        var now = Environment.TickCount64;
+        if (now - lastSourceRefresh < 1000) return;
+        lastSourceRefresh = now;
+
+        try
+        {
+            var rows = new List<PluginSourceRow>();
+            foreach (var p in pi.InstalledPlugins)
+            {
+                rows.Add(new PluginSourceRow
+                {
+                    Name         = p.Name,
+                    InternalName = p.InternalName,
+                    Author       = p.Manifest.Author ?? "",
+                    Version      = p.Version?.ToString() ?? "",
+                    Url          = p.Manifest.InstalledFromUrl ?? "",
+                    IsLoaded     = p.IsLoaded,
+                    IsDev        = p.IsDev,
+                    IsThirdParty = p.IsThirdParty,
+                    IsTesting    = p.IsTesting,
+                    IsOutdated   = p.IsOutdated,
+                    IsOrphaned   = p.IsOrphaned,
+                    IsBanned     = p.IsBanned || p.IsDecommissioned,
+                    IsSelf       = p.InternalName == pi.InternalName,
+                });
+            }
+            Sources = rows;
+            Repos   = ReadThirdPartyRepos();
+            // Repo listings can hold thousands of entries; they only change when Dalamud refetches, so 5 s is plenty
+            if (now - lastListingRefresh >= 5000)
+            {
+                lastListingRefresh = now;
+                Listings = ReadRepoListings();
+            }
+        }
+        catch (Exception e)
+        {
+            log.Warning(e, "[HF] hdebug: plugin source refresh failed.");
+        }
+    }
+
+    // What each repo offers, from the plugin lists Dalamud already downloaded for its installer (no network here).
+    // PluginManager and PluginRepository are internal, so this is reflection. Null when unavailable.
+    public List<RepoListing>? Listings { get; private set; }
+    private long lastListingRefresh = long.MinValue / 2;
+    private bool listingReflectionFailed;
+
+    private List<RepoListing>? ReadRepoListings()
+    {
+        if (listingReflectionFailed) return null;
+        try
+        {
+            const BindingFlags any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            static object? Get(object o, string name) => o.GetType().GetProperty(name, any)?.GetValue(o);
+
+            var dal    = typeof(IDalamudPluginInterface).Assembly;
+            var pmType = dal.GetType("Dalamud.Plugin.Internal.PluginManager", true)!;
+            var pm     = dal.GetType("Dalamud.Service`1", true)!.MakeGenericType(pmType)
+                            .GetMethod("Get", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)!;
+            if (Get(pm, "Repos") is not IEnumerable repos) throw new MissingMemberException(pmType.Name, "Repos");
+
+            var result = new List<RepoListing>();
+            foreach (var repo in repos)
+            {
+                if (repo == null) continue;
+                var listing = new RepoListing
+                {
+                    Url          = Get(repo, "PluginMasterUrl") as string ?? "",
+                    IsThirdParty = Get(repo, "IsThirdParty") as bool? ?? true,
+                    IsEnabled    = Get(repo, "IsEnabled") as bool? ?? false,
+                };
+                if (Get(repo, "PluginMaster") is IEnumerable master)
+                    foreach (var m in master)
+                    {
+                        if (m == null || Get(m, "InternalName") is not string iname || iname.Length == 0) continue;
+                        listing.Plugins.Add((iname, Get(m, "Name") as string ?? iname, Get(m, "AssemblyVersion")?.ToString() ?? ""));
+                    }
+                result.Add(listing);
+            }
+            return result;
+        }
+        catch (Exception e)
+        {
+            listingReflectionFailed = true;
+            log.Warning(e, "[HF] hdebug: could not read the repo plugin listings.");
+            return null;
+        }
+    }
+
+    // The custom repo list from Dalamud's settings. DalamudConfiguration is internal, so this is reflection;
+    // it only reads the local config (no network). Null when it cannot be read on this Dalamud version.
+    public List<(string Url, bool Enabled)>? Repos { get; private set; }
+    private PropertyInfo? thirdRepoListProp;
+    private object?       dalamudConfig;
+    private bool          repoReflectionFailed;
+
+    private List<(string Url, bool Enabled)>? ReadThirdPartyRepos()
+    {
+        if (repoReflectionFailed) return null;
+        try
+        {
+            if (dalamudConfig == null)
+            {
+                var dal     = typeof(IDalamudPluginInterface).Assembly;
+                var cfgType = dal.GetType("Dalamud.Configuration.Internal.DalamudConfiguration", true)!;
+                dalamudConfig = dal.GetType("Dalamud.Service`1", true)!.MakeGenericType(cfgType)
+                                   .GetMethod("Get", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null);
+                thirdRepoListProp = cfgType.GetProperty("ThirdRepoList", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                                    ?? throw new MissingMemberException(cfgType.Name, "ThirdRepoList");
+            }
+
+            var list = new List<(string, bool)>();
+            if (thirdRepoListProp!.GetValue(dalamudConfig) is IEnumerable repos)
+                foreach (var r in repos)
+                {
+                    if (r == null) continue;
+                    // ThirdPartyRepoSettings is internal too
+                    var t       = r.GetType();
+                    var url     = t.GetProperty("Url",       BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(r) as string;
+                    var enabled = t.GetProperty("IsEnabled", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(r) as bool? ?? false;
+                    if (!string.IsNullOrWhiteSpace(url)) list.Add((url.Trim(), enabled));
+                }
+            return list;
+        }
+        catch (Exception e)
+        {
+            repoReflectionFailed = true;
+            log.Warning(e, "[HF] hdebug: could not read the third-party repo list.");
+            return null;
+        }
+    }
 
     private PluginStatRow? ResolveHandlerOwner(string key, Dictionary<Assembly, PluginStatRow> byAsm, List<(string Prefix, PluginStatRow Row)> byPrefix)
     {

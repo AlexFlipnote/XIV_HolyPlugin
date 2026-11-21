@@ -58,6 +58,11 @@ internal static class Theme
     internal static Vector4 ColRed      => UseCustom ? new(220/255f,  80/255f,  80/255f, 1f) : ImGuiColors.ErrorForeground;   // #DC5050
     internal static Vector4 ColWarning  => UseCustom ? ColGold                                : ImGuiColors.WarningForeground;
 
+    // Light blue accent (hdebug freeze). Same in both themes, so a frozen state always reads as frozen.
+    internal static readonly Vector4 ColBlue    = new(20/255f, 186/255f, 228/255f, 1f); // #14BAE4
+    internal static readonly Vector4 ColBlueMid = ColBlue with { W = 0.35f };
+    internal static readonly Vector4 ColBlueSub = ColBlue with { W = 0.18f };
+
     // Tinted fills behind content (fate progress bars)
     internal static Vector4 ColRedBg     => UseCustom ? ColRed  with { W = 0.45f } : ImGuiColors.ErrorBackground;
     internal static Vector4 ColWarningBg => UseCustom ? ColGold with { W = 0.40f } : ImGuiColors.WarningBackground;

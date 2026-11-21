@@ -264,7 +264,7 @@ public sealed class Plugin : IDalamudPlugin
         pingChartWindow        = new PingChartWindow(serverInfoHandler);
         fpsChartWindow         = new FpsChartWindow(serverInfoHandler);
         processMonitorHandler  = new ProcessMonitorHandler(PluginInterface, Condition, Log);
-        processMonitorWindow   = new ProcessMonitorWindow(processMonitorHandler);
+        processMonitorWindow   = new ProcessMonitorWindow(configuration, processMonitorHandler);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
         serverInfoHandler.SetFpsClickAction(() => fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen, () =>
