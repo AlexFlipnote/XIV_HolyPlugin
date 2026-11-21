@@ -67,7 +67,7 @@ public partial class ConfigWindow
 
         ConfigInputText("Tooltip text##locationdtrtooltip", configuration.LocationDtrTooltipFormat,
             v => configuration.LocationDtrTooltipFormat = v, width: 240,
-            hint: "(empty = default)",
+            hint: "(empty = default, \\n = new line)",
             desc: "What hovering the entry shows. Type \\n for a new line.");
         RowGap(0);
 
