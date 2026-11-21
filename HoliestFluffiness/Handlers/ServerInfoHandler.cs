@@ -115,7 +115,8 @@ public sealed class ServerInfoHandler : IDisposable
 
     public void SetPingClickAction(Action action) => dtrPing.OnClick = _ => action();
 
-    public void SetFpsClickAction(Action action) => dtrFps.OnClick = _ => action();
+    public void SetFpsClickAction(Action leftClick, Action rightClick)
+        => dtrFps.OnClick = e => (e.ClickType == MouseClickType.Right ? rightClick : leftClick)();
 
     private unsafe void OnUpdate(IFramework fw)
     {

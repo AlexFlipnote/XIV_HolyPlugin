@@ -211,12 +211,9 @@ public partial class ConfigWindow
             "Show FPS in server bar##serverinfofps",
             configuration.ServerInfoFpsEnabled,
             v => configuration.ServerInfoFpsEnabled = v,
-            "Turns green while an FPS limit is holding.");
+            "Left click opens the FPS chart, right click toggles the FPS limit. Turns green while a limit is holding.");
 
         ImGui.BeginDisabled(!configuration.ServerInfoFpsEnabled);
-        ConfigCombo("On click##serverinfofpsclick", (int)configuration.ServerInfoFpsClick, FpsClickActions,
-            v => configuration.ServerInfoFpsClick = (FpsClickAction)v, width: 180,
-            desc: "Open the FPS chart, or toggle the FPS limit.");
         ConfigCheckbox(
             "Live FPS##serverinfofpslive",
             configuration.ServerInfoFpsLive,
@@ -299,8 +296,6 @@ public partial class ConfigWindow
     private static readonly string[] PingDisplayModes = ["Last ping", "Average ping", "Both"];
 
     private static readonly string[] DisableRenderModes = ["When unfocused", "Always"];
-
-    private static readonly string[] FpsClickActions = ["Open chart", "Toggle limit"];
 
     private static readonly string[] MediaBarSlots = ["Top left", "Top right", "Bottom left", "Bottom right"];
 

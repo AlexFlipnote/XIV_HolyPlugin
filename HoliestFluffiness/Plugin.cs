@@ -262,14 +262,8 @@ public sealed class Plugin : IDalamudPlugin
         fpsChartWindow         = new FpsChartWindow(serverInfoHandler);
         serverInfoHandler.SetNearbyClickAction(() => CommandManager.ProcessCommand(NearbyCommand));
         serverInfoHandler.SetPingClickAction(() => pingChartWindow.IsOpen = !pingChartWindow.IsOpen);
-        serverInfoHandler.SetFpsClickAction(() =>
+        serverInfoHandler.SetFpsClickAction(() => fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen, () =>
         {
-            if (configuration.ServerInfoFpsClick != FpsClickAction.ToggleLimit)
-            {
-                fpsChartWindow.IsOpen = !fpsChartWindow.IsOpen;
-                return;
-            }
-
             configuration.FpsLimitEnabled = !configuration.FpsLimitEnabled;
             configuration.Save();
             Common.ShowToast("FPS limit", configuration.FpsLimitEnabled
