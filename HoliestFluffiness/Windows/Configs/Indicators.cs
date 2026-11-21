@@ -18,6 +18,12 @@ public partial class ConfigWindow
     private HideMpBarsHandler hideMpBarsHandler = null!;
     internal void SetHideMpBarsHandler(HideMpBarsHandler handler) => hideMpBarsHandler = handler;
 
+    private ActionFadeHandler actionFadeHandler = null!;
+    internal void SetActionFadeHandler(ActionFadeHandler handler) => actionFadeHandler = handler;
+
+    private LocationDtrHandler locationDtrHandler = null!;
+    internal void SetLocationDtrHandler(LocationDtrHandler handler) => locationDtrHandler = handler;
+
     private void DrawIndicatorsSection()
     {
         BeginSection("Indicators", "Settings for in-game indicators and HUD additions.");
@@ -44,6 +50,26 @@ public partial class ConfigWindow
             },
             "Hides the padlock icon on the action bar");
 
+        // ── Location ──────────────────────────────────────────────────────────
+        SubsectionLabel("Location", "Where you are, in the server info bar. Hover it for the full location.");
+
+        ConfigCheckbox(
+            "Show location in server bar##locationdtr",
+            configuration.LocationDtrEnabled,
+            v => configuration.LocationDtrEnabled = v,
+            "Click the entry in-game to copy the location.");
+
+        ImGui.BeginDisabled(!configuration.LocationDtrEnabled);
+        ConfigInputText("Location text##locationdtrformat", configuration.LocationDtrFormat,
+            v => configuration.LocationDtrFormat = v, width: 240,
+            hint: $"(empty = {Configuration.DefaultLocationDtrFormat})",
+            desc: "Empty or repeated tags are left out, along with the separator in front of them.");
+        RowGap(0);
+
+        var locationTags = $"Tags: {LocationInfo.Tags}";
+        var preview      = LocationDtrHandler.Format(configuration.LocationDtrFormat, locationDtrHandler.Current);
+        Common.DimmedText(preview.Length > 0 ? $"{locationTags}\nPreview: {preview}" : locationTags);
+        ImGui.EndDisabled();
 
         // ── Ward Info ──────────────────────────────────────────────────────────
         SubsectionLabel("Ward Info");
@@ -90,8 +116,8 @@ public partial class ConfigWindow
         ImGui.EndDisabled();
         ImGui.EndDisabled();
 
-        // ── Loot ──────────────────────────────────────────────────────────────
-        SubsectionLabel("Loot");
+        // ── Fade ──────────────────────────────────────────────────────────────
+        SubsectionLabel("Fade");
 
         ConfigCheckbox(
             "Fade loot button##lootfade",
@@ -103,6 +129,23 @@ public partial class ConfigWindow
         ConfigSliderFloat("Fade amount##lootfadeamount", configuration.LootFadePercent * 100f, 0f, 95f,
             v => configuration.LootFadePercent = v / 100f, width: 200, format: "%.0f%%",
             hint: "(0% = no fade)");
+        ImGui.EndDisabled();
+
+        ImGui.Dummy(new Vector2(0, 4));
+        ImGui.BeginDisabled(!actionFadeHandler.IsAvailable);
+        ConfigCheckbox(
+            "Fade unavailable actions##actionfade",
+            configuration.ActionFadeEnabled,
+            v => configuration.ActionFadeEnabled = v,
+            actionFadeHandler.IsAvailable
+                ? "Fades hotbar actions the game marks as unusable right now, for example when you lack the resources for them."
+                : "Unavailable: the hotbar update could not be hooked on your current game version.");
+
+        ImGui.BeginDisabled(!configuration.ActionFadeEnabled);
+        ConfigSliderFloat("Fade amount##actionfadeamount", configuration.ActionFadePercent * 100f, 0f, 90f,
+            v => configuration.ActionFadePercent = v / 100f, width: 200, format: "%.0f%%",
+            hint: "(default 70%)");
+        ImGui.EndDisabled();
         ImGui.EndDisabled();
 
         // ── Hide MP bars ──────────────────────────────────────────────────────

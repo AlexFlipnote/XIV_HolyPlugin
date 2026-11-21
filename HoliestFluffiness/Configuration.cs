@@ -103,6 +103,11 @@ public class Configuration : IPluginConfiguration
     public bool   MediaDtrEnabled    { get; set; } = false;
     public string MediaDtrFormat     { get; set; } = DefaultMediaDtrFormat;
 
+    // Tags are listed in LocationInfo.Tags; empty and repeated tags drop out with their separator
+    public const string DefaultLocationDtrFormat = "<area>, <zone> <ward> <instance>";
+    public bool   LocationDtrEnabled { get; set; } = false;
+    public string LocationDtrFormat  { get; set; } = DefaultLocationDtrFormat;
+
     public bool NoKillEnabled { get; set; } = false;
     public bool NoKillDisablePopup { get; set; } = false;
 
@@ -120,6 +125,8 @@ public class Configuration : IPluginConfiguration
     public bool  LootFadeEnabled { get; set; } = false;
     public float LootFadePercent { get; set; } = 0.5f;
 
+    public bool  ActionFadeEnabled   { get; set; } = false;
+    public float ActionFadePercent   { get; set; } = 0.7f;
     public bool HideMpBarsPartyList   { get; set; } = false;
     public bool HideMpBarsParamWidget { get; set; } = false;
 

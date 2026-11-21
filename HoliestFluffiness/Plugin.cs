@@ -118,6 +118,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly RenderingHandler        renderingHandler;
     private readonly DrawSheatheHandler       drawSheatheHandler;
     private readonly LootFadeHandler          lootFadeHandler;
+    private readonly ActionFadeHandler        actionFadeHandler;
     private readonly BlacklistMenuHandler     blacklistMenuHandler;
     private readonly HideMpBarsHandler        hideMpBarsHandler;
     private readonly DutyTimerHandler dutyTimerHandler;
@@ -130,6 +131,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly MediaWindow mediaWindow;
     private readonly MediaExpBarHandler mediaExpBarHandler;
     private readonly MediaDtrHandler mediaDtrHandler;
+    private readonly LocationDtrHandler locationDtrHandler;
     private readonly IFontHandle titleFont;
     private IReadOnlyTitleScreenMenuEntry? titleMenuEntry;
     private ISharedImmediateTexture? titleMenuIcon;
@@ -238,6 +240,7 @@ public sealed class Plugin : IDalamudPlugin
         renderingHandler        = new RenderingHandler(configuration, Framework, Condition, GameInterop, PluginInterface, Log);
         drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
+        actionFadeHandler       = new ActionFadeHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         blacklistMenuHandler    = new BlacklistMenuHandler(configuration, ContextMenu, ObjectTable, TargetManager);
         hideMpBarsHandler       = new HideMpBarsHandler(configuration, AddonLifecycle, ClientState, ObjectTable, DataManager);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);
@@ -252,6 +255,7 @@ public sealed class Plugin : IDalamudPlugin
         mediaExpBarHandler.SetClickAction(() => CommandManager.ProcessCommand(MediaCommand));
         mediaDtrHandler        = new MediaDtrHandler(configuration, mediaHandler, DtrBar, Framework, ClientState);
         mediaDtrHandler.SetClickAction(() => CommandManager.ProcessCommand(MediaCommand));
+        locationDtrHandler     = new LocationDtrHandler(configuration, DtrBar, Framework, ClientState, DataManager);
         titleFont              = PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamily.Axis, 32f));
         doorbellHandler.OnEntered     += OnDoorbellEntered;
         doorbellHandler.OnLeft        += OnDoorbellLeft;
@@ -283,8 +287,10 @@ public sealed class Plugin : IDalamudPlugin
         configWindow.SetClientTweaksHandler(clientTweaksHandler);
         configWindow.SetRenderingHandler(renderingHandler);
         configWindow.SetHideMpBarsHandler(hideMpBarsHandler);
+        configWindow.SetActionFadeHandler(actionFadeHandler);
         configWindow.SetRaiseCleanseOverlay(raiseCleanseOverlay);
         configWindow.SetMediaHandler(mediaHandler);
+        configWindow.SetLocationDtrHandler(locationDtrHandler);
 
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(loginInfoWindow);
@@ -1178,6 +1184,7 @@ public sealed class Plugin : IDalamudPlugin
         renderingHandler.Dispose();
         drawSheatheHandler.Dispose();
         lootFadeHandler.Dispose();
+        actionFadeHandler.Dispose();
         blacklistMenuHandler.Dispose();
         hideMpBarsHandler.Dispose();
         dutyTimerHandler.Dispose();
@@ -1188,6 +1195,7 @@ public sealed class Plugin : IDalamudPlugin
         foodCheckHandler.Dispose();
         foodCheckOverlay.Dispose();
         mediaDtrHandler.Dispose();
+        locationDtrHandler.Dispose();
         mediaWindow.Dispose();
         mediaExpBarHandler.Dispose();
         mediaHandler.Dispose();
