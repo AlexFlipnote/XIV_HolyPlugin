@@ -1,15 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Arrays.Common;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using static FFXIVClientStructs.FFXIV.Client.UI.Misc.RaptureHotbarModule.HotbarUIIntermediate;
+using LuminaAction = Lumina.Excel.Sheets.Action;
 
 namespace HoliestFluffiness.Handlers;
 
-// Fades hotbar actions you can't use right now.
+// Fades hotbar actions that are above your level, which mostly shows up when synced down.
 // Idea from VanillaPlus (MidoriKami); runs inside the game's own per-slot hotbar update.
 public sealed unsafe class ActionFadeHandler : IDisposable
 {
@@ -23,18 +26,23 @@ public sealed unsafe class ActionFadeHandler : IDisposable
     private readonly Configuration config;
     private readonly IFramework    framework;
     private readonly IObjectTable  objectTable;
+    private readonly IDataManager  data;
     private readonly IPluginLog    log;
     private readonly Hook<AddonActionBarBase.Delegates.UpdateHotbarSlot>? hook;
 
     // Last state we painted with, so turning a setting off puts every slot back once
     private bool wasActive;
 
+    // Action id to the level it unlocks at, 0 for actions that never fade (role actions, unknown rows)
+    private readonly Dictionary<uint, byte> actionLevels = [];
+
     public ActionFadeHandler(Configuration config, IGameInteropProvider gameInterop, IFramework framework,
-        IObjectTable objectTable, IPluginLog log)
+        IObjectTable objectTable, IDataManager data, IPluginLog log)
     {
         this.config      = config;
         this.framework   = framework;
         this.objectTable = objectTable;
+        this.data        = data;
         this.log         = log;
 
         try
@@ -81,14 +89,27 @@ public sealed unsafe class ActionFadeHandler : IDisposable
         }
         wasActive = true;
 
-        // Every action greys out for the length of a cast; fading them all for it would just flicker
-        if (objectTable.LocalPlayer is { IsCasting: true }) return;
         if (slot == null || numbers == null) return;
 
-        var data = (ActionBarSlotNumberArray*)&numbers->IntArray[numberIndex];
-        var fade = data->Type is SlotType.Action or SlotType.CraftAction && !(data->Executable && data->Executable2);
+        // Level is the synced level while synced, so this only catches actions the sync took away;
+        // cooldowns, resources and range are left to the game's own greying
+        var entry = (ActionBarSlotNumberArray*)&numbers->IntArray[numberIndex];
+        var level = objectTable.LocalPlayer?.Level ?? 0;
+        var fade  = entry->Type == SlotType.Action && level > 0 && ActionLevel(entry->ActionId) > level;
 
         Apply(slot, fade);
+    }
+
+    private byte ActionLevel(uint actionId)
+    {
+        // The slot may hold the base action of a combo or upgrade; the level that matters is the one in use
+        var id = ActionManager.Instance()->GetAdjustedActionId(actionId);
+        if (actionLevels.TryGetValue(id, out var level)) return level;
+
+        // Role actions are left alone, the same way VanillaPlus handles them
+        level = data.GetExcelSheet<LuminaAction>().TryGetRow(id, out var row) && !row.IsRoleAction ? row.ClassJobLevel : (byte)0;
+        actionLevels[id] = level;
+        return level;
     }
 
     private void Apply(ActionBarSlot* slot, bool fade)

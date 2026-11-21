@@ -240,7 +240,7 @@ public sealed class Plugin : IDalamudPlugin
         renderingHandler        = new RenderingHandler(configuration, Framework, Condition, GameInterop, PluginInterface, Log);
         drawSheatheHandler      = new DrawSheatheHandler(configuration, GameInterop, Framework, ObjectTable, Log);
         lootFadeHandler         = new LootFadeHandler(configuration, AddonLifecycle);
-        actionFadeHandler       = new ActionFadeHandler(configuration, GameInterop, Framework, ObjectTable, Log);
+        actionFadeHandler       = new ActionFadeHandler(configuration, GameInterop, Framework, ObjectTable, DataManager, Log);
         blacklistMenuHandler    = new BlacklistMenuHandler(configuration, ContextMenu, ObjectTable, TargetManager);
         hideMpBarsHandler       = new HideMpBarsHandler(configuration, AddonLifecycle, ClientState, ObjectTable, DataManager);
         dutyTimerHandler       = new DutyTimerHandler(configuration, AddonLifecycle, DataManager);

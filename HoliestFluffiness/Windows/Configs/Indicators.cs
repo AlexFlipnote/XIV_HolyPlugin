@@ -143,11 +143,11 @@ public partial class ConfigWindow
         ImGui.Dummy(new Vector2(0, 4));
         ImGui.BeginDisabled(!actionFadeHandler.IsAvailable);
         ConfigCheckbox(
-            "Fade unavailable actions##actionfade",
+            "Fade synced down actions##actionfade",
             configuration.ActionFadeEnabled,
             v => configuration.ActionFadeEnabled = v,
             actionFadeHandler.IsAvailable
-                ? "Fades hotbar actions the game marks as unusable right now, for example when you lack the resources for them."
+                ? "Fades hotbar actions above your current level, like when synced down in a duty. Cooldowns and resources are left alone."
                 : "Unavailable: the hotbar update could not be hooked on your current game version.");
 
         ImGui.BeginDisabled(!configuration.ActionFadeEnabled);
