@@ -56,13 +56,13 @@ public partial class ConfigWindow
         static SearchIndex()
         {
             Seed(ConfigSection.Client, "Settings that change client/application behaviour.",
-                "window title taskbar flash physics fps anti-afk mouse media music spotify song");
+                "window title taskbar flash physics fps limit cap frame rate unfocused background ping server bar anti-afk mouse media music spotify song");
             Seed(ConfigSection.Login, "Settings for what happens when you log in with a character.",
                 "welcome message fashion accessory glamour idle movie congestion queue no-kill lobby error");
             Seed(ConfigSection.Indicators, "Settings for in-game indicators and HUD additions.",
-                "loot mp bar server info song media repair food check ready check combat hits");
+                "loot mp bar repair food check ready check combat hits");
             Seed(ConfigSection.Social, "Nearby players, targeting tracker, house doorbell, commendation sounds, and nameplate tweaks.",
-                "nameplate doorbell commendation targeting");
+                "nameplate doorbell commendation targeting server bar");
             Seed(ConfigSection.Database, "Tracks info for your own characters only, across every world and data center you play on. " +
                 "Everything is stored in a local SQLite database on your machine, nothing is ever sent anywhere.",
                 "sqlite storage backup export");

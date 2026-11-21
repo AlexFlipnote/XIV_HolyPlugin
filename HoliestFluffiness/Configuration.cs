@@ -53,6 +53,11 @@ public class Configuration : IPluginConfiguration
     public bool ServerInfoPingEnabled { get; set; } = false;
     public PingDisplay ServerInfoPingDisplay { get; set; } = PingDisplay.Last;
     public bool ServerInfoFpsEnabled { get; set; } = false;
+    public bool ServerInfoFpsLive    { get; set; } = false;
+    public bool FpsLimitEnabled      { get; set; } = false;
+    public int  FpsLimitTarget       { get; set; } = 60;
+    public bool FpsLimitBackgroundEnabled { get; set; } = false;
+    public int  FpsLimitBackgroundTarget  { get; set; } = 15;
 
     public bool RepairLowEnabled { get; set; } = false;
     public float RepairLowThreshold { get; set; } = 50f;

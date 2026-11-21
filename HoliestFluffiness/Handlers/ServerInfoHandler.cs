@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using GameFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework;
 
@@ -54,6 +57,17 @@ public sealed class ServerInfoHandler : IDisposable
     public float[] FpsChartData { get; private set; } = [];
 
     private int lastFps;
+    private bool lastFpsGreen;
+    private FpsLimiterHandler? fpsLimiter;
+
+    // Live mode: our own frame count over a short window, so the entry reacts faster than the
+    // game's once a second FrameRate. The chart keeps sampling the game's value either way.
+    private static readonly long FpsLiveWindowTicks = Stopwatch.Frequency / 4; // 250ms
+    private long fpsLiveWindowStart;
+    // Game text, not ImGui, so a fixed colour rather than Theme (same #50C850 as the custom theme green)
+    private static readonly Vector4 FpsLimitGreen = new(80 / 255f, 200 / 255f, 80 / 255f, 1f);
+    private int  fpsLiveFrames;
+    private int  fpsLiveValue;
     private uint lastDcId;
     private int lastNearbyCount = -1;
 
@@ -88,6 +102,8 @@ public sealed class ServerInfoHandler : IDisposable
     }
 
     public void SetNearbyHandler(NearbyHandler handler) => nearbyHandler = handler;
+
+    public void SetFpsLimiter(FpsLimiterHandler limiter) => fpsLimiter = limiter;
 
     public void SetNearbyClickAction(Action action) => dtrNearby.OnClick = _ => action();
 
@@ -155,22 +171,59 @@ public sealed class ServerInfoHandler : IDisposable
         if (dtrFps.Shown != shown) dtrFps.Shown = shown;
         if (!shown) return;
 
-        var fps = (int)(GameFramework.Instance()->FrameRate + 0.5f);
+        var gameFw  = GameFramework.Instance();
+        var gameFps = (int)(gameFw->FrameRate + 0.5f);
 
         // Sample the FPS chart history on a fixed interval, independent of the DTR text update below.
         var now = Environment.TickCount64;
         if (now - lastFpsSampleTick >= FpsSampleIntervalMs)
         {
             lastFpsSampleTick = now;
-            fpsHistory.Enqueue(fps);
+            fpsHistory.Enqueue(gameFps);
             if (fpsHistory.Count > FpsHistorySize) fpsHistory.Dequeue();
             FpsChartData = [.. fpsHistory];
         }
 
-        if (fps == lastFps) return;
-        lastFps        = fps;
-        dtrFps.Text    = $"{fps} fps";
-        dtrFps.Tooltip = $"{fps} fps";
+        // Alt-tabbed: nobody is watching the number, so fall back to the game's own value
+        var fps = gameFps;
+        if (config.ServerInfoFpsLive && !gameFw->WindowInactive)
+            fps = SampleLiveFps(gameFps);
+        else
+            fpsLiveWindowStart = 0;
+
+        var green = fpsLimiter?.IsLimiting == true;
+        if (fps == lastFps && green == lastFpsGreen) return;
+        lastFps      = fps;
+        lastFpsGreen = green;
+
+        var text = $"{fps} fps";
+        dtrFps.Text = green
+            ? new Lumina.Text.SeStringBuilder().PushColorRgba(FpsLimitGreen).Append(text).PopColor()
+                .ToReadOnlySeString().ToDalamudString()
+            : text;
+        dtrFps.Tooltip = green ? $"{text} (limited to {config.FpsLimitTarget})" : text;
+    }
+
+    private int SampleLiveFps(int fallback)
+    {
+        var now = Stopwatch.GetTimestamp();
+        if (fpsLiveWindowStart == 0)
+        {
+            fpsLiveWindowStart = now;
+            fpsLiveFrames      = 0;
+            fpsLiveValue       = fallback;
+            return fpsLiveValue;
+        }
+
+        fpsLiveFrames++;
+        var elapsed = now - fpsLiveWindowStart;
+        if (elapsed >= FpsLiveWindowTicks)
+        {
+            fpsLiveValue       = (int)(fpsLiveFrames * (double)Stopwatch.Frequency / elapsed + 0.5);
+            fpsLiveWindowStart = now;
+            fpsLiveFrames      = 0;
+        }
+        return fpsLiveValue;
     }
 
     private void UpdatePingEntry()

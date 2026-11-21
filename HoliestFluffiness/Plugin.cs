@@ -87,6 +87,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly CharaSelectHandler charaSelectHandler;
     private readonly HousingLotteryHandler housingLotteryHandler;
     private readonly ServerInfoHandler serverInfoHandler;
+    private readonly FpsLimiterHandler fpsLimiterHandler;
     private readonly RepairHandler repairHandler;
     private readonly WardInfoHandler wardInfoHandler;
     private readonly WardInfoWindow wardInfoWindow;
@@ -213,6 +214,8 @@ public sealed class Plugin : IDalamudPlugin
         charaSelectHandler     = new CharaSelectHandler(configuration, characterDb, AddonLifecycle, DataManager, Framework, Log, noKillHandler, SwitchToCharacter);
         housingLotteryHandler  = new HousingLotteryHandler(characterDb, AddonLifecycle, AddonEventManager, ObjectTable, ChatGui, Log);
         serverInfoHandler      = new ServerInfoHandler(configuration, DtrBar, Framework, ClientState, ObjectTable, Log);
+        fpsLimiterHandler      = new FpsLimiterHandler(configuration, Framework);
+        serverInfoHandler.SetFpsLimiter(fpsLimiterHandler);
         repairHandler          = new RepairHandler(configuration, SigScanner, GameInterop, AddonLifecycle, ClientState, Log);
         wardInfoHandler        = new WardInfoHandler(configuration, SigScanner, GameInterop, GameGui, Framework, Log, ObjectTable, TargetManager, Condition, ClientState);
         pointWalker            = new PointWalker(ObjectTable, GameConfig, SigScanner, GameInterop, Log);
@@ -1123,6 +1126,7 @@ public sealed class Plugin : IDalamudPlugin
         charaSelectHandler.Dispose();
         housingLotteryHandler.Dispose();
         serverInfoHandler.Dispose();
+        fpsLimiterHandler.Dispose();
         repairHandler.Dispose();
         wardInfoHandler.Dispose();
         apartmentSweepHandler.Dispose();

@@ -21,6 +21,20 @@ public partial class ConfigWindow
         BeginSection("Client", "Settings that change client/application behaviour.");
 
         ConfigCheckbox(
+            "Show ping in server bar##serverinfoping",
+            configuration.ServerInfoPingEnabled,
+            v => configuration.ServerInfoPingEnabled = v,
+            "Click the entry in-game to open the ping history chart.",
+            trailing: () =>
+            {
+                ImGui.BeginDisabled(!configuration.ServerInfoPingEnabled);
+                ConfigCombo("##serverinfopingdisplay", (int)configuration.ServerInfoPingDisplay, PingDisplayModes,
+                    v => configuration.ServerInfoPingDisplay = (PingDisplay)v, width: 150, padding: false,
+                    title: "Ping display mode");
+                ImGui.EndDisabled();
+            });
+
+        ConfigCheckbox(
             "Always yes##alwaysyes",
             configuration.AlwaysYesEnabled,
             v => configuration.AlwaysYesEnabled = v,
@@ -169,18 +183,79 @@ public partial class ConfigWindow
         ImGui.SameLine(column);
         Common.DimmedText("Bottom left, the game's own line");
         ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "Show current song in server bar##mediadtr",
+            configuration.MediaDtrEnabled,
+            v => configuration.MediaDtrEnabled = v,
+            "Click the entry in-game to open the media player.");
+
+        ImGui.BeginDisabled(!configuration.MediaDtrEnabled);
+        ConfigInputText("Song text##mediadtrformat", configuration.MediaDtrFormat,
+            v => configuration.MediaDtrFormat = v, width: 240,
+            hint: $"(empty = {Configuration.DefaultMediaDtrFormat})",
+            desc: "Format of the song entry, using <song>, <artist>, <app> and <time>.");
+        RowGap(0);
+
+        var tagsHelper = "Tags: <song> | <artist> | <app> | <time>";
+        if (mediaHandler?.Current is { Title.Length: > 0 } song)
+            Common.DimmedText($"{tagsHelper}\nPreview: {MediaDtrHandler.Format(configuration.MediaDtrFormat, song)}");
+        else
+            Common.DimmedText(tagsHelper);
+        ImGui.EndDisabled();
         ImGui.EndDisabled();
 
-        SubsectionLabel("High FPS physics fix");
+        SubsectionLabel("FPS");
+
         ConfigCheckbox(
-            "Enable physics fix##physicsenable",
+            "Show FPS in server bar##serverinfofps",
+            configuration.ServerInfoFpsEnabled,
+            v => configuration.ServerInfoFpsEnabled = v,
+            "Click the entry in-game to open the FPS history chart. Turns green while the FPS limit below is holding.");
+
+        ImGui.BeginDisabled(!configuration.ServerInfoFpsEnabled);
+        ConfigCheckbox(
+            "Live FPS##serverinfofpslive",
+            configuration.ServerInfoFpsLive,
+            v => configuration.ServerInfoFpsLive = v,
+            "Updates the number four times a second instead of once. The chart keeps its normal pace. Returns to normal while alt-tabbed.");
+        ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "Limit FPS##fpslimit",
+            configuration.FpsLimitEnabled,
+            v => configuration.FpsLimitEnabled = v,
+            "Caps the frame rate to any value, not just the game's 30 or 60. Set the game's own limit to none for this to work.");
+
+        ImGui.BeginDisabled(!configuration.FpsLimitEnabled);
+        ConfigSliderInt("Target FPS##fpslimittarget", configuration.FpsLimitTarget, FpsLimiterHandler.MinFps, FpsLimiterHandler.MaxFps,
+            v => configuration.FpsLimitTarget = Math.Clamp(v, FpsLimiterHandler.MinFps, FpsLimiterHandler.MaxFps),
+            hint: "(default 60)");
+        ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "Limit FPS when unfocused##fpslimitbg",
+            configuration.FpsLimitBackgroundEnabled,
+            v => configuration.FpsLimitBackgroundEnabled = v,
+            "Caps the frame rate while the game is alt-tabbed. Turn off the game's own background limit for this to take effect.");
+
+        ImGui.BeginDisabled(!configuration.FpsLimitBackgroundEnabled);
+        ConfigSliderInt("Unfocused FPS##fpslimitbgtarget", configuration.FpsLimitBackgroundTarget, FpsLimiterHandler.MinBackgroundFps, FpsLimiterHandler.MaxBackgroundFps,
+            v => configuration.FpsLimitBackgroundTarget = Math.Clamp(v, FpsLimiterHandler.MinBackgroundFps, FpsLimiterHandler.MaxBackgroundFps),
+            hint: "(default 15)");
+        ImGui.EndDisabled();
+
+        ConfigCheckbox(
+            "High FPS physics fix##physicsenable",
             physicsHandler.IsEnabled,
             v => { if (v) physicsHandler.Enable(); else physicsHandler.Disable(); },
             "Limits physics updates to a target FPS so hair/cloth physics behave correctly at high frame rates.");
 
+        ImGui.BeginDisabled(!physicsHandler.IsEnabled);
         ConfigSliderInt("Physics FPS##physicsfps", (int)configuration.PhysicsTargetFps, 1, 120,
             v => { configuration.PhysicsTargetFps = Math.Clamp(v, 1, 240); physicsHandler.Recalculate(); },
             hint: "(default 60)");
+        ImGui.EndDisabled();
 
         SubsectionLabel("Anti-AFK");
         ConfigCheckbox(
@@ -205,6 +280,8 @@ public partial class ConfigWindow
 
         EndSection(10);
     }
+
+    private static readonly string[] PingDisplayModes = ["Last ping", "Average ping", "Both"];
 
     private static readonly string[] DisableRenderModes = ["When unfocused", "Always"];
 

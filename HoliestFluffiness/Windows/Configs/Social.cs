@@ -32,6 +32,12 @@ public partial class ConfigWindow
             "A window listing every player around you. Open or close it with the /nearby command.");
 
         ConfigCheckbox(
+            "Show nearby player count in server bar##nearbydtr",
+            configuration.NearbyDtrEnabled,
+            v => configuration.NearbyDtrEnabled = v,
+            "Click the entry in-game to open the nearby players window.");
+
+        ConfigCheckbox(
             "Hide while in combat##nearbyhidecombat",
             configuration.NearbyHideInCombat,
             v => configuration.NearbyHideInCombat = v,
