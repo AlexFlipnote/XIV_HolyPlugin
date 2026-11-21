@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.32",
+        "AssemblyVersion": "0.12.33",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.32/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.32/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.32/latest.zip",
-        "Changelog": "The ping chart now always shows the timeout count next to the server address, written out as \"TimeOut\" instead of \"TO\". It turns red once there is at least one, with the T and O highlighted to show what the server bar's \"TO\" stands for. The server address is gold to match the average line.\n\nBoth the ping and FPS charts now keep the main numbers on the left and push the extra info (timeouts, min and max) to the right edge of the window.",
-        "DownloadCount": 505,
-        "LastUpdate": 1795272369
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.33/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.33/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.33/latest.zip",
+        "Changelog": "New /hdebug command (also /hf hdebug): an htop-style monitor for figuring out what is eating your frames, CPU and memory.\n\nThe top shows CPU, memory, GPU and VRAM bars, plugin cost per frame with average FPS and 1% / 0.1% lows, and disk and network activity. When the CPU, GPU or VRAM is the bottleneck, that bar gets tagged, and hovering it explains why.\n\nTabs:\n- Plugins: draw and update time per plugin, share of the frame, worst spike, hooks, texture memory and a texture trend line to spot leaks. Holiest Fluffiness itself is shown in gold, since part of its draw time is this window.\n- Spikes: catches stutter frames and shows which plugin (or the game itself) caused each one.\n- Threads: CPU per game thread and where it started from.\n- Injected: overlays and other DLLs inside the game, like ReShade, Discord, Steam, RTSS and OBS.\n- I/O: disk read/write and the game's network connections.\n- Memory: process and .NET memory, garbage collection and history charts.\n\n\"Copy report\" puts a summary on your clipboard, ready to paste into Discord when asking for help. Everything is read locally and only while the window is open.",
+        "DownloadCount": 508,
+        "LastUpdate": 1795275086
     }
 ]
