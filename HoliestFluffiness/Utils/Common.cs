@@ -447,6 +447,9 @@ internal static class Common
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
             if (!ImGui.Begin("##hf_toasts", Flags)) { ImGui.PopStyleVar(); ImGui.End(); return; }
             ImGui.PopStyleVar();
+            // Always on top: clicking any other window (ours or another plugin's) would otherwise raise it over
+            // the toasts. Re-raising every frame keeps them visible without ever taking focus.
+            ImGuiP.BringWindowToDisplayFront(ImGuiP.GetCurrentWindow());
 
             float curY = (vp.WorkSize.Y - totalH) * 0.5f;
             for (int i = 0; i < _toasts.Count; i++)

@@ -650,6 +650,17 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
         var usedUrls = new HashSet<string>(all.Where(s => s.IsThirdParty).Select(s => NormUrl(s.Url)));
         var unused   = handler.Repos?.Where(r => !usedUrls.Contains(NormUrl(r.Url))).ToList();
 
+        repoListings.Clear();
+        officialListing = null;
+        if (handler.Listings is { } lists)
+            foreach (var l in lists)
+            {
+                if (!l.IsThirdParty) officialListing ??= l;
+                else repoListings.TryAdd(NormUrl(l.Url), l);
+            }
+        installedNames.Clear();
+        foreach (var s in all) installedNames.Add(s.InternalName);
+
         repoPos.Clear();
         if (handler.Repos is { } repoList)
             for (var i = 0; i < repoList.Count; i++)
@@ -794,8 +805,8 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             if (showRepo && ImGui.TableSetColumnIndex(SCRepo))
             {
                 Common.DimmedText(RepoText(s));
-                // The column can still be narrower than a long url; the tooltip always has all of it
-                if (ImGui.IsItemHovered() && s.IsThirdParty) ImGui.SetTooltip(s.Url);
+                // The column can be narrower than a long url; the tooltip has all of it plus what the repo offers
+                if (ImGui.IsItemHovered() && !s.IsDev) RepoTooltip(s.IsThirdParty ? s.Url : null);
             }
         }
         ImGui.EndTable();
@@ -868,7 +879,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             foreach (var url in covered)
             {
                 Common.DimmedText($"  {RepoLine(url)}");
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip(url);
+                if (ImGui.IsItemHovered()) RepoTooltip(url);
             }
             ImGui.Spacing();
         }
@@ -934,7 +945,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
 
             ImGui.TableSetColumnIndex(3);
             Common.DimmedText(r.IsThirdParty ? RepoLine(r.Url) : "official");
-            if (ImGui.IsItemHovered() && r.IsThirdParty) ImGui.SetTooltip(r.Url);
+            if (ImGui.IsItemHovered()) RepoTooltip(r.IsThirdParty ? r.Url : null);
         }
         ImGui.EndTable();
         ImGui.Spacing();
@@ -981,7 +992,7 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
             Common.DimmedText(RepoLine(url));
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(url);
+            if (ImGui.IsItemHovered()) RepoTooltip(url);
             ImGui.TableSetColumnIndex(1);
             if (enabled) ImGui.TextUnformatted("Enabled"); else Common.DimmedText("Disabled");
         }
@@ -1017,6 +1028,49 @@ public sealed class ProcessMonitorWindow : Window, IDisposable
     // Position of each custom repo in Dalamud's settings list (1-based, same numbers as the settings page),
     // keyed by normalised url. Rebuilt every frame the Sources tab draws.
     private readonly Dictionary<string, int> repoPos = new();
+
+    // Repo listings by normalised url, the official repo and installed InternalNames, for the repo tooltips.
+    // Rebuilt every frame the Sources tab draws.
+    private readonly Dictionary<string, RepoListing> repoListings = new();
+    private RepoListing? officialListing;
+    private readonly HashSet<string> installedNames = [];
+    private const int RepoTooltipMax = 40;
+
+    // Url, then a bullet list of what the repo offers: installed plugins bright, the rest dimmed.
+    // `url` null means the official repo.
+    private void RepoTooltip(string? url)
+    {
+        var listing = url == null ? officialListing : repoListings.GetValueOrDefault(NormUrl(url));
+
+        ImGui.BeginTooltip();
+        Common.GoldText(url == null ? "Official repo" : RepoLine(url));
+        if (listing == null)
+        {
+            Common.DimmedText(handler.Listings == null
+                ? "Repo contents are unavailable on this Dalamud version."
+                : "Dalamud has not loaded this repo's plugin list (it may be disabled or failed to load).");
+        }
+        else if (listing.Plugins.Count == 0)
+        {
+            Common.DimmedText("This repo offers no plugins.");
+        }
+        else
+        {
+            var plugins = listing.Plugins.DistinctBy(p => p.InternalName)
+                                 .OrderByDescending(p => installedNames.Contains(p.InternalName))
+                                 .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            var have = plugins.Count(p => installedNames.Contains(p.InternalName));
+            Common.DimmedText($"{plugins.Count} plugin{(plugins.Count == 1 ? "" : "s")}, {have} installed");
+            foreach (var p in plugins.Take(RepoTooltipMax))
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, installedNames.Contains(p.InternalName) ? Theme.ColWhite : Theme.ColWhiteDim);
+                ImGui.BulletText(p.Name);
+                ImGui.PopStyleColor();
+            }
+            if (plugins.Count > RepoTooltipMax) Common.DimmedText($"...and {plugins.Count - RepoTooltipMax} more");
+        }
+        ImGui.EndTooltip();
+    }
 
     private int RepoPos(string? url) => url != null && repoPos.TryGetValue(NormUrl(url), out var p) ? p : int.MaxValue;
 
