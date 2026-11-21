@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.33",
+        "AssemblyVersion": "0.12.34",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.33/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.33/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.33/latest.zip",
-        "Changelog": "New /hdebug command (also /hf hdebug): an htop-style monitor for figuring out what is eating your frames, CPU and memory.\n\nThe top shows CPU, memory, GPU and VRAM bars, plugin cost per frame with average FPS and 1% / 0.1% lows, and disk and network activity. When the CPU, GPU or VRAM is the bottleneck, that bar gets tagged, and hovering it explains why.\n\nTabs:\n- Plugins: draw and update time per plugin, share of the frame, worst spike, hooks, texture memory and a texture trend line to spot leaks. Holiest Fluffiness itself is shown in gold, since part of its draw time is this window.\n- Spikes: catches stutter frames and shows which plugin (or the game itself) caused each one.\n- Threads: CPU per game thread and where it started from.\n- Injected: overlays and other DLLs inside the game, like ReShade, Discord, Steam, RTSS and OBS.\n- I/O: disk read/write and the game's network connections.\n- Memory: process and .NET memory, garbage collection and history charts.\n\n\"Copy report\" puts a summary on your clipboard, ready to paste into Discord when asking for help. Everything is read locally and only while the window is open.",
-        "DownloadCount": 508,
-        "LastUpdate": 1795275086
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.34/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.34/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.34/latest.zip",
+        "Changelog": "The About page now has a Changelog section with the last 10 releases. The newest one starts open, the older ones are collapsed, and the version you have installed is highlighted in gold. The notes are bundled with the plugin, so nothing is downloaded to show them.\n\nFixed a hook error in /xllog (\"Hook verification failed\" for the battle log). The critical heal sounds use this hook to tell your own heals apart from others', and it now matches what the game expects exactly, so it no longer passes a cut-off value back to the game.",
+        "DownloadCount": 510,
+        "LastUpdate": 1795275846
     }
 ]
