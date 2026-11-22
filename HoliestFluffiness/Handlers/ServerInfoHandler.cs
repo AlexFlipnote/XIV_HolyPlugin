@@ -151,7 +151,7 @@ public sealed class ServerInfoHandler : IDisposable
     private void UpdateDcAddress()
     {
         var player = objectTable[0] as IPlayerCharacter;
-        var dcId   = player?.CurrentWorld.ValueNullable?.DataCenter.RowId;
+        var dcId   = player?.CurrentWorld.ValueNullable is { } cw ? DataCenters.IdFor(cw) : (uint?)null;
         if (dcId == null || dcId == lastDcId) return;
         lastDcId = (uint)dcId;
         dcFallbackAddress = dcId.Value switch

@@ -507,7 +507,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
 
             var name  = pc.Name.TextValue;
             var world = Common.WorldName(pc);
-            var dc    = pc.HomeWorld.ValueNullable?.DataCenter.ValueNullable?.Name.ExtractText() ?? "";
+            var dc    = pc.HomeWorld.ValueNullable is { } hw ? DataCenters.NameFor(hw) : "";
 
             if (name.Length == 0 || world == null) return;
 

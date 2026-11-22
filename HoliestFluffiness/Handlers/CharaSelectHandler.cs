@@ -66,7 +66,7 @@ public sealed class CharaSelectHandler : IDisposable
 
             var dc = "";
             if (worldSheet?.GetRowOrDefault(entry->HomeWorldId) is { } worldRow)
-                dc = worldRow.DataCenter.ValueNullable?.Name.ExtractText() ?? "";
+                dc = DataCenters.NameFor(worldRow);
 
             worldCounters.TryAdd(world, 0);
             int slot = ++worldCounters[world];

@@ -49,6 +49,18 @@ public sealed class CharacterDb : IDisposable
         AddColumnIfMissing("characters", "fc_points", "INTEGER");
         AddColumnIfMissing("characters", "fc_leader", "INTEGER");
         AddColumnIfMissing("notes", "hide_on_combat", "INTEGER");
+        FixDataCenters();
+    }
+
+    // Rows captured before DataCenters existed hold the stale World sheet DC; rewrite them from the table.
+    private void FixDataCenters()
+    {
+        foreach (var rec in db.Table<CharacterRecord>().ToList())
+        {
+            if (DataCenters.NameFor(rec.World) is not { } dc || dc == rec.DataCenter) continue;
+            rec.DataCenter = dc;
+            db.Update(rec);
+        }
     }
 
     private void AddColumnIfMissing(string table, string column, string type)
