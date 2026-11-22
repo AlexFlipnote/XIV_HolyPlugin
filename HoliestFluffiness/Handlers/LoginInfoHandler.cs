@@ -120,7 +120,7 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
         if (needPlate && !instant)
         {
             // A cached value shows immediately and is verified live in the background
-            string? cachedPlate = existing?.SearchInfo;
+            string? cachedPlate = string.IsNullOrEmpty(existing?.SearchInfo) ? null : existing.SearchInfo;
 
             if (cachedPlate != null)
             {
@@ -609,9 +609,13 @@ public class LoginInfoHandler(Configuration configuration, IChatGui chatGui, IFr
                 {
                     var detail = InfoProxyDetail.Instance();
                     if (detail == null) return;
-                    var span = detail->UpdateData.SearchComment;
-                    if (span.Length <= 0) return;
-                    bytes = span.ToArray();
+                    // Fixed-size buffer: Length is constant, and it is all zeroes until the server
+                    // sends the comment, so measure up to the null terminator instead.
+                    ReadOnlySpan<byte> span = detail->UpdateData.SearchComment;
+                    var len = span.IndexOf((byte)0);
+                    if (len < 0) len = span.Length;
+                    if (len == 0) return;
+                    bytes = span[..len].ToArray();
                 }
             });
 
