@@ -24,17 +24,17 @@
             "fluffiness",
             "cute"
         ],
-        "AssemblyVersion": "0.12.43",
+        "AssemblyVersion": "0.12.44",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/AlexFlipnote/XIV_HolyPlugin/master/HoliestFluffiness/Images/icon.png",
         "ImageUrls": [],
         "IsHide": false,
         "IsTestingExclusive": false,
-        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.43/latest.zip",
-        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.43/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.43/latest.zip",
-        "Changelog": "Fixed the wrong data center being saved for many characters. The game's own world list still uses the old layout, so worlds like Balmung, Alpha and Alexander showed up under Aether, Chaos and Elemental instead of Crystal, Light and Gaia. Characters already in the database are corrected automatically when the plugin loads. This also fixes the ping fallback on those data centers, which was pinging the wrong server.\n\nFixed search info sometimes being saved as empty right after logging in. The plugin now waits for the game to actually receive it instead of taking the first, still empty, read. Characters that were saved without it pick it up the next time you log in on them.",
-        "DownloadCount": 541,
-        "LastUpdate": 1795373323
+        "DownloadLinkInstall": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.44/latest.zip",
+        "DownloadLinkTesting": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.44/latest.zip",
+        "DownloadLinkUpdate": "https://github.com/AlexFlipnote/XIV_HolyPlugin/releases/download/0.12.44/latest.zip",
+        "Changelog": "The House bids page now shows the character and world in separate columns, the same way the Characters page does, so you can sort bids by world. Characters with a world slot show it the same way too, like World/2.",
+        "DownloadCount": 550,
+        "LastUpdate": 1795458908
     }
 ]
