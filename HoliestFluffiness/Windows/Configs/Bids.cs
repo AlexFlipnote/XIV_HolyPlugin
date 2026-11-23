@@ -34,19 +34,19 @@ public partial class ConfigWindow
                         bool isCurrent = currentKey != null && rec.Key == currentKey;
                         if (isCurrent)
                         {
-                            Common.GreenText($"{rec.Name} @ {rec.World}");
+                            Common.GreenText(rec.Name);
                         }
                         else if (lifestreamOn)
                         {
                             ImGui.PushStyleColor(ImGuiCol.Text, Theme.ColGold);
-                            if (ImGui.Selectable($"{rec.Name} @ {rec.World}##sel{bid.Id}", false, ImGuiSelectableFlags.None))
+                            if (ImGui.Selectable($"{rec.Name}##sel{bid.Id}", false, ImGuiSelectableFlags.None))
                                 onGoToBid(rec, bid);
                             ImGui.PopStyleColor();
                             if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Switch to {rec.Name} and teleport to {bid.District} W{bid.Ward} P{bid.Plot}");
                         }
                         else
                         {
-                            ImGui.TextUnformatted($"{rec.Name} @ {rec.World}");
+                            ImGui.TextUnformatted(rec.Name);
                         }
                     }
                     else
@@ -54,16 +54,23 @@ public partial class ConfigWindow
                         Common.DimmedText(bid.CharacterKey);
                     }
                 }),
-            new("Location", 2, ImGuiTableColumnFlags.WidthStretch, 0,
+            new("World", 2, ImGuiTableColumnFlags.WidthStretch, 0,
+                t => t.Char?.World ?? "",
+                t =>
+                {
+                    if (t.Char == null) return;
+                    ImGui.TextUnformatted(t.Char.Slot > 0 ? $"{t.Char.World}/{t.Char.Slot}" : t.Char.World);
+                }),
+            new("Location", 3, ImGuiTableColumnFlags.WidthStretch, 0,
                 t => t.Bid.District,
                 t => ImGui.TextUnformatted($"{t.Bid.District} W{t.Bid.Ward} P{t.Bid.Plot}")),
-            new("Bid#", 3, ImGuiTableColumnFlags.WidthFixed, 40f,
+            new("Bid#", 4, ImGuiTableColumnFlags.WidthFixed, 40f,
                 t => t.Bid.BidNumber,
                 t => ImGui.TextUnformatted(t.Bid.BidNumber.ToString())),
-            new("Type", 4, ImGuiTableColumnFlags.WidthFixed, 60f,
+            new("Type", 5, ImGuiTableColumnFlags.WidthFixed, 60f,
                 t => t.Bid.BidType,
                 t => ImGui.TextUnformatted(t.Bid.BidType == BidType.Private ? "Private" : "FC")),
-            new("Actions", 5,
+            new("Actions", 6,
                 ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, 26f,
                 null,
                 t =>
