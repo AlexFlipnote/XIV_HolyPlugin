@@ -46,6 +46,10 @@ public sealed class LotterySaleWindow : Window
     private string ownBidKey = string.Empty;
     private DateTime ownBidCheckedAt = DateTime.MinValue;
 
+    // Plot the auto-copy last fired for while the placard stayed open; cleared when it closes so
+    // opening the same placard again copies again (entry counts may have moved since).
+    private string? autoCopiedKey;
+
     public LotterySaleWindow(Configuration config, CharacterDb characterDb, IGameGui gameGui, IObjectTable objectTable)
         : base("Lottery##HFLotterySale", ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings)
     {
@@ -73,6 +77,25 @@ public sealed class LotterySaleWindow : Window
         }
 
         IsOpen = sale != null;
+        TryAutoCopy();
+    }
+
+    private void TryAutoCopy()
+    {
+        if (sale == null)
+        {
+            autoCopiedKey = null;
+            return;
+        }
+
+        if (!config.LotteryAutoCopy) return;
+
+        var key = $"{world}|{sale.District}|{sale.Ward}|{sale.Plot}";
+        if (key == autoCopiedKey) return;
+
+        autoCopiedKey = key;
+        ImGui.SetClipboardText(CopyText(sale));
+        Common.ShowToast("Lottery", "Sale auto-copied to clipboard.");
     }
 
     public override unsafe void PreDraw()

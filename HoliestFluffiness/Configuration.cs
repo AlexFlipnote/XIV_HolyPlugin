@@ -147,6 +147,10 @@ public class Configuration : IPluginConfiguration
 
     public bool WardInfoWindowEnabled { get; set; } = false;
 
+    // Copies the lottery sale one-liner to the clipboard as soon as a "For Sale" placard opens,
+    // saving the "Copy sale" click. Opt-in since it overwrites whatever was on the clipboard.
+    public bool LotteryAutoCopy { get; set; } = false;
+
     // Which districts "Sweep all districts" (the standalone Ward Info window's auto-sweep-all
     // automation) walks through - unticking one skips it entirely, all on by default.
     public bool WardInfoAutoSweepMist          { get; set; } = true;

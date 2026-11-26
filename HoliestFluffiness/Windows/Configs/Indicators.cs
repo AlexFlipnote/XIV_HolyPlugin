@@ -93,6 +93,12 @@ public partial class ConfigWindow
             "\"For Sale\" placards that are selling via lottery. Session-only: never written to disk.");
 
         ImGui.BeginDisabled(!configuration.WardInfoWindowEnabled);
+        ConfigCheckbox(
+            "Auto-copy lottery sales##lotteryautocopy",
+            configuration.LotteryAutoCopy,
+            v => configuration.LotteryAutoCopy = v,
+            "Copies the sale to your clipboard as soon as a lottery \"For Sale\" placard opens, same as " +
+            "pressing \"Copy sale\". Overwrites whatever was on the clipboard.");
         RowGap();
         Common.DimmedText("Auto districts to check:");
         DrawWardInfoAutoSweepCheckbox("Mist##wardinfoautosweepmist",
@@ -106,14 +112,13 @@ public partial class ConfigWindow
         DrawWardInfoAutoSweepCheckbox("Empyreum##wardinfoautosweepempyreum",
             configuration.WardInfoAutoSweepEmpyreum, v => configuration.WardInfoAutoSweepEmpyreum = v);
 
-        ImGui.Dummy(new Vector2(0, 4));
+        ImGui.Dummy(new Vector2(0, 2));
         ConfigCheckbox(
             "Play sound when an apartment is found##wardinfoapartmentsound",
             configuration.WardInfoApartmentSound,
             v => configuration.WardInfoApartmentSound = v,
             "Plays a sound when \"Find apartment\" reaches a building with a vacant room.");
 
-        ImGui.Dummy(new Vector2(0, 2));
         ImGui.BeginDisabled(!configuration.WardInfoApartmentSound);
         DrawSoundPicker(
             "wardinfoapartment", "Apartment found sound",
